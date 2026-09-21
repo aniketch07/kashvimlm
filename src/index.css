@@ -137,6 +137,17 @@ body {
   background-color: var(--bg-secondary);
 }
 
+.app-wrapper.dashboard-mode {
+  background-color: #ffffff;
+}
+
+.main-content.main-dashboard-canvas {
+  background-color: #f4f6f9;
+  padding: 0;
+  margin: 0;
+  display: block;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -208,9 +219,11 @@ img {
 }
 
 .navbar-logo-img {
-  height: 48px;
+  height: 46px;
   width: auto;
+  max-width: 210px;
   object-fit: contain;
+  display: block;
 }
 
 .navbar-logo-text {
@@ -578,9 +591,11 @@ img {
 }
 
 .footer-brand-badge-img {
-  width: 44px;
   height: 44px;
+  width: auto;
+  max-width: 210px;
   object-fit: contain;
+  display: block;
 }
 
 .footer-brand-name {
@@ -601,6 +616,120 @@ img {
   display: flex;
   align-items: center;
   gap: 0.625rem;
+}
+
+/* Corporate Entity Info */
+.corporate-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.corp-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.corp-info-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.corp-info-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+}
+
+.corp-info-val {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  font-family: monospace;
+}
+
+.corp-info-address {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.corp-info-link {
+  font-size: 0.88rem;
+  color: #cbd5e1;
+  transition: color 0.2s ease;
+  width: fit-content;
+}
+
+.corp-info-link:hover {
+  color: #00e5ff;
+}
+
+.corp-phone-highlight {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+/* Support Actions */
+.footer-support-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.footer-support-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 42px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f59e0b 0%, #ea580c 100%);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+  transition: all 0.2s ease;
+}
+
+.footer-support-cta:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.footer-trust-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-radius: 10px;
+}
+
+.trust-badge-title {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.trust-badge-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.footer-dev-tag {
+  font-size: 0.78rem;
+  color: #64748b;
 }
 
 .footer-social-btn {
@@ -1336,5 +1465,39 @@ img {
   .profile-info-value {
     text-align: left;
   }
+}
+
+/* ==========================================================================
+   DISTRIBUTOR DASHBOARD VIEW OVERRIDES (WHITE CANVAS & ZERO DARK BLEED)
+   ========================================================================== */
+body:has(.dashboard-mode),
+body:has(.kashvimlm-portal-root),
+html:has(.dashboard-mode),
+html:has(.kashvimlm-portal-root),
+#root:has(.dashboard-mode),
+#root:has(.kashvimlm-portal-root) {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color: #1e293b !important;
+}
+
+.app-wrapper.dashboard-mode {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  min-height: 100vh;
+}
+
+.app-wrapper.dashboard-mode > header.navbar,
+.app-wrapper.dashboard-mode > footer.footer,
+body:has(.kashvimlm-portal-root) header.navbar,
+body:has(.kashvimlm-portal-root) footer.footer {
+  display: none !important;
+}
+
+.main-content.main-dashboard-canvas {
+  background-color: #f4f6f9 !important;
+  background: #f4f6f9 !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 

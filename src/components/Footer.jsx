@@ -1,69 +1,63 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { Globe, MessageSquare, Camera, Play } from 'lucide-react';
+import { MapPin, Mail, Phone, ShieldCheck, ChevronRight } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 /**
- * Coastal & Oceanic styled Footer for KASHVIMLM
- * matching the provided screenshot design.
+ * High-Trust, Corporate Direct-Selling Footer for KASHVIMLM
+ * Matching the multi-column format from the reference snapshot:
+ * - Column 1: Corporate entity info (CIN, Registered Office, Email, Customer Helpline)
+ * - Column 2: Quick Links (Home, About, Products, Plan, Leadership, Documents)
+ * - Column 3: Code of Ethics & Policies (Disclaimer, Refund, Shipping, Grievances)
+ * - Column 4: Customer Support & Distributor Care
+ * - Bottom Bar: Copyright & Rights Reserved
  */
 function Footer() {
-  const [email, setEmail] = useState('');
-
-  const handleSubscribe = (e) => {
-    e.preventDefault();
-    if (email.trim()) {
-      alert('Thank you for subscribing!');
-      setEmail('');
-    }
-  };
-
   return (
     <footer className="footer">
       <div className="footer-container">
         <div className="footer-grid">
-          {/* Column 1: Brand & Tagline */}
+          {/* Column 1: Corporate Entity Info */}
           <div className="footer-col footer-brand-col">
-            <Link to="/" className="footer-brand-header" aria-label="kashvimlm Home">
-              <img src={logoImg} alt="KASHVIMLM" className="footer-brand-badge-img" />
-              <span className="footer-brand-name">kashvimlm</span>
+            <Link to="/" className="footer-brand-header" aria-label="KASHVIMLM Home">
+              <img src={logoImg} alt="KASHVI NETWORK PRIVATE LIMITED" className="footer-brand-badge-img" />
             </Link>
-            <p className="footer-brand-desc">
-              Crafting high-energy coastal apparel, surf essentials, and ocean-inspired lifestyle goods. Bringing breezy optimism and modern craftsmanship to your everyday tide.
-            </p>
-            <div className="footer-social-row">
-              <a
-                href="#"
-                className="footer-social-btn"
-                aria-label="Website"
-                onClick={(e) => e.preventDefault()}
-              >
-                <Globe size={15} />
-              </a>
-              <a
-                href="#"
-                className="footer-social-btn"
-                aria-label="Messages"
-                onClick={(e) => e.preventDefault()}
-              >
-                <MessageSquare size={15} />
-              </a>
-              <a
-                href="#"
-                className="footer-social-btn"
-                aria-label="Photos"
-                onClick={(e) => e.preventDefault()}
-              >
-                <Camera size={15} />
-              </a>
-              <a
-                href="#"
-                className="footer-social-btn"
-                aria-label="Videos"
-                onClick={(e) => e.preventDefault()}
-              >
-                <Play size={15} />
-              </a>
+            
+            <div className="corporate-info-list">
+              <div className="corp-info-item">
+                <span className="corp-info-label">CIN No</span>
+                <span className="corp-info-val">U52339HR2024PTC099841</span>
+              </div>
+
+              <div className="corp-info-item">
+                <div className="corp-info-icon-title">
+                  <MapPin size={15} className="text-cyan-accent" />
+                  <span className="corp-info-label">Registered Address</span>
+                </div>
+                <p className="corp-info-address">
+                  Plot No. 43, Shiv TP Nagar, Baldev Nagar, Ambala City, Haryana – 134007 [India]
+                </p>
+              </div>
+
+              <div className="corp-info-item">
+                <div className="corp-info-icon-title">
+                  <Mail size={15} className="text-cyan-accent" />
+                  <span className="corp-info-label">Email Support</span>
+                </div>
+                <a href="mailto:kashvicustomercare@gmail.com" className="corp-info-link">
+                  kashvicustomercare@gmail.com
+                </a>
+              </div>
+
+              <div className="corp-info-item">
+                <div className="corp-info-icon-title">
+                  <Phone size={15} className="text-cyan-accent" />
+                  <span className="corp-info-label">Customer Care Helpline</span>
+                </div>
+                <a href="tel:+917015643886" className="corp-info-link corp-phone-highlight">
+                  +91 70156 43886 / +91 1800-202-9900
+                </a>
+              </div>
             </div>
           </div>
 
@@ -71,63 +65,61 @@ function Footer() {
           <div className="footer-col">
             <h4 className="footer-heading">QUICK LINKS</h4>
             <ul className="footer-links">
-              <li><Link to="/shop" className="footer-link">New Arrivals</Link></li>
-              <li><Link to="/shop" className="footer-link">Best Sellers</Link></li>
-              <li><Link to="/categories" className="footer-link">Ocean Sustainable</Link></li>
-              <li><Link to="/about" className="footer-link">Our Story</Link></li>
-              <li><Link to="/shop" className="footer-link">Seasonal Lookbook</Link></li>
+              <li><Link to="/" className="footer-link">Home Page</Link></li>
+              <li><Link to="/contact" className="footer-link">Contact Us</Link></li>
+              <li><Link to="/profile" className="footer-link">Member Profile</Link></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Business Plan &amp; BV Margins</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Compliance Documents</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>List of Directors</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Grievance Redressal Officer</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>List of Direct Sellers</a></li>
             </ul>
           </div>
 
-          {/* Column 3: Customer Support */}
+          {/* Column 3: Code of Ethics & Policies */}
           <div className="footer-col">
-            <h4 className="footer-heading">CUSTOMER SUPPORT</h4>
+            <h4 className="footer-heading">CODE OF ETHICS &amp; POLICIES</h4>
             <ul className="footer-links">
-              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Help Center</a></li>
-              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Order Tracking</a></li>
-              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Returns &amp; Exchanges</a></li>
-              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Shipping &amp; Delivery</a></li>
-              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Contact Ocean Crew</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Disclaimer Clause</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Direct Selling Guidelines</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Payment &amp; Payout Policy</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Cancellation &amp; Refund Policy</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Shipping &amp; Delivery Policy</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Product Warranty &amp; Exchange</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Privacy Policy &amp; Security</a></li>
+              <li><a href="#" className="footer-link" onClick={(e) => e.preventDefault()}>Distributor Code of Conduct</a></li>
             </ul>
           </div>
 
-          {/* Column 4: Stay In The Current (Newsletter) */}
+          {/* Column 4: Customer Support & Assurance */}
           <div className="footer-col footer-newsletter-col">
-            <h4 className="footer-heading">STAY IN THE CURRENT</h4>
+            <h4 className="footer-heading">CUSTOMER SUPPORT</h4>
             <p className="footer-newsletter-desc">
-              Get 15% off your first voyage with updates on limited wave drops.
+              Need assistance with an order, product warranty, or your distributor BV account? We are here to support you Monday through Saturday, 9:30 AM – 6:30 PM.
             </p>
-            <form className="footer-newsletter-form" onSubmit={handleSubscribe}>
-              <input
-                type="email"
-                className="footer-newsletter-input"
-                placeholder="Your email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <button type="submit" className="footer-newsletter-btn">
-                Subscribe
-              </button>
-            </form>
+            <div className="footer-support-actions">
+              <Link to="/contact" className="footer-support-cta">
+                <span>Online Enquiry</span>
+                <ChevronRight size={16} />
+              </Link>
+              <div className="footer-trust-badge">
+                <ShieldCheck size={22} className="text-cyan-accent" />
+                <div>
+                  <span className="trust-badge-title">100% Verified Direct Selling</span>
+                  <span className="trust-badge-sub">Consumer Protection Compliant</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Bottom Legal Row */}
+        {/* Bottom Legal Copyright Row */}
         <div className="footer-bottom-row">
           <p className="footer-bottom-copy">
-            &copy; 2026 KASHVIMLM. All rights reserved. Designed for coastal living.
+            Copyright &copy; 2026 <strong>Kashvi Network Private Limited</strong>. All Rights Reserved.
           </p>
           <div className="footer-legal-links">
-            <a href="#" className="footer-legal-link" onClick={(e) => e.preventDefault()}>
-              Privacy Policy
-            </a>
-            <a href="#" className="footer-legal-link" onClick={(e) => e.preventDefault()}>
-              Terms of Service
-            </a>
-            <a href="#" className="footer-legal-link" onClick={(e) => e.preventDefault()}>
-              Cookie Preferences
-            </a>
+            <span className="footer-dev-tag">Developed for Kashvi MLM Platform</span>
           </div>
         </div>
       </div>

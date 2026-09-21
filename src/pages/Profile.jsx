@@ -1,214 +1,589 @@
-import React from 'react';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  ShieldCheck, 
-  Award, 
-  CheckCircle2, 
-  Settings, 
-  LogOut,
-  Sparkles
+import React, { useState, useEffect } from 'react';
+import {
+  User,
+  Lock,
+  Eye,
+  EyeOff,
+  Mail,
+  Phone,
+  ArrowRight,
+  Sparkles,
+  CheckCircle2,
+  Users,
+  Briefcase
 } from 'lucide-react';
 import PageContainer from '../components/PageContainer';
+import DistributorDashboard from '../components/dashboard/DistributorDashboard';
+import './Profile.css';
 
 /**
- * Logged-in Person Profile page for KASHVIMLM.
- * Displays user identity, membership tier, active session, and account details.
+ * Authentication & Profile Page for KASHVIMLM.
+ * When a visitor or member clicks "Profile":
+ * - Displays the Login page with username, password, and Sponsor ID.
+ * - Includes a Register option with full distributor enrollment fields.
+ * - Displays Member Profile Dashboard upon successful login.
  */
 function Profile() {
-  const user = {
-    name: 'Kashvi Sharma',
-    username: '@kashvi_sharma',
-    email: 'kashvi.sharma@kashvimlm.com',
-    phone: '+91 98765 43210',
-    location: 'Mumbai, Maharashtra, India',
-    memberId: 'KV-2026-9042',
-    memberSince: 'March 2024',
-    tier: 'Gold Tier Member',
-    status: 'Active (Logged In)',
+  // Check persisted auth session from localStorage
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kashvi_auth');
+      return saved ? JSON.parse(saved).isLoggedIn : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kashvi_auth');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.user) {
+          // If stored session had old name/ID, migrate to Rahul kaushal (owner)
+          if (parsed.user.name === 'Poonam mehta' || parsed.user.memberId === '18618331') {
+            parsed.user.name = 'Rahul kaushal';
+            parsed.user.memberId = '88767139';
+            parsed.user.sponsorId = '88767139';
+            parsed.user.username = '@rahul_kaushal';
+            parsed.user.email = 'rahul.kaushal@kashvimlm.com';
+            localStorage.setItem('kashvi_auth', JSON.stringify(parsed));
+          }
+          return parsed.user;
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Auth Card Mode: 'login' | 'register'
+  const [activeTab, setActiveTab] = useState('login');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
+  const [authSuccessMsg, setAuthSuccessMsg] = useState('');
+
+  // Login Form State
+  const [loginForm, setLoginForm] = useState({
+    username: '',
+    password: '',
+    sponsorId: '',
+    rememberMe: true,
+  });
+
+  // Register Form State
+  const [registerForm, setRegisterForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    username: '',
+    password: '',
+    confirmPassword: '',
+  });
+
+  // Sync auth state to localStorage
+  useEffect(() => {
+    if (isLoggedIn && currentUser) {
+      localStorage.setItem(
+        'kashvi_auth',
+        JSON.stringify({ isLoggedIn: true, user: currentUser })
+      );
+    } else {
+      localStorage.removeItem('kashvi_auth');
+    }
+  }, [isLoggedIn, currentUser]);
+
+  // Handle Login Submit
+  const handleLoginSubmit = (e) => {
+    e.preventDefault();
+    if (!loginForm.username.trim() || !loginForm.password.trim()) {
+      alert('Please enter both your Username and Password.');
+      return;
+    }
+
+    // Sponsor ID is compulsory
+    if (!loginForm.sponsorId.trim()) {
+      alert('Sponsor ID is compulsory! Without a valid Sponsor ID you cannot log in.');
+      return;
+    }
+
+    const isOwnerDemo =
+      loginForm.username.toLowerCase().includes('rahul') ||
+      loginForm.username === '88767139' ||
+      loginForm.username.toLowerCase().includes('poonam') ||
+      loginForm.username === '18618331';
+
+    const displayName = isOwnerDemo
+      ? 'Rahul kaushal'
+      : (loginForm.username === 'kashvi' ? 'Kashvi Sharma' : loginForm.username);
+
+    const userData = {
+      name: displayName,
+      username: `@${loginForm.username.replace('@', '')}`,
+      email: `${loginForm.username.toLowerCase()}@kashvimlm.com`,
+      phone: '+91 98765 43210',
+      location: 'Mumbai, Maharashtra, India',
+      memberId: isOwnerDemo ? '88767139' : (loginForm.username === 'kashvi' ? '10001001' : '88767139'),
+      sponsorId: loginForm.sponsorId.trim() || '88767139',
+      memberSince: '2026',
+      since: '2026',
+      tier: 'Business Center',
+      bvPoints: '0.00 CP',
+      teamSize: 48,
+    };
+
+    setAuthSuccessMsg(`Welcome back, ${userData.name}! Loading your distributor portal...`);
+    setTimeout(() => {
+      localStorage.setItem('kashvi_auth', JSON.stringify({ isLoggedIn: true, user: userData }));
+      setCurrentUser(userData);
+      setIsLoggedIn(true);
+      setAuthSuccessMsg('');
+      window.dispatchEvent(new Event('kashvi_auth_change'));
+    }, 400);
   };
 
-  const handleAction = (msg) => {
-    alert(msg);
+  // Handle Register Submit
+  const handleRegisterSubmit = (e) => {
+    e.preventDefault();
+    if (!registerForm.fullName.trim() || !registerForm.username.trim() || !registerForm.password.trim()) {
+      alert('Please fill in all required fields.');
+      return;
+    }
+    if (registerForm.password !== registerForm.confirmPassword) {
+      alert('Passwords do not match.');
+      return;
+    }
+
+    const newMemberId = `${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const userData = {
+      name: registerForm.fullName,
+      username: `@${registerForm.username.replace('@', '')}`,
+      email: registerForm.email || `${registerForm.username.toLowerCase()}@kashvimlm.com`,
+      phone: registerForm.phone || '+91 98000 12345',
+      location: 'India',
+      memberId: newMemberId,
+      sponsorId: '88767139',
+      memberSince: '2026',
+      since: '2026',
+      tier: 'Business Center',
+      bvPoints: '0.00 CP',
+      teamSize: 0,
+    };
+
+    setAuthSuccessMsg('Registration successful! Launching your business portal...');
+    setTimeout(() => {
+      localStorage.setItem('kashvi_auth', JSON.stringify({ isLoggedIn: true, user: userData }));
+      setCurrentUser(userData);
+      setIsLoggedIn(true);
+      setAuthSuccessMsg('');
+      window.dispatchEvent(new Event('kashvi_auth_change'));
+    }, 400);
   };
 
-  return (
-    <PageContainer className="profile-page-wrapper">
-      <div className="profile-card-container">
-        {/* Profile Hero Header */}
-        <div className="profile-hero-card">
-          <div className="profile-hero-banner" />
-          
-          <div className="profile-hero-content">
-            <div className="profile-avatar-wrapper">
-              <div className="profile-avatar-circle">
-                <span className="profile-avatar-initials">KS</span>
-              </div>
-              <span className="profile-status-indicator" title="Logged In">
-                <span className="profile-status-pulse" />
-              </span>
-            </div>
+  // Handle Sign Out
+  const handleSignOut = () => {
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    localStorage.removeItem('kashvi_auth');
+    window.dispatchEvent(new Event('kashvi_auth_change'));
+    setLoginForm({
+      username: '',
+      password: '',
+      sponsorId: '',
+      rememberMe: true,
+    });
+  };
 
-            <div className="profile-identity-info">
-              <div className="profile-identity-top">
-                <h1 className="profile-name">{user.name}</h1>
-                <span className="profile-badge-active">
-                  <CheckCircle2 size={14} />
-                  <span>Logged In</span>
-                </span>
-                <span className="profile-tier-badge">
-                  <Award size={14} />
-                  <span>{user.tier}</span>
-                </span>
+  // Autofill Demo Account (Owner Profile)
+  const handleAutofillDemo = () => {
+    setLoginForm({
+      username: 'rahul_kaushal',
+      password: '••••••••',
+      sponsorId: '88767139',
+      rememberMe: true,
+    });
+  };
+
+  // =========================================================================
+  // VIEW 1: AUTHENTICATION / LOGIN & REGISTER PAGE
+  // =========================================================================
+  if (!isLoggedIn) {
+    return (
+      <PageContainer className="auth-page-wrapper">
+        <div className="auth-bg-glow-orb-1" />
+        <div className="auth-bg-glow-orb-2" />
+
+        <div className="auth-card-container">
+          <div className="auth-card">
+            {/* Brand Header */}
+            <div className="auth-card-header">
+              <div className="auth-brand-badge">
+                <Sparkles size={13} />
+                <span>KASHVI DISTRIBUTOR PORTAL</span>
               </div>
-              <p className="profile-username">
-                {user.username} &bull; Member ID: <strong className="profile-id-text">{user.memberId}</strong>
+              <h1 className="auth-title">
+                {activeTab === 'login' ? 'Sign In to Your Account' : 'Distributor Registration'}
+              </h1>
+              <p className="auth-subtitle">
+                {activeTab === 'login'
+                  ? 'Access your sales commission, BV earnings, and direct selling network.'
+                  : 'Enroll under your sponsor to start distributing electronics & Hozri wear.'}
               </p>
             </div>
 
-            <div className="profile-hero-actions">
+            {/* Mode Switcher Tabs */}
+            <div className="auth-tabs-nav">
               <button
                 type="button"
-                className="profile-btn-primary"
-                onClick={() => handleAction('Edit Profile modal is ready.')}
+                className={`auth-tab-btn ${activeTab === 'login' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('login');
+                  setAuthSuccessMsg('');
+                }}
               >
-                <Settings size={16} />
-                <span>Edit Profile</span>
+                <User size={16} />
+                <span>Sign In</span>
               </button>
               <button
                 type="button"
-                className="profile-btn-secondary"
-                onClick={() => handleAction('You are currently securely logged in as ' + user.name)}
+                className={`auth-tab-btn ${activeTab === 'register' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('register');
+                  setAuthSuccessMsg('');
+                }}
               >
-                <LogOut size={16} />
-                <span>Sign Out</span>
+                <Users size={16} />
+                <span>Register</span>
               </button>
             </div>
-          </div>
-        </div>
 
-        {/* Quick Stats Grid */}
-        <div className="profile-stats-grid">
-          <div className="profile-stat-card">
-            <div className="profile-stat-icon-wrap stat-icon-blue">
-              <Sparkles size={20} />
-            </div>
-            <div className="profile-stat-details">
-              <span className="profile-stat-label">Account Status</span>
-              <span className="profile-stat-value text-green">Active &amp; Logged In</span>
-            </div>
-          </div>
-
-          <div className="profile-stat-card">
-            <div className="profile-stat-icon-wrap stat-icon-pink">
-              <Award size={20} />
-            </div>
-            <div className="profile-stat-details">
-              <span className="profile-stat-label">Membership Rank</span>
-              <span className="profile-stat-value">{user.tier}</span>
-            </div>
-          </div>
-
-          <div className="profile-stat-card">
-            <div className="profile-stat-icon-wrap stat-icon-blue">
-              <Calendar size={20} />
-            </div>
-            <div className="profile-stat-details">
-              <span className="profile-stat-label">Member Since</span>
-              <span className="profile-stat-value">{user.memberSince}</span>
-            </div>
-          </div>
-
-          <div className="profile-stat-card">
-            <div className="profile-stat-icon-wrap stat-icon-pink">
-              <ShieldCheck size={20} />
-            </div>
-            <div className="profile-stat-details">
-              <span className="profile-stat-label">Security &amp; 2FA</span>
-              <span className="profile-stat-value text-green">Verified &amp; Secure</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Profile Information Cards */}
-        <div className="profile-details-grid">
-          {/* Personal Information */}
-          <div className="profile-section-card">
-            <div className="profile-section-header">
-              <User size={18} className="profile-section-icon" />
-              <h2 className="profile-section-title">Personal Information</h2>
-            </div>
-
-            <div className="profile-info-list">
-              <div className="profile-info-row">
-                <span className="profile-info-label">
-                  <User size={15} /> Full Name
-                </span>
-                <span className="profile-info-value">{user.name}</span>
+            {authSuccessMsg && (
+              <div className="auth-alert-success">
+                <CheckCircle2 size={18} />
+                <span>{authSuccessMsg}</span>
               </div>
+            )}
 
-              <div className="profile-info-row">
-                <span className="profile-info-label">
-                  <Mail size={15} /> Email Address
-                </span>
-                <div className="profile-info-email-group">
-                  <span className="profile-info-value">{user.email}</span>
-                  <span className="profile-verified-tag">Verified</span>
+            {/* TAB 1: LOGIN FORM */}
+            {activeTab === 'login' && (
+              <form className="auth-form" onSubmit={handleLoginSubmit}>
+                {/* Username or Member ID */}
+                <div className="auth-input-group">
+                  <label htmlFor="login-username" className="auth-label">
+                    <span>Username or Member ID *</span>
+                  </label>
+                  <div className="auth-input-wrapper">
+                    <User size={17} className="auth-input-icon" />
+                    <input
+                      id="login-username"
+                      type="text"
+                      required
+                      placeholder="Enter your Username or Member ID"
+                      value={loginForm.username}
+                      onChange={(e) =>
+                        setLoginForm((prev) => ({ ...prev, username: e.target.value }))
+                      }
+                      className="auth-input"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="profile-info-row">
-                <span className="profile-info-label">
-                  <Phone size={15} /> Phone Number
-                </span>
-                <span className="profile-info-value">{user.phone}</span>
-              </div>
+                {/* Password with Eye Toggle */}
+                <div className="auth-input-group">
+                  <label htmlFor="login-password" className="auth-label">
+                    <span>Password *</span>
+                  </label>
+                  <div className="auth-input-wrapper">
+                    <Lock size={17} className="auth-input-icon" />
+                    <input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Enter your Password"
+                      value={loginForm.password}
+                      onChange={(e) =>
+                        setLoginForm((prev) => ({ ...prev, password: e.target.value }))
+                      }
+                      className="auth-input"
+                    />
+                    <button
+                      type="button"
+                      className="auth-eye-btn"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
 
-              <div className="profile-info-row">
-                <span className="profile-info-label">
-                  <MapPin size={15} /> Location
-                </span>
-                <span className="profile-info-value">{user.location}</span>
-              </div>
-            </div>
-          </div>
+                {/* Sponsor ID (Compulsory to login) */}
+                <div className="auth-input-group auth-sponsor-block">
+                  <label htmlFor="login-sponsor" className="auth-label">
+                    <span>Sponsor ID *</span>
+                    <span className="auth-label-tag">Compulsory</span>
+                  </label>
+                  <div className="auth-input-wrapper">
+                    <Users size={17} className="auth-input-icon" />
+                    <input
+                      id="login-sponsor"
+                      type="text"
+                      required
+                      placeholder="Enter Sponsor ID (Compulsory to log in)"
+                      value={loginForm.sponsorId}
+                      onChange={(e) =>
+                        setLoginForm((prev) => ({ ...prev, sponsorId: e.target.value }))
+                      }
+                      className="auth-input"
+                    />
+                  </div>
+                  <span className="auth-sponsor-hint">
+                    Sponsor ID is compulsory. You cannot log in without a valid Sponsor ID.
+                  </span>
+                </div>
 
-          {/* Account & Session Settings */}
-          <div className="profile-section-card">
-            <div className="profile-section-header">
-              <ShieldCheck size={18} className="profile-section-icon" />
-              <h2 className="profile-section-title">Account &amp; Session Details</h2>
-            </div>
+                {/* Remember Me & Forgot Password */}
+                <div className="auth-options-row">
+                  <label className="auth-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={loginForm.rememberMe}
+                      onChange={(e) =>
+                        setLoginForm((prev) => ({ ...prev, rememberMe: e.target.checked }))
+                      }
+                    />
+                    <span>Remember this device</span>
+                  </label>
 
-            <div className="profile-info-list">
-              <div className="profile-info-row">
-                <span className="profile-info-label">Login Session</span>
-                <span className="profile-info-value text-green font-medium">● Current Device (Active Now)</span>
-              </div>
+                  <button
+                    type="button"
+                    className="auth-forgot-link"
+                    onClick={() => alert('Password reset instructions sent to your registered email.')}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
 
-              <div className="profile-info-row">
-                <span className="profile-info-label">Two-Factor Authentication</span>
-                <span className="profile-info-value">Enabled (SMS + App)</span>
-              </div>
+                {/* Submit Button */}
+                <button type="submit" className="auth-submit-btn">
+                  <span>Sign In to Portal</span>
+                  <ArrowRight size={18} />
+                </button>
 
-              <div className="profile-info-row">
-                <span className="profile-info-label">Account Type</span>
-                <span className="profile-info-value">KASHVIMLM Official Member</span>
-              </div>
+                {/* Demo Autofill Helper */}
+                <div className="auth-demo-helper">
+                  <p className="auth-demo-text">Quick Demo: Fill sample distributor credentials</p>
+                  <button
+                    type="button"
+                    className="auth-demo-btn"
+                    onClick={handleAutofillDemo}
+                  >
+                    Autofill Demo
+                  </button>
+                </div>
+              </form>
+            )}
 
-              <div className="profile-info-row">
-                <span className="profile-info-label">Notification Preferences</span>
-                <span className="profile-info-value">Email &amp; In-App Alerts</span>
-              </div>
+            {/* TAB 2: REGISTER FORM */}
+            {activeTab === 'register' && (
+              <form className="auth-form" onSubmit={handleRegisterSubmit}>
+                {/* 1. Name & 2. Email */}
+                <div className="auth-form-row">
+                  <div className="auth-input-group">
+                    <label htmlFor="reg-name" className="auth-label">
+                      <span>Name *</span>
+                    </label>
+                    <div className="auth-input-wrapper">
+                      <User size={17} className="auth-input-icon" />
+                      <input
+                        id="reg-name"
+                        type="text"
+                        required
+                        placeholder="Name"
+                        value={registerForm.fullName}
+                        onChange={(e) =>
+                          setRegisterForm((prev) => ({ ...prev, fullName: e.target.value }))
+                        }
+                        className="auth-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="auth-input-group">
+                    <label htmlFor="reg-email" className="auth-label">
+                      <span>Email *</span>
+                    </label>
+                    <div className="auth-input-wrapper">
+                      <Mail size={17} className="auth-input-icon" />
+                      <input
+                        id="reg-email"
+                        type="email"
+                        required
+                        placeholder="Email"
+                        value={registerForm.email}
+                        onChange={(e) =>
+                          setRegisterForm((prev) => ({ ...prev, email: e.target.value }))
+                        }
+                        className="auth-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Mobile Number & Username */}
+                <div className="auth-form-row">
+                  <div className="auth-input-group">
+                    <label htmlFor="reg-phone" className="auth-label">
+                      <span>Mobile Number *</span>
+                    </label>
+                    <div className="auth-input-wrapper">
+                      <Phone size={17} className="auth-input-icon" />
+                      <input
+                        id="reg-phone"
+                        type="tel"
+                        required
+                        placeholder="Mobile Number"
+                        value={registerForm.phone}
+                        onChange={(e) =>
+                          setRegisterForm((prev) => ({ ...prev, phone: e.target.value }))
+                        }
+                        className="auth-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="auth-input-group">
+                    <label htmlFor="reg-username" className="auth-label">
+                      <span>Username</span>
+                    </label>
+                    <div className="auth-input-wrapper">
+                      <Briefcase size={17} className="auth-input-icon" />
+                      <input
+                        id="reg-username"
+                        type="text"
+                        placeholder="Username"
+                        value={registerForm.username}
+                        onChange={(e) =>
+                          setRegisterForm((prev) => ({ ...prev, username: e.target.value }))
+                        }
+                        className="auth-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Password & Confirm Password */}
+                <div className="auth-form-row">
+                  <div className="auth-input-group">
+                    <label htmlFor="reg-password" className="auth-label">
+                      <span>Create Password *</span>
+                    </label>
+                    <div className="auth-input-wrapper">
+                      <Lock size={17} className="auth-input-icon" />
+                      <input
+                        id="reg-password"
+                        type={showRegPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Password"
+                        value={registerForm.password}
+                        onChange={(e) =>
+                          setRegisterForm((prev) => ({ ...prev, password: e.target.value }))
+                        }
+                        className="auth-input"
+                        style={{ paddingRight: '2.5rem' }}
+                      />
+                      <button
+                        type="button"
+                        className="auth-eye-btn"
+                        onClick={() => setShowRegPassword((prev) => !prev)}
+                        aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                        title={showRegPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="auth-input-group">
+                    <label htmlFor="reg-confirm" className="auth-label">
+                      <span>Confirm Password *</span>
+                    </label>
+                    <div className="auth-input-wrapper">
+                      <Lock size={17} className="auth-input-icon" />
+                      <input
+                        id="reg-confirm"
+                        type={showRegConfirmPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Confirm Password"
+                        value={registerForm.confirmPassword}
+                        onChange={(e) =>
+                          setRegisterForm((prev) => ({
+                            ...prev,
+                            confirmPassword: e.target.value,
+                          }))
+                        }
+                        className="auth-input"
+                        style={{ paddingRight: '2.5rem' }}
+                      />
+                      <button
+                        type="button"
+                        className="auth-eye-btn"
+                        onClick={() => setShowRegConfirmPassword((prev) => !prev)}
+                        aria-label={showRegConfirmPassword ? 'Hide password' : 'Show password'}
+                        title={showRegConfirmPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showRegConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Register Button */}
+                <button type="submit" className="auth-submit-btn">
+                  <span>Create Distributor Account</span>
+                  <ArrowRight size={18} />
+                </button>
+              </form>
+            )}
+
+            {/* Bottom Toggle Link */}
+            <div className="auth-footer-switch">
+              {activeTab === 'login' ? (
+                <>
+                  Don't have an account yet?{' '}
+                  <button
+                    type="button"
+                    className="auth-switch-link"
+                    onClick={() => setActiveTab('register')}
+                  >
+                    Register here
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already registered with Kashvi?{' '}
+                  <button
+                    type="button"
+                    className="auth-switch-link"
+                    onClick={() => setActiveTab('login')}
+                  >
+                    Sign in here
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
-      </div>
-    </PageContainer>
-  );
+      </PageContainer>
+    );
+  }
+
+  // =========================================================================
+  // VIEW 2: LOGGED-IN DISTRIBUTOR DASHBOARD (KASHVIMLM REPRODUCTION)
+  // =========================================================================
+  return <DistributorDashboard user={currentUser} onSignOut={handleSignOut} />;
 }
 
 export default Profile;

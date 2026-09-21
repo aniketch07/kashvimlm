@@ -1,36 +1,71 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
-import AboutUs from './pages/AboutUs';
-import Shop from './pages/Shop';
-import Categories from './pages/Categories';
 import Contact from './pages/Contact';
 import Profile from './pages/Profile';
 
 /**
- * Main application component for KASHVIMLM.
- * Sets up routing, layout structure, and page views.
+ * Inner layout component that inspects the current route and auth status.
+ * When a user is logged in and viewing their distributor dashboard (/profile or /dashboard):
+ * - Displays the full-width Kashvimlm distributor portal matching the reference snapshot
+ * - Omits external headers and footers as requested ("dont copy the footer just make the page like this and finctionable")
  */
+function AppContent() {
+  const location = useLocation();
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kashvi_auth');
+      return saved ? Boolean(JSON.parse(saved).isLoggedIn) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const syncAuth = () => {
+      try {
+        const saved = localStorage.getItem('kashvi_auth');
+        setIsLoggedIn(saved ? Boolean(JSON.parse(saved).isLoggedIn) : false);
+      } catch {
+        setIsLoggedIn(false);
+      }
+    };
+
+    syncAuth();
+    window.addEventListener('storage', syncAuth);
+    window.addEventListener('kashvi_auth_change', syncAuth);
+    return () => {
+      window.removeEventListener('storage', syncAuth);
+      window.removeEventListener('kashvi_auth_change', syncAuth);
+    };
+  }, [location.pathname]);
+
+  const isDashboardView =
+    (location.pathname === '/profile' || location.pathname === '/dashboard') && isLoggedIn;
+
+  return (
+    <div className={`app-wrapper ${isDashboardView ? 'dashboard-mode' : ''}`}>
+      {!isDashboardView && <Navbar />}
+      <main className={`main-content ${isDashboardView ? 'main-dashboard-canvas' : ''}`}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/dashboard" element={<Profile />} />
+          <Route path="*" element={<Home />} />
+        </Routes>
+      </main>
+      {!isDashboardView && <Footer />}
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
-      <div className="app-wrapper">
-        <Navbar />
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/about" element={<AboutUs />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="*" element={<Home />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
+      <AppContent />
     </BrowserRouter>
   );
 }

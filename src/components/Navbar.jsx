@@ -15,6 +15,31 @@ function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const [prevPath, setPrevPath] = useState(location.pathname);
+  const [authState, setAuthState] = useState({ isLoggedIn: false, name: '' });
+
+  // Sync auth state with localStorage
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const saved = localStorage.getItem('kashvi_auth');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setAuthState({
+            isLoggedIn: Boolean(parsed.isLoggedIn),
+            name: parsed.user?.name || 'Member',
+          });
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      setAuthState({ isLoggedIn: false, name: '' });
+    };
+
+    checkAuth();
+    window.addEventListener('storage', checkAuth);
+    return () => window.removeEventListener('storage', checkAuth);
+  }, [location.pathname]);
 
   // Close mobile menu immediately on route change
   if (prevPath !== location.pathname) {
@@ -52,9 +77,6 @@ function Navbar() {
 
   const navLinks = [
     { label: 'Home', path: '/' },
-    { label: 'About Us', path: '/about' },
-    { label: 'Shop', path: '/shop' },
-    { label: 'Categories', path: '/categories' },
     { label: 'Contact', path: '/contact' },
   ];
 
@@ -65,7 +87,6 @@ function Navbar() {
         <div className="navbar-left">
           <Link to="/" className="navbar-logo" aria-label="KASHVIMLM Home">
             <img src={logoImg} alt="KASHVIMLM" className="navbar-logo-img" />
-            <span className="navbar-logo-text">kashvimlm</span>
           </Link>
         </div>
 
@@ -96,13 +117,17 @@ function Navbar() {
               isActive ? 'navbar-profile-btn active' : 'navbar-profile-btn'
             }
             aria-label="User Profile"
-            title="Kashvi Sharma (Logged In)"
+            title={authState.isLoggedIn ? `${authState.name} (Logged In)` : 'Sign In / Profile'}
           >
             <div className="navbar-profile-avatar-wrap">
               <User size={18} className="navbar-profile-icon" />
-              <span className="navbar-profile-online-badge" title="Logged In" />
+              {authState.isLoggedIn && (
+                <span className="navbar-profile-online-badge" title="Logged In" />
+              )}
             </div>
-            <span className="navbar-profile-text">Profile</span>
+            <span className="navbar-profile-text">
+              {authState.isLoggedIn ? 'Profile' : 'Sign In'}
+            </span>
           </NavLink>
 
           <button
@@ -141,11 +166,15 @@ function Navbar() {
             >
               <div className="mobile-profile-avatar">
                 <User size={20} />
-                <span className="mobile-profile-online-badge" />
+                {authState.isLoggedIn && <span className="mobile-profile-online-badge" />}
               </div>
               <div className="mobile-profile-info">
-                <span className="mobile-profile-name">Kashvi Sharma</span>
-                <span className="mobile-profile-status">● Logged In</span>
+                <span className="mobile-profile-name">
+                  {authState.isLoggedIn ? authState.name : 'Sign In / Register'}
+                </span>
+                <span className="mobile-profile-status">
+                  {authState.isLoggedIn ? '● Logged In' : 'Distributor Portal'}
+                </span>
               </div>
             </NavLink>
 
