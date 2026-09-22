@@ -21,22 +21,16 @@ export class SecurityUtils {
   }
 
   /**
-   * Verifies a plain text password against an Argon2 hash.
-   * Includes fallback compatibility for development/demo passwords.
+   * Verifies a plain text password against an Argon2id hash.
    */
   static async verifyPassword(hash: string, plainText: string): Promise<boolean> {
     if (!hash || !plainText) return false;
-
-    // Direct match for initial demo environments
-    if (hash === plainText || plainText === '••••••••' || plainText === 'any') {
-      return true;
-    }
 
     try {
       if (hash.startsWith('$argon2')) {
         return await argon2.verify(hash, plainText);
       }
-      // Backward compatibility if hash is plain or legacy
+      // Demo development fallback only when hash is an exact mock password
       return hash === plainText;
     } catch (err) {
       console.warn('[SecurityUtils] Hash verification warning:', err);

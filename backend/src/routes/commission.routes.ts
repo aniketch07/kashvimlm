@@ -1,0 +1,106 @@
+import { Router } from 'express';
+import { CommissionController } from '../controllers/commission.controller';
+import { authenticate } from '../middleware/auth';
+import { authorizeRoles } from '../middleware/role';
+import { validate } from '../middleware/validate';
+import {
+  calculateMilestoneBonusSchema,
+  calculateRankBonusSchema,
+  createCommissionRuleSchema,
+  payoutCommissionsSchema,
+  processPCOrderBonusSchema,
+  updateCommissionRuleSchema,
+} from '../validators/commission.validators';
+
+const router = Router();
+
+// All commission endpoints require authentication
+router.use(authenticate);
+
+// ==========================================
+// DISTRIBUTOR COMMISSION VIEWS
+// ==========================================
+
+// GET /api/v1/commissions/current - Current active period and qualification
+router.get('/current', CommissionController.getCurrentPeriod);
+
+// GET /api/v1/commissions/history - Historical commission periods
+router.get('/history', CommissionController.getPeriodHistory);
+
+// GET /api/v1/commissions/me - Personal commission ledger history
+router.get('/me', CommissionController.getMyCommissions);
+
+// GET /api/v1/commissions/rules - List active commission rules
+router.get('/rules', CommissionController.getRules);
+
+// GET /api/v1/commissions/:id - Details of specific commission or period
+router.get('/:id', CommissionController.getCommissionOrPeriodById);
+
+// ==========================================
+// ADMIN RULE MANAGEMENT
+// ==========================================
+
+// POST /api/v1/commissions/rules - Create new database-driven rule
+router.post(
+  '/rules',
+  authorizeRoles('SUPER_ADMIN', 'ADMIN'),
+  validate({ body: createCommissionRuleSchema }),
+  CommissionController.createRule
+);
+
+// PATCH /api/v1/commissions/rules/:id - Update existing rule
+router.patch(
+  '/rules/:id',
+  authorizeRoles('SUPER_ADMIN', 'ADMIN'),
+  validate({ body: updateCommissionRuleSchema }),
+  CommissionController.updateRule
+);
+
+// ==========================================
+// COMMISSION CALCULATION ENGINE TRIGGERS
+// ==========================================
+
+// POST /api/v1/commissions/calculate-weekly - Run weekly commission cycle
+router.post(
+  '/calculate-weekly',
+  authorizeRoles('SUPER_ADMIN', 'ADMIN'),
+  CommissionController.calculateWeekly
+);
+
+// POST /api/v1/commissions/process-pc-order - Process PC order bonus idempotently
+router.post(
+  '/process-pc-order',
+  authorizeRoles('SUPER_ADMIN', 'ADMIN'),
+  validate({ body: processPCOrderBonusSchema }),
+  CommissionController.processPCOrder
+);
+
+// POST /api/v1/commissions/calculate/milestone - Calculate milestone bonus
+router.post(
+  '/calculate/milestone',
+  authorizeRoles('SUPER_ADMIN', 'ADMIN'),
+  validate({ body: calculateMilestoneBonusSchema }),
+  CommissionController.calculateMilestone
+);
+
+// POST /api/v1/commissions/calculate/rank - Calculate rank bonus
+router.post(
+  '/calculate/rank',
+  authorizeRoles('SUPER_ADMIN', 'ADMIN'),
+  validate({ body: calculateRankBonusSchema }),
+  CommissionController.calculateRank
+);
+
+// ==========================================
+// WALLET PAYOUT PROCESSING
+// ==========================================
+
+// POST /api/v1/commissions/payout - Process eligible payable commissions to wallet
+router.post(
+  '/payout',
+  authorizeRoles('SUPER_ADMIN', 'ADMIN'),
+  validate({ body: payoutCommissionsSchema }),
+  CommissionController.payout
+);
+
+export const commissionRouter = router;

@@ -277,51 +277,91 @@ CREATE UNIQUE INDEX idx_training_dist_module ON training_progress(distributor_id
 -- -----------------------------------------------------------------------------
 CREATE TABLE support_tickets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    ticket_number VARCHAR(50) UNIQUE NOT NULL, -- e.g. TICKET-2026-9041
-    distributor_id UUID NOT NULL REFERENCES distributors(id),
+    ticket_number VARCHAR(50) UNIQUE NOT NULL, -- e.g. KV-TKT-781290
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(50),
+    distributor_id UUID REFERENCES distributors(id) ON DELETE SET NULL,
+    department VARCHAR(100) NOT NULL, -- 'General Customer & Order Support', 'Distributor Enrollment & Lineage', etc.
     subject VARCHAR(255) NOT NULL,
-    category VARCHAR(100) NOT NULL, -- 'Commission & Payout', 'Order Delivery', 'Tree Placement', 'KYC & Bank'
-    priority VARCHAR(20) NOT NULL DEFAULT 'Medium', -- 'Low', 'Medium', 'High', 'Urgent'
-    status VARCHAR(30) NOT NULL DEFAULT 'Open', -- 'Open', 'In Progress', 'Resolved', 'Closed'
     description TEXT NOT NULL,
-    admin_response TEXT,
+    status VARCHAR(30) NOT NULL DEFAULT 'Open', -- 'Open', 'In Progress', 'Resolved', 'Closed'
+    priority VARCHAR(20) NOT NULL DEFAULT 'Medium', -- 'Low', 'Medium', 'High', 'Urgent'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    resolved_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX idx_tickets_ticket_number ON support_tickets(ticket_number);
+CREATE INDEX idx_tickets_user ON support_tickets(user_id);
 CREATE INDEX idx_tickets_distributor ON support_tickets(distributor_id);
+CREATE INDEX idx_tickets_status ON support_tickets(status);
+
+-- -----------------------------------------------------------------------------
+-- 11b. SUPPORT MESSAGES TABLE (Threaded Ticket Communication)
+-- -----------------------------------------------------------------------------
+CREATE TABLE support_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+    sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_support_messages_ticket ON support_messages(ticket_id);
+CREATE INDEX idx_support_messages_sender ON support_messages(sender_id);
 
 -- -----------------------------------------------------------------------------
 -- 12. NOTIFICATIONS TABLE (Real-Time Member Alerts & Broadcasts)
 -- -----------------------------------------------------------------------------
 CREATE TABLE notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    distributor_id UUID NOT NULL REFERENCES distributors(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    distributor_id UUID REFERENCES distributors(id) ON DELETE CASCADE,
     title VARCHAR(200) NOT NULL,
     message TEXT NOT NULL,
-    type VARCHAR(50) NOT NULL DEFAULT 'GENERAL', -- 'COMMISSION', 'ENROLLMENT', 'ORDER', 'RANK', 'SYSTEM'
+    type VARCHAR(50) NOT NULL DEFAULT 'SYSTEM', -- 'COMMISSION', 'ORDER', 'PAYMENT', 'PAYOUT', 'ENROLLMENT', 'TRAINING', 'SYSTEM', 'SUPPORT', 'NEWS'
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
     action_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_notifications_distributor ON notifications(distributor_id);
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_notifications_type ON notifications(type);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 
 -- -----------------------------------------------------------------------------
--- 13. AUDIT LOGS TABLE (Comprehensive System & Financial Event Logging)
+-- 13. AUDIT LOGS TABLE (Immutable Compliance & System Event Logging)
 -- -----------------------------------------------------------------------------
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    actor_id UUID REFERENCES users(id),
-    actor_role VARCHAR(50),
-    action VARCHAR(100) NOT NULL, -- e.g. 'PRODUCT_PRICE_UPDATED', 'COMMISSION_CALCULATED', 'PAYOUT_APPROVED'
-    resource_type VARCHAR(100) NOT NULL,
-    resource_id VARCHAR(100),
+    actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(50) NOT NULL, -- 'LOGIN', 'LOGOUT', 'USER_CREATED', 'USER_UPDATED', 'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DELETED', 'ORDER_CREATED', 'ORDER_CANCELLED', 'BV_CREDIT', 'BV_DEBIT', 'COMMISSION_CREATED', 'COMMISSION_REVERSED', 'WALLET_ADJUSTMENT', 'PAYOUT_APPROVED', 'PAYOUT_REJECTED', 'KYC_APPROVED', 'KYC_REJECTED', 'ADMIN_ACTION'
+    entity_type VARCHAR(100) NOT NULL,
+    entity_id VARCHAR(100),
+    old_value JSONB,
+    new_value JSONB,
     ip_address VARCHAR(50),
     user_agent TEXT,
-    metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_audit_action ON audit_logs(action);
+CREATE INDEX idx_audit_actor_id ON audit_logs(actor_id);
+CREATE INDEX idx_audit_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX idx_audit_created_at ON audit_logs(created_at);
+
+-- IMMUTABILITY ENFORCEMENT: Strictly prohibit DELETE and UPDATE operations on audit logs
+CREATE OR REPLACE FUNCTION prevent_audit_log_tampering()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'Audit logs are immutable permanent records. Deletion and modification are strictly prohibited.';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_immutable_audit_logs ON audit_logs;
+CREATE TRIGGER trg_immutable_audit_logs
+BEFORE UPDATE OR DELETE ON audit_logs
+FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_tampering();
+

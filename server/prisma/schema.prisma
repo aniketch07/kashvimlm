@@ -59,6 +59,18 @@ enum TicketStatus {
   CLOSED
 }
 
+enum NotificationType {
+  COMMISSION
+  ORDER
+  PAYMENT
+  PAYOUT
+  ENROLLMENT
+  TRAINING
+  SYSTEM
+  SUPPORT
+  NEWS
+}
+
 // 1. USERS (Authentication & Identity)
 model User {
   id           String        @id @default(uuid())
@@ -71,8 +83,11 @@ model User {
   lastLoginAt  DateTime?     @map("last_login_at")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
-  distributor  Distributor?
-  auditLogs    AuditLog[]
+  distributor     Distributor?
+  auditLogs       AuditLog[]
+  supportTickets  SupportTicket[]
+  supportMessages SupportMessage[]
+  notifications   Notification[]
 
   @@map("users")
 }
@@ -320,55 +335,108 @@ model TrainingProgress {
 
 // 11. SUPPORT TICKETS (Screen E)
 model SupportTicket {
-  id            String         @id @default(uuid())
-  ticketNumber  String         @unique @map("ticket_number") // e.g. KV-TKT-781290
-  distributorId String?        @map("distributor_id")
-  distributor   Distributor?   @relation(fields: [distributorId], references: [id])
-  fullName      String         @map("full_name")
+  id            String          @id @default(uuid())
+  ticketNumber  String          @unique @map("ticket_number") // e.g. KV-TKT-781290
+  userId        String?         @map("user_id")
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name          String
   email         String
   phone         String?
-  category      String         // 'General Support' | 'Commission & BV' | 'Grievance' | ...
+  distributorId String?         @map("distributor_id")
+  distributor   Distributor?    @relation(fields: [distributorId], references: [id], onDelete: SetNull)
+  department    String
   subject       String
-  message       String         @db.Text
-  priority      TicketPriority @default(MEDIUM)
-  status        TicketStatus   @default(OPEN)
-  adminResponse String?        @map("admin_response") @db.Text
-  createdAt     DateTime       @default(now()) @map("created_at")
-  resolvedAt    DateTime?      @map("resolved_at")
+  description   String          @db.Text
+  status        TicketStatus    @default(OPEN)
+  priority      TicketPriority  @default(MEDIUM)
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  messages      SupportMessage[]
 
   @@index([ticketNumber])
+  @@index([userId])
+  @@index([distributorId])
+  @@index([status])
   @@map("support_tickets")
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid())
+  ticketId  String        @map("ticket_id")
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId  String        @map("sender_id")
+  sender    User?         @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  message   String        @db.Text
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@index([senderId])
+  @@map("support_messages")
 }
 
 // 12. NOTIFICATIONS (Screen A Alerts)
 model Notification {
-  id            String      @id @default(uuid())
-  distributorId String      @map("distributor_id")
-  distributor   Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  id            String           @id @default(uuid())
+  distributorId String?          @map("distributor_id")
+  distributor   Distributor?     @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  userId        String?          @map("user_id")
+  user          User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
   title         String
-  message       String      @db.Text
-  type          String      @default("GENERAL") // 'COMMISSION' | 'ENROLLMENT' | 'ORDER' | 'SYSTEM'
-  isRead        Boolean     @default(false) @map("is_read")
-  actionUrl     String?     @map("action_url")
-  createdAt     DateTime    @default(now()) @map("created_at")
+  message       String           @db.Text
+  type          NotificationType @default(SYSTEM)
+  isRead        Boolean          @default(false) @map("is_read")
+  actionUrl     String?          @map("action_url")
+  createdAt     DateTime         @default(now()) @map("created_at")
 
   @@index([distributorId])
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
   @@map("notifications")
 }
 
-// 13. AUDIT LOGS (Enterprise Compliance)
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  USER_CREATED
+  USER_UPDATED
+  PRODUCT_CREATED
+  PRODUCT_UPDATED
+  PRODUCT_DELETED
+  ORDER_CREATED
+  ORDER_CANCELLED
+  BV_CREDIT
+  BV_DEBIT
+  COMMISSION_CREATED
+  COMMISSION_REVERSED
+  WALLET_ADJUSTMENT
+  PAYOUT_APPROVED
+  PAYOUT_REJECTED
+  KYC_APPROVED
+  KYC_REJECTED
+  ADMIN_ACTION
+}
+
+// 13. AUDIT LOGS (Immutable Compliance Ledger)
 model AuditLog {
-  id           String   @id @default(uuid())
-  actorId      String?  @map("actor_id")
-  user         User?    @relation(fields: [actorId], references: [id])
-  actorRole    String?  @map("actor_role")
-  action       String   // 'PRODUCT_CREATED' | 'COMMISSION_CALCULATED' | 'PAYOUT_SETTLED'
-  resourceType String   @map("resource_type")
-  resourceId   String   @map("resource_id")
-  ipAddress    String?  @map("ip_address")
-  metadata     Json     @default("{}")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id         String      @id @default(uuid())
+  actorId    String?     @map("actor_id")
+  user       User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     AuditAction
+  entityType String      @map("entity_type")
+  entityId   String?     @map("entity_id")
+  oldValue   Json?       @map("old_value")
+  newValue   Json?       @map("new_value")
+  ipAddress  String?     @map("ip_address")
+  userAgent  String?     @map("user_agent")
+  createdAt  DateTime    @default(now()) @map("created_at")
 
   @@index([action])
+  @@index([actorId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
   @@map("audit_logs")
 }
+

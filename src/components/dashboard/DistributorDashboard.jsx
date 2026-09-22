@@ -29,6 +29,7 @@ import EnrollmentView from './EnrollmentView';
 import ShopView from './ShopView';
 import ProductManagerView from './ProductManagerView';
 import { getStoredCatalog } from '../../data/productCatalog';
+import { api } from '../../services/api.js';
 
 // Import generated & project assets
 import reportsTabletImg from '../../assets/dashboard/reports_tablet.jpg';
@@ -78,6 +79,47 @@ function DistributorDashboard({ user, onSignOut }) {
     window.addEventListener('kashvi_catalog_update', handleCatalogUpdate);
     return () => window.removeEventListener('kashvi_catalog_update', handleCatalogUpdate);
   }, []);
+
+  // Live Notifications State
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    async function fetchNotifs() {
+      try {
+        const res = await api.getNotifications();
+        if (mounted && res && res.data) {
+          setNotifications(res.data);
+          setUnreadNotifCount(res.unreadCount ?? res.data.filter((n) => !n.isRead).length);
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    }
+    fetchNotifs();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleMarkNotification = async (id) => {
+    try {
+      await api.markNotificationAsRead(id);
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+      setUnreadNotifCount((prev) => Math.max(0, prev - 1));
+    } catch {}
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.markAllNotificationsAsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadNotifCount(0);
+    } catch {}
+    showToast('All notifications marked as read.');
+    setActiveModal(null);
+  };
 
   // Dropdowns & Selects
   const [selectedWebsite, setSelectedWebsite] = useState('My KASHVIMLM Website');
@@ -224,10 +266,10 @@ function DistributorDashboard({ user, onSignOut }) {
             className="kashvimlm-nav-icon-btn"
             onClick={() => setActiveModal('notify')}
             aria-label="Notifications"
-            title="Notifications (3 unread)"
+            title={`Notifications (${unreadNotifCount} unread)`}
           >
             <Bell size={19} />
-            <span className="kashvimlm-notification-dot" />
+            {unreadNotifCount > 0 && <span className="kashvimlm-notification-dot" />}
           </button>
 
           {/* User Profile Avatar with Menu */}
@@ -1495,45 +1537,59 @@ function DistributorDashboard({ user, onSignOut }) {
             </div>
             <div className="modal-body">
               <div className="notifications-list">
-                <div className="notification-item unread">
-                  <span className="notif-dot" />
-                  <div className="notif-content">
-                    <p className="notif-msg">
-                      <strong>Prague 2026 Activity Contest</strong> is now live! Opt in to qualify
-                      for travel points.
-                    </p>
-                    <span className="notif-time">2 hours ago</span>
-                  </div>
-                </div>
-                <div className="notification-item unread">
-                  <span className="notif-dot" />
-                  <div className="notif-content">
-                    <p className="notif-msg">
-                      All 40+ <strong>Team Manager Reports</strong> are now complimentary for your
-                      Business Center.
-                    </p>
-                    <span className="notif-time">5 hours ago</span>
-                  </div>
-                </div>
-                <div className="notification-item">
-                  <div className="notif-content">
-                    <p className="notif-msg">
-                      Weekly Cycle 1/1A commission snapshot calculated. View weekly checks in Payout
-                      center.
-                    </p>
-                    <span className="notif-time">Yesterday</span>
-                  </div>
-                </div>
+                {notifications && notifications.length > 0 ? (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`notification-item ${!n.isRead ? 'unread' : ''}`}
+                      onClick={() => handleMarkNotification(n.id)}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to mark as read"
+                    >
+                      {!n.isRead && <span className="notif-dot" />}
+                      <div className="notif-content">
+                        <p className="notif-msg">
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              letterSpacing: '0.5px',
+                              marginRight: '6px',
+                              backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                              color: '#38bdf8',
+                              border: '1px solid rgba(56, 189, 248, 0.3)',
+                            }}
+                          >
+                            {n.type}
+                          </span>
+                          <strong>{n.title}</strong>: {n.message}
+                        </p>
+                        <span className="notif-time">
+                          {new Date(n.createdAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ textAlign: 'center', padding: '2rem 1rem', color: '#94a3b8' }}>
+                    No notifications at this time.
+                  </p>
+                )}
               </div>
             </div>
             <div className="modal-footer">
               <button
                 type="button"
                 className="btn-modal-secondary"
-                onClick={() => {
-                  showToast('All notifications marked as read.');
-                  setActiveModal(null);
-                }}
+                onClick={handleMarkAllRead}
               >
                 Mark all as read
               </button>

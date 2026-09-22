@@ -200,10 +200,10 @@ export const api = {
     return null;
   },
 
-  // 5. Support Tickets
+  // 5. Support Tickets & Messages
   async submitSupportTicket(ticketData) {
     try {
-      const res = await fetch(`${API_BASE_URL}/support`, {
+      const res = await fetch(`${API_BASE_URL}/support/tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(ticketData),
@@ -214,6 +214,230 @@ export const api = {
       }
     } catch (err) {
       console.warn('[API] Support ticket submission failed:', err.message);
+    }
+    return null;
+  },
+
+  async getSupportTickets(params = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, val]) => {
+        if (val) queryParams.append(key, val);
+      });
+      const url = `${API_BASE_URL}/support/tickets${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Get support tickets failed:', err.message);
+    }
+    return null;
+  },
+
+  async getSupportTicket(ticketId) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/support/tickets/${ticketId}`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Get support ticket failed:', err.message);
+    }
+    return null;
+  },
+
+  async addTicketMessage(ticketId, messageData) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/support/tickets/${ticketId}/messages`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(messageData),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Add ticket message failed:', err.message);
+    }
+    return null;
+  },
+
+  async closeSupportTicket(ticketId, reason) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/support/tickets/${ticketId}/close`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Close support ticket failed:', err.message);
+    }
+    return null;
+  },
+
+  // Admin Support Ticket Management
+  async getAdminSupportTickets(params = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, val]) => {
+        if (val) queryParams.append(key, val);
+      });
+      const url = `${API_BASE_URL}/admin/support/tickets${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Get admin support tickets failed:', err.message);
+    }
+    return null;
+  },
+
+  async updateAdminSupportTicket(id, ticketData) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/support/tickets/${id}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(ticketData),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Update admin support ticket failed:', err.message);
+    }
+    return null;
+  },
+
+  async replyAdminSupportTicket(id, replyData) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/support/tickets/${id}/reply`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(replyData),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Reply admin support ticket failed:', err.message);
+    }
+    return null;
+  },
+
+  // Executive Admin Management
+  async getAdminOverview() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('[API] Get admin overview failed:', err.message);
+    }
+    return null;
+  },
+
+  async getAdminMetrics() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/metrics`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Get admin metrics failed:', err.message);
+    }
+    return null;
+  },
+
+  async getAdminAuditLogs(params = 50) {
+    try {
+      const queryParams = new URLSearchParams();
+      if (typeof params === 'number') {
+        queryParams.append('limit', params.toString());
+      } else if (typeof params === 'object' && params !== null) {
+        Object.entries(params).forEach(([key, val]) => {
+          if (val !== undefined && val !== null && val !== '') queryParams.append(key, val.toString());
+        });
+      }
+      const url = `${API_BASE_URL}/admin/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Get admin audit logs failed:', err.message);
+    }
+    return null;
+  },
+
+  async calculateAdminCommissions(cycleWeek, cycleYear) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/calculate-commissions`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ cycleWeek, cycleYear }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('[API] Calculate commissions failed:', err.message);
+    }
+    return null;
+  },
+
+  async settleAdminPayouts(batchCode) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/settle-payouts`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ batchCode }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('[API] Settle payouts failed:', err.message);
+    }
+    return null;
+  },
+
+  async updateAdminDistributorStatus(memberId, status) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/distributors/${memberId}/status`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Update distributor status failed:', err.message);
     }
     return null;
   },
@@ -230,6 +454,57 @@ export const api = {
       }
     } catch (err) {
       console.warn('[API] Fetch profile failed:', err.message);
+    }
+    return null;
+  },
+
+  // 7. Notifications
+  async getNotifications(params = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null) queryParams.append(key, val);
+      });
+      const url = `${API_BASE_URL}/notifications${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('[API] Fetch notifications failed:', err.message);
+    }
+    return null;
+  },
+
+  async markNotificationAsRead(id) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Mark notification read failed:', err.message);
+    }
+    return null;
+  },
+
+  async markAllNotificationsAsRead() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/notifications/read-all`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data;
+      }
+    } catch (err) {
+      console.warn('[API] Mark all notifications read failed:', err.message);
     }
     return null;
   },

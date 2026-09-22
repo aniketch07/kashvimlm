@@ -1,10 +1,14 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { errorHandler } from './middleware/errorHandler.js';
 import { httpLogger } from './middleware/logging.js';
 import { globalLimiter } from './middleware/rateLimiter.js';
+import { requestIdMiddleware } from './middleware/requestId.js';
+import { csrfProtection } from './middleware/csrf.js';
 import { setupSwagger } from './config/swagger.js';
+import { config } from './config/env.js';
 
 // Module Route Imports
 import authRoutes from './modules/auth/auth.routes.js';
@@ -21,37 +25,72 @@ import { trainingRoutes } from './modules/training/training.routes.js';
 import { supportRoutes } from './modules/support/support.routes.js';
 import { notificationRoutes } from './modules/notifications/notification.routes.js';
 import { adminRoutes } from './modules/admin/admin.routes.js';
+import cartRoutes from './modules/cart/cart.routes.js';
+import newsRoutes from './modules/news/news.routes.js';
+import websiteRoutes from './modules/website/website.routes.js';
 
 export const app: Express = express();
 
-// 1. Hardened HTTP Security Headers
+// 1. Request Correlation ID (Unique request UUID tracking)
+app.use(requestIdMiddleware);
+
+// 2. Cookie Parser for HTTP-Only Secure Cookies & Refresh Tokens
+app.use(cookieParser());
+
+// 3. Hardened HTTP Security Headers via Helmet
 app.use(
   helmet({
     contentSecurityPolicy: false, // Allows Swagger UI and local preview assets
     crossOriginEmbedderPolicy: false,
+    frameguard: { action: 'deny' },
+    xContentTypeOptions: true,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    hidePoweredBy: true,
   })
 );
 
-// 2. Cross-Origin Resource Sharing
+// 4. Strict Cross-Origin Resource Sharing (CORS Whitelist)
 app.use(
   cors({
-    origin: '*',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+      if (
+        config.corsAllowedOrigins.includes(origin) ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:')
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS policy violation: Origin ${origin} not permitted.`));
+    },
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'X-CSRF-Token',
+      'X-Request-ID',
+    ],
+    exposedHeaders: ['X-Request-ID'],
   })
 );
 
-// 3. High-Performance Pino Structured HTTP Request Logging
+// 5. High-Performance Pino Structured HTTP Request Logging with PII Redaction
 app.use(httpLogger);
 
-// 4. Rate Limiting for DoS Protection
+// 6. Rate Limiting for DoS Protection
 app.use('/api/', globalLimiter);
 
-// 5. Payload Parsers (Supports up to 50MB for image gallery uploads)
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// 7. Payload Parsers (Bounded to 10MB to prevent memory exhaustion DoS)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 6. Interactive OpenAPI / Swagger UI
+// 8. CSRF Protection for Cookie-Authenticated Requests
+app.use(csrfProtection);
+
+// 9. Interactive OpenAPI / Swagger UI
 setupSwagger(app);
 
 // 7. Health Check & Root Route
@@ -68,6 +107,7 @@ app.get('/', (_req: Request, res: Response) => {
       distributors: '/api/v1/distributors',
       enrollment: '/api/v1/enrollment',
       products: '/api/v1/products',
+      cart: '/api/v1/cart',
       orders: '/api/v1/orders',
       mlmTree: '/api/v1/tree',
       bvEngine: '/api/v1/bv',
@@ -75,6 +115,8 @@ app.get('/', (_req: Request, res: Response) => {
       wallet: '/api/v1/wallet',
       payouts: '/api/v1/payouts',
       training: '/api/v1/training',
+      website: '/api/v1/website',
+      news: '/api/v1/news',
       support: '/api/v1/support',
       notifications: '/api/v1/notifications',
       admin: '/api/v1/admin',
@@ -103,6 +145,9 @@ app.use('/api/v1/wallet', walletRoutes);
 app.use('/api/v1/payouts', payoutRoutes);
 app.use('/api/v1/training', trainingRoutes);
 app.use('/api/v1/support', supportRoutes);
+app.use('/api/v1/cart', cartRoutes);
+app.use('/api/v1/news', newsRoutes);
+app.use('/api/v1/website', websiteRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/admin', adminRoutes);
 

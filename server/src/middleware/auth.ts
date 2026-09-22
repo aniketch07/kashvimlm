@@ -9,12 +9,17 @@ export interface AuthenticatedUser {
   role: string;
   distributorId?: string;
   memberId?: string;
+  isActive?: boolean;
+  tokenType?: string;
 }
 
 export interface AuthRequest extends Request {
   user?: AuthenticatedUser;
 }
 
+/**
+ * Verifies JWT Access Token, checks token type and active user status
+ */
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
@@ -29,23 +34,131 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as AuthenticatedUser;
+
+    // Reject refresh tokens presented at protected operational endpoints
+    if (decoded.tokenType === 'refresh') {
+      res.status(403).json({
+        success: false,
+        message: 'Invalid token type: Refresh token cannot be used as an access token.',
+      });
+      return;
+    }
+
+    // Verify user active account status
+    if (decoded.isActive === false) {
+      res.status(403).json({
+        success: false,
+        message: 'Account suspended or inactive. Please contact compliance support.',
+      });
+      return;
+    }
+
     req.user = decoded;
     next();
-  } catch (err) {
+  } catch {
     res.status(403).json({
       success: false,
-      message: 'Invalid or expired authentication token.',
+      message: 'Invalid or expired authentication token. Please log in again.',
     });
   }
 }
 
+/**
+ * Strict Role-Based Access Control (RBAC)
+ */
+export function requireRole(...roles: string[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthenticated.' });
+      return;
+    }
+
+    const normalizedUserRole = req.user.role?.toLowerCase();
+    const normalizedAllowedRoles = roles.map((r) => r.toLowerCase());
+
+    if (!normalizedAllowedRoles.includes(normalizedUserRole)) {
+      res.status(403).json({
+        success: false,
+        message: `Forbidden: Required role [${roles.join(', ')}]. Your account role is [${req.user.role}].`,
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * High-privilege Admin Authorization Check
+ */
 export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): void {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user || req.user.role?.toLowerCase() !== 'admin') {
     res.status(403).json({
       success: false,
-      message: 'Access forbidden. Administrator clearance required.',
+      message: 'Access forbidden. Executive Administrator clearance required.',
     });
     return;
+  }
+  next();
+}
+
+/**
+ * Strict Resource Ownership Verification
+ * Guarantees that non-admin members can NEVER access or mutate records belonging to other users.
+ * "Do not trust IDs coming from frontend."
+ */
+export function requireOwnership(
+  getParamOwnerId: (req: AuthRequest) => string | undefined,
+  resourceName: string = 'Resource'
+) {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ success: false, message: 'Unauthenticated.' });
+      return;
+    }
+
+    // System administrators possess cross-network operational clearance
+    if (req.user.role?.toLowerCase() === 'admin') {
+      return next();
+    }
+
+    const requestedId = getParamOwnerId(req);
+    if (!requestedId) {
+      return next();
+    }
+
+    // Never trust frontend IDs: verify against authentic JWT session identity
+    const isOwner =
+      req.user.id === requestedId ||
+      req.user.memberId === requestedId ||
+      req.user.distributorId === requestedId;
+
+    if (!isOwner) {
+      res.status(403).json({
+        success: false,
+        message: `Ownership verification failed: You do not have permission to access or modify this ${resourceName}.`,
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Optional Auth helper for public discovery endpoints
+ */
+export function optionalAuth(req: AuthRequest, _res: Response, next: NextFunction): void {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, config.jwtSecret) as AuthenticatedUser;
+      req.user = decoded;
+    } catch {
+      // Pass without setting user if token is invalid or expired
+    }
   }
   next();
 }

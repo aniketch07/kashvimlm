@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { ProductService } from './product.service.js';
 import { AuthRequest } from '../../middleware/auth.js';
+import { AuditService } from '../audit/audit.service.js';
+import { AuditAction } from '../audit/audit.types.js';
 
 export class ProductController {
   private static verifyIdOwner(req: AuthRequest): boolean {
@@ -39,6 +41,17 @@ export class ProductController {
         return;
       }
       const newProduct = await ProductService.create(req.body);
+
+      // Immutable Audit Log: PRODUCT_CREATED
+      await AuditService.recordFromRequest(
+        req,
+        AuditAction.PRODUCT_CREATED,
+        'Product',
+        newProduct?.id || newProduct?.sku || null,
+        null,
+        newProduct
+      );
+
       res.status(201).json({
         success: true,
         message: 'Product created and published to wholesale catalog.',
@@ -59,7 +72,19 @@ export class ProductController {
         return;
       }
       const { id } = req.params;
+      const oldProduct = await ProductService.getById(id);
       const updated = await ProductService.updatePricingAndDetails(id, req.body);
+
+      // Immutable Audit Log: PRODUCT_UPDATED
+      await AuditService.recordFromRequest(
+        req,
+        AuditAction.PRODUCT_UPDATED,
+        'Product',
+        id,
+        oldProduct,
+        updated
+      );
+
       res.status(200).json({
         success: true,
         message: 'Product price and volume points updated.',
@@ -80,7 +105,19 @@ export class ProductController {
         return;
       }
       const { id } = req.params;
+      const oldProduct = await ProductService.getById(id);
       await ProductService.deleteProduct(id);
+
+      // Immutable Audit Log: PRODUCT_DELETED
+      await AuditService.recordFromRequest(
+        req,
+        AuditAction.PRODUCT_DELETED,
+        'Product',
+        id,
+        oldProduct,
+        null
+      );
+
       res.status(200).json({ success: true, message: `Product ${id} removed from catalog.` });
     } catch (err) {
       next(err);

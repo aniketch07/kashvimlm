@@ -1,14 +1,50 @@
 import { Router } from 'express';
 import { AdminController } from './admin.controller.js';
-import { authenticateToken, requireAdmin } from '../../middleware/auth.js';
+import { authenticateToken, requireAdmin, optionalAuth } from '../../middleware/auth.js';
+import { validateRequest } from '../../middleware/validate.js';
+import { updateTicketSchema, adminReplySchema } from '../../schemas/support.schemas.js';
 
 export const adminRoutes = Router();
 
+// ============================================================================
+// Root Admin Overview Endpoint: GET /api/v1/admin
+// ============================================================================
+// Returns executive catalog of admin endpoints, system status, and live metrics
+adminRoutes.get('/', optionalAuth, AdminController.getAdminOverview);
+
+// Protect all remaining operational admin endpoints with JWT authentication and Admin role enforcement
 adminRoutes.use(authenticateToken);
 adminRoutes.use(requireAdmin);
 
+// System Metrics & Audit (Immutable Compliance Trail)
 adminRoutes.get('/metrics', AdminController.getMetrics);
 adminRoutes.get('/audit-logs', AdminController.getAuditLogs);
+adminRoutes.delete('/audit-logs', AdminController.blockAuditDeletion);
+adminRoutes.delete('/audit-logs/:id', AdminController.blockAuditDeletion);
+
+// Financial & Operations
 adminRoutes.post('/calculate-commissions', AdminController.triggerWeeklyCommissionCalculation);
 adminRoutes.post('/settle-payouts', AdminController.triggerPayoutSettlement);
 adminRoutes.patch('/distributors/:memberId/status', AdminController.updateMemberStatus);
+
+// ============================================================================
+// Admin Support Desk Management: /api/v1/admin/support/tickets
+// ============================================================================
+// 1. GET /api/v1/admin/support/tickets - View all helpdesk tickets with filtering
+adminRoutes.get('/support/tickets', AdminController.getSupportTickets);
+
+// 2. PATCH /api/v1/admin/support/tickets/:id - Update status, priority, or department
+adminRoutes.patch(
+  '/support/tickets/:id',
+  validateRequest({ body: updateTicketSchema }),
+  AdminController.updateSupportTicket
+);
+
+// 3. POST /api/v1/admin/support/tickets/:id/reply - Post official administrator reply
+adminRoutes.post(
+  '/support/tickets/:id/reply',
+  validateRequest({ body: adminReplySchema }),
+  AdminController.replySupportTicket
+);
+
+export default adminRoutes;

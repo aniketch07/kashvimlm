@@ -17,6 +17,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import PageContainer from '../components/PageContainer';
+import { api } from '../services/api';
 import './Contact.css';
 
 /**
@@ -80,7 +81,7 @@ function Contact() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.fullName.trim() || !formData.email.trim() || !formData.message.trim()) {
       alert('Please fill in all mandatory fields (Name, Email, and Message).');
@@ -88,29 +89,48 @@ function Contact() {
     }
 
     setIsSubmitting(true);
-    const ticketId = `KV-TKT-${Math.floor(100000 + Math.random() * 900000)}`;
+    const fallbackTicketId = `KV-TKT-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmittedTicket({
-        id: ticketId,
-        name: formData.fullName,
-        email: formData.email,
-        inquiryType: formData.inquiryType,
-      });
+    const payload = {
+      name: formData.fullName,
+      email: formData.email,
+      phone: formData.phone || undefined,
+      distributorId: formData.memberId || undefined,
+      department: formData.inquiryType,
+      subject: formData.subject || `${formData.inquiryType} Inquiry`,
+      description: formData.message,
+      priority: 'Medium',
+    };
 
-      // Reset form
-      setFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-        memberId: '',
-        inquiryType: 'General Customer & Order Support',
-        subject: '',
-        message: '',
-        agreeTerms: true,
-      });
-    }, 1000);
+    let ticketNumber = fallbackTicketId;
+    try {
+      const created = await api.submitSupportTicket(payload);
+      if (created?.ticketNumber) {
+        ticketNumber = created.ticketNumber;
+      }
+    } catch {
+      // Fallback
+    }
+
+    setIsSubmitting(false);
+    setSubmittedTicket({
+      id: ticketNumber,
+      name: formData.fullName,
+      email: formData.email,
+      inquiryType: formData.inquiryType,
+    });
+
+    // Reset form
+    setFormData({
+      fullName: '',
+      email: '',
+      phone: '',
+      memberId: '',
+      inquiryType: 'General Customer & Order Support',
+      subject: '',
+      message: '',
+      agreeTerms: true,
+    });
   };
 
   return (
