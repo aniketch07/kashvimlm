@@ -3,10 +3,10 @@ import { z } from 'zod';
 export const placementPositionEnum = z.enum(['LEFT', 'RIGHT']);
 
 export const placeDistributorSchema = z.object({
-  distributorId: z.string().uuid('distributorId must be a valid UUID'),
-  businessCenterId: z.string().uuid('businessCenterId must be a valid UUID'),
-  sponsorId: z.string().uuid('sponsorId must be a valid UUID'),
-  placementParentId: z.string().uuid('placementParentId must be a valid UUID'),
+  distributorId: z.string().min(1, 'distributorId is required'),
+  businessCenterId: z.string().optional(),
+  sponsorId: z.string().optional(),
+  placementParentId: z.string().min(1, 'placementParentId is required'),
   placementPosition: placementPositionEnum,
 });
 

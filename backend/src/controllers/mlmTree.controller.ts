@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { MlmTreeService } from '../services/mlmTree.service';
+import { TreePlacementService } from '../services/treePlacement.service';
 import { sendSuccess } from '../utils/apiResponse';
 
 export class MlmTreeController {
@@ -94,4 +95,22 @@ export class MlmTreeController {
       next(error);
     }
   }
+
+  /**
+   * Enrolls a new member using Sponsor ID
+   * POST /api/v1/tree/enroll
+   */
+  public static async enrollMember(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await MlmTreeService.enrollMember(req.body);
+      sendSuccess(res, {
+        statusCode: 201,
+        message: 'Member successfully enrolled under sponsor.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

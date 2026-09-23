@@ -553,4 +553,62 @@ export const api = {
       throw err;
     }
   },
+
+  async enrollMember(memberData) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/tree/enroll`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(memberData),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Enroll member failed:', err.message);
+    }
+    return null;
+  },
+
+  async getSponsorTree(distributorId = 'KV-1001', depth = 3) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/tree/sponsor/${encodeURIComponent(distributorId)}?depth=${depth}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Get sponsor tree failed:', err.message);
+    }
+    return null;
+  },
+
+  // 9. Sponsor Validation & Binary Enrollment (Prompt 5)
+  async validateSponsor(sponsorId) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/sponsors/${encodeURIComponent(sponsorId)}`);
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('[API] Validate sponsor failed:', err.message);
+      return { success: false, code: 'NETWORK_ERROR', message: err.message };
+    }
+  },
+
+  async submitCompleteEnrollment(enrollData) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/enrollments/complete`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(enrollData),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('[API] Submit complete enrollment failed:', err.message);
+      return { success: false, code: 'NETWORK_ERROR', message: err.message };
+    }
+  },
 };
+

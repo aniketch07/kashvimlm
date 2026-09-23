@@ -11,8 +11,12 @@ import { cartRouter } from './cart.routes';
 import { categoryRouter } from './category.routes';
 import { orderRouter } from './order.routes';
 import { productRouter } from './product.routes';
+import { sponsorRouter } from './sponsor.routes';
 
 const apiRouter = Router();
+
+// Sponsor Validation Endpoint: GET /api/v1/sponsors/:sponsorId
+apiRouter.use('/sponsors', sponsorRouter);
 
 // Health Check Endpoint: GET /api/v1/health
 apiRouter.use('/health', healthRouter);

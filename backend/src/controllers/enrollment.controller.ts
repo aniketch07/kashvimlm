@@ -148,4 +148,22 @@ export class EnrollmentController {
       next(error);
     }
   }
+
+  /**
+   * Direct complete enrollment in a single atomic transaction.
+   * POST /api/v1/enrollments/complete
+   */
+  public static async complete(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await EnrollmentService.completeDirectEnrollment(req.body);
+      sendSuccess(res, {
+        statusCode: 201,
+        message: 'Enrollment completed successfully! Account and placement activated.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

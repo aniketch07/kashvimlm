@@ -293,24 +293,28 @@ export async function seedDatabase(): Promise<void> {
   });
 
   const rahulDistributor = await prisma.distributorProfile.upsert({
-    where: { distributorCode: 'KV-DEMO-1001' },
+    where: { distributorCode: 'KV-1001' },
     update: {
+      distributorId: 'KV-1001',
       firstName: 'Rahul',
-      lastName: 'Example',
-      displayName: 'Rahul Example',
+      lastName: 'Kaushal',
+      displayName: 'Rahul Kaushal',
       status: 'ACTIVE',
       currentRankId: rankGold.id,
       highestRankId: rankGold.id,
+      rankId: rankGold.id,
     },
     create: {
       userId: rahulUser.id,
-      distributorCode: 'KV-DEMO-1001',
+      distributorId: 'KV-1001',
+      distributorCode: 'KV-1001',
       firstName: 'Rahul',
-      lastName: 'Example',
-      displayName: 'Rahul Example',
+      lastName: 'Kaushal',
+      displayName: 'Rahul Kaushal',
       status: 'ACTIVE',
       currentRankId: rankGold.id,
       highestRankId: rankGold.id,
+      rankId: rankGold.id,
       lifetimePV: new Prisma.Decimal('1500.00'),
       lifetimeGV: new Prisma.Decimal('45000.00'),
       activatedAt: new Date('2026-01-01T00:00:00Z'),
@@ -340,32 +344,28 @@ export async function seedDatabase(): Promise<void> {
     },
   });
 
-  // Bank Account for Rahul Example (Payout verification)
-  const rahulBankAccount = await prisma.bankAccount.upsert({
-    where: {
-      distributorId_accountNumberHash: {
-        distributorId: rahulDistributor.id,
-        accountNumberHash: 'hash-demo-1001-bank-acct',
-      },
-    },
-    update: {},
-    create: {
-      distributorId: rahulDistributor.id,
-      bankName: 'JPMorgan Chase Bank',
-      accountHolderName: 'Rahul Example',
-      accountNumberMasked: '********1098',
-      accountNumberHash: 'hash-demo-1001-bank-acct',
-      routingNumberMasked: '021*****4',
-      status: 'VERIFIED',
-      isPrimary: true,
-    },
+  let rahulBankAccount = await prisma.bankAccount.findFirst({
+    where: { distributorId: rahulDistributor.id },
   });
+  if (!rahulBankAccount) {
+    rahulBankAccount = await prisma.bankAccount.create({
+      data: {
+        distributorId: rahulDistributor.id,
+        bankName: 'JPMorgan Chase Bank',
+        accountHolderName: 'Rahul Kaushal',
+        accountNumber: '987654321098',
+        routingNumber: '021000021',
+        status: 'VERIFIED',
+        isPrimary: true,
+      },
+    });
+  }
 
   // ==========================================
-  // 6. 3 Business Centers for Rahul Example (KV-DEMO-1001)
+  // 6. 3 Business Centers for Rahul (KV-1001)
   // ==========================================
   const rahulBC1 = await prisma.businessCenter.upsert({
-    where: { centerCode: 'KV-DEMO-1001-BC1' },
+    where: { centerCode: 'KV-1001-BC1' },
     update: {
       leftVolume: new Prisma.Decimal('14500.00'),
       rightVolume: new Prisma.Decimal('11200.00'),
@@ -375,7 +375,7 @@ export async function seedDatabase(): Promise<void> {
     create: {
       distributorId: rahulDistributor.id,
       centerNumber: 1,
-      centerCode: 'KV-DEMO-1001-BC1',
+      centerCode: 'KV-1001-BC1',
       status: 'ACTIVE',
       leftVolume: new Prisma.Decimal('14500.00'),
       rightVolume: new Prisma.Decimal('11200.00'),
@@ -385,7 +385,7 @@ export async function seedDatabase(): Promise<void> {
   });
 
   const rahulBC2 = await prisma.businessCenter.upsert({
-    where: { centerCode: 'KV-DEMO-1001-BC2' },
+    where: { centerCode: 'KV-1001-BC2' },
     update: {
       leftVolume: new Prisma.Decimal('6200.00'),
       rightVolume: new Prisma.Decimal('5400.00'),
@@ -395,7 +395,7 @@ export async function seedDatabase(): Promise<void> {
     create: {
       distributorId: rahulDistributor.id,
       centerNumber: 2,
-      centerCode: 'KV-DEMO-1001-BC2',
+      centerCode: 'KV-1001-BC2',
       status: 'ACTIVE',
       leftVolume: new Prisma.Decimal('6200.00'),
       rightVolume: new Prisma.Decimal('5400.00'),
@@ -405,7 +405,7 @@ export async function seedDatabase(): Promise<void> {
   });
 
   const rahulBC3 = await prisma.businessCenter.upsert({
-    where: { centerCode: 'KV-DEMO-1001-BC3' },
+    where: { centerCode: 'KV-1001-BC3' },
     update: {
       leftVolume: new Prisma.Decimal('3800.00'),
       rightVolume: new Prisma.Decimal('3100.00'),
@@ -415,7 +415,7 @@ export async function seedDatabase(): Promise<void> {
     create: {
       distributorId: rahulDistributor.id,
       centerNumber: 3,
-      centerCode: 'KV-DEMO-1001-BC3',
+      centerCode: 'KV-1001-BC3',
       status: 'ACTIVE',
       leftVolume: new Prisma.Decimal('3800.00'),
       rightVolume: new Prisma.Decimal('3100.00'),
@@ -424,7 +424,7 @@ export async function seedDatabase(): Promise<void> {
     },
   });
 
-  // Root Node in Binary Tree for Demo Distributor BC1
+  // Root Node in Binary Tree for Rahul (KV-1001) BC1
   const rootNode = await prisma.mLMNode.upsert({
     where: { businessCenterId: rahulBC1.id },
     update: {},
@@ -435,6 +435,7 @@ export async function seedDatabase(): Promise<void> {
       binaryPath: 'ROOT',
     },
   });
+
 
   // ==========================================
   // 7. PREFERRED CUSTOMER: customer@example.com
@@ -540,18 +541,30 @@ export async function seedDatabase(): Promise<void> {
   });
 
   const distA = await prisma.distributorProfile.upsert({
-    where: { distributorCode: 'KV-DEMO-1002' },
-    update: {},
-    create: {
-      userId: userA.id,
-      distributorCode: 'KV-DEMO-1002',
-      firstName: 'Alice',
-      lastName: 'Miller',
-      displayName: 'Alice Miller',
+    where: { distributorCode: 'KV-1002' },
+    update: {
+      distributorId: 'KV-1002',
+      firstName: 'Amit',
+      lastName: 'Verma',
+      displayName: 'Amit Verma',
       status: 'ACTIVE',
       sponsorId: rahulDistributor.id,
       currentRankId: rankSilver.id,
       highestRankId: rankSilver.id,
+      rankId: rankSilver.id,
+    },
+    create: {
+      userId: userA.id,
+      distributorId: 'KV-1002',
+      distributorCode: 'KV-1002',
+      firstName: 'Amit',
+      lastName: 'Verma',
+      displayName: 'Amit Verma',
+      status: 'ACTIVE',
+      sponsorId: rahulDistributor.id,
+      currentRankId: rankSilver.id,
+      highestRankId: rankSilver.id,
+      rankId: rankSilver.id,
       lifetimePV: new Prisma.Decimal('600.00'),
       lifetimeGV: new Prisma.Decimal('18000.00'),
       activatedAt: new Date('2026-01-10T00:00:00Z'),
@@ -559,12 +572,12 @@ export async function seedDatabase(): Promise<void> {
   });
 
   const bcA = await prisma.businessCenter.upsert({
-    where: { centerCode: 'KV-DEMO-1002-BC1' },
+    where: { centerCode: 'KV-1002-BC1' },
     update: {},
     create: {
       distributorId: distA.id,
       centerNumber: 1,
-      centerCode: 'KV-DEMO-1002-BC1',
+      centerCode: 'KV-1002-BC1',
       status: 'ACTIVE',
       leftVolume: new Prisma.Decimal('6200.00'),
       rightVolume: new Prisma.Decimal('5800.00'),
@@ -617,18 +630,30 @@ export async function seedDatabase(): Promise<void> {
   });
 
   const distB = await prisma.distributorProfile.upsert({
-    where: { distributorCode: 'KV-DEMO-1003' },
-    update: {},
-    create: {
-      userId: userB.id,
-      distributorCode: 'KV-DEMO-1003',
-      firstName: 'Bob',
-      lastName: 'Chen',
-      displayName: 'Bob Chen',
+    where: { distributorCode: 'KV-1003' },
+    update: {
+      distributorId: 'KV-1003',
+      firstName: 'Rohit',
+      lastName: 'Singh',
+      displayName: 'Rohit Singh',
       status: 'ACTIVE',
       sponsorId: rahulDistributor.id,
       currentRankId: rankSilver.id,
       highestRankId: rankSilver.id,
+      rankId: rankSilver.id,
+    },
+    create: {
+      userId: userB.id,
+      distributorId: 'KV-1003',
+      distributorCode: 'KV-1003',
+      firstName: 'Rohit',
+      lastName: 'Singh',
+      displayName: 'Rohit Singh',
+      status: 'ACTIVE',
+      sponsorId: rahulDistributor.id,
+      currentRankId: rankSilver.id,
+      highestRankId: rankSilver.id,
+      rankId: rankSilver.id,
       lifetimePV: new Prisma.Decimal('500.00'),
       lifetimeGV: new Prisma.Decimal('15000.00'),
       activatedAt: new Date('2026-01-12T00:00:00Z'),
@@ -636,12 +661,12 @@ export async function seedDatabase(): Promise<void> {
   });
 
   const bcB = await prisma.businessCenter.upsert({
-    where: { centerCode: 'KV-DEMO-1003-BC1' },
+    where: { centerCode: 'KV-1003-BC1' },
     update: {},
     create: {
       distributorId: distB.id,
       centerNumber: 1,
-      centerCode: 'KV-DEMO-1003-BC1',
+      centerCode: 'KV-1003-BC1',
       status: 'ACTIVE',
       leftVolume: new Prisma.Decimal('5100.00'),
       rightVolume: new Prisma.Decimal('4800.00'),

@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../src/app';
 import {
+  completeEnrollmentSchema,
   createEnrollmentSchema,
   step1PersonalInfoSchema,
   step2AddressSchema,
@@ -331,4 +332,115 @@ describe('ENROLLMENT MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
       expect(sanitized.steps[0].stepData.pinConfigured).toBe(true);
     });
   });
+
+  describe('6. Direct Complete Enrollment & Binary Tree Integration (Prompt 5)', () => {
+    const validPayload = {
+      fullName: 'Vikram Sharma',
+      email: 'vikram.sharma@example.com',
+      phone: '+91 98201 54321',
+      dob: '1992-06-15',
+      address: 'Flat 402, Greenfield Heights, Andheri West',
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      pincode: '400053',
+      country: 'India',
+      sponsorId: 'KV-1008',
+      placementParentId: 'KV-1008',
+      placementPosition: 'LEFT',
+      enrollmentType: 'DISTRIBUTOR',
+      starterKitId: 'kit_pro',
+      productPackage: 'Professional Pack',
+      price: 249.99,
+      bv: 100,
+      bankName: 'HDFC Bank',
+      accountNumber: '50100234981122',
+      ifscCode: 'HDFC0000123',
+      password: 'SecurePass2026!',
+    };
+
+    it('should validate completeEnrollmentSchema correctly', () => {
+      const parsed = completeEnrollmentSchema.safeParse(validPayload);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('should reject when sponsorId is missing', () => {
+      const parsed = completeEnrollmentSchema.safeParse({
+        ...validPayload,
+        sponsorId: '',
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it('should reject invalid placement position', () => {
+      const parsed = completeEnrollmentSchema.safeParse({
+        ...validPayload,
+        placementPosition: 'CENTER' as any,
+      });
+      expect(parsed.success).toBe(false);
+    });
+
+    it('should successfully complete enrollment via POST /api/v1/enrollments/complete', async () => {
+      const mockResult = {
+        user: { id: 'usr-123', email: validPayload.email, roleName: 'DISTRIBUTOR', status: 'ACTIVE' },
+        distributor: { id: 'dst-123', distributorId: 'KV-1009', distributorCode: 'KV-1009', displayName: validPayload.fullName, status: 'ACTIVE' },
+        sponsor: { id: 'spon-123', distributorId: 'KV-1008', distributorCode: 'KV-1008', displayName: 'Vikram Malhotra' },
+        placement: { placementParentId: 'node-123', placementParentDistributorId: 'KV-1008', position: 'LEFT', depth: 2, binaryPath: 'ROOT/L', nodeId: 'node-new-123' },
+        businessCenter: { id: 'bc-123', centerCode: 'KV-1009-BC1', centerNumber: 1 },
+      };
+
+      vi.spyOn(EnrollmentService, 'completeDirectEnrollment').mockResolvedValue(mockResult as any);
+
+      const res = await request(app)
+        .post('/api/v1/enrollments/complete')
+        .send(validPayload)
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.distributor.distributorId).toBe('KV-1009');
+      expect(res.body.data.placement.position).toBe('LEFT');
+    });
+
+    it('should return 409 conflict when placement position is already occupied', async () => {
+      vi.spyOn(EnrollmentService, 'completeDirectEnrollment').mockRejectedValue(
+        new AppError('The LEFT position under placement parent (KV-1001) is already occupied.', 409, 'POSITION_ALREADY_OCCUPIED')
+      );
+
+      const res = await request(app)
+        .post('/api/v1/enrollments/complete')
+        .send(validPayload)
+        .expect(409);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.code).toBe('POSITION_ALREADY_OCCUPIED');
+    });
+
+    it('should return 404 when sponsor does not exist', async () => {
+      vi.spyOn(EnrollmentService, 'completeDirectEnrollment').mockRejectedValue(
+        new AppError('Sponsor not found', 404, 'SPONSOR_NOT_FOUND')
+      );
+
+      const res = await request(app)
+        .post('/api/v1/enrollments/complete')
+        .send({ ...validPayload, sponsorId: 'KV-NONEXISTENT' })
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.code).toBe('SPONSOR_NOT_FOUND');
+    });
+
+    it('should return 400 when sponsor is inactive', async () => {
+      vi.spyOn(EnrollmentService, 'completeDirectEnrollment').mockRejectedValue(
+        new AppError('The specified sponsor account is not active.', 400, 'SPONSOR_INACTIVE')
+      );
+
+      const res = await request(app)
+        .post('/api/v1/enrollments/complete')
+        .send(validPayload)
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.code).toBe('SPONSOR_INACTIVE');
+    });
+  });
 });
+

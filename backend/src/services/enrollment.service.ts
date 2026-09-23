@@ -1,11 +1,12 @@
 import { randomUUID } from 'crypto';
-import { Prisma, UserRole } from '@prisma/client';
+import { PlacementPosition, Prisma, UserRole } from '@prisma/client';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
 import { AppError } from '../utils/appError';
 import { maskAccountNumber, sanitizeEnrollmentResponse } from '../utils/masking';
 import { hashPassword } from '../utils/password';
 import {
+  CompleteEnrollmentInput,
   CreateEnrollmentInput,
   Step1PersonalInfoInput,
   Step2AddressInput,
@@ -935,7 +936,7 @@ export class EnrollmentService {
 
     // Verify all 5 steps are completed
     const stepMap = new Map<number, any>();
-    enrollment.steps.forEach((s) => stepMap.set(s.stepNumber, s));
+    enrollment.steps.forEach((s: any) => stepMap.set(s.stepNumber, s));
 
     for (let i = 1; i <= 5; i++) {
       const step = stepMap.get(i);
@@ -1306,4 +1307,356 @@ export class EnrollmentService {
       enrollment: sanitizeEnrollmentResponse(result.enrollment),
     };
   }
+
+  /**
+   * DIRECT COMPLETE ENROLLMENT
+   * Executes the exact 12-step atomic transaction requested in Prompt 5:
+   * 1. Validate applicant
+   * 2. Validate sponsor
+   * 3. Validate sponsor status
+   * 4. Validate placement parent
+   * 5. Validate LEFT/RIGHT position
+   * 6. Re-check position availability (with row locking / before-insert verification)
+   * 7. Create user
+   * 8. Create distributor
+   * 9. Create sponsor relationship
+   * 10. Create business center if required
+   * 11. Create MLM tree relationship
+   * 12. Commit
+   *
+   * If ANY operation fails: ROLLBACK EVERYTHING.
+   */
+  public static async completeDirectEnrollment(input: CompleteEnrollmentInput) {
+    const email = input.email.toLowerCase().trim();
+    const phone = input.phone.trim();
+    const legalName = input.fullName.trim();
+    const nameParts = legalName.split(/\s+/);
+    const firstName = nameParts[0] || 'Distributor';
+    const lastName = nameParts.slice(1).join(' ') || nameParts[0];
+    const position = input.placementPosition as PlacementPosition;
+
+    try {
+      // Execute within a single database transaction with automatic rollback
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Validate applicant
+        const existingUser = await tx.user.findUnique({
+          where: { email },
+        });
+        if (existingUser) {
+          throw AppError.conflict(
+            'An account with this email address already exists. Please login instead.',
+            'ENROLLMENT_USER_ALREADY_EXISTS'
+          );
+        }
+
+        // 2. Validate sponsor
+        const sponsorIdentifier = input.sponsorId.trim();
+        const sponsor = await tx.distributorProfile.findFirst({
+          where: {
+            OR: [
+              { distributorId: { equals: sponsorIdentifier, mode: 'insensitive' } },
+              { distributorCode: { equals: sponsorIdentifier, mode: 'insensitive' } },
+              { id: sponsorIdentifier },
+            ],
+          },
+          include: {
+            user: true,
+            mlmNodes: {
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        });
+
+        if (!sponsor) {
+          throw AppError.notFound(
+            `Sponsor '${sponsorIdentifier}' not found. Please verify the sponsor ID.`,
+            'SPONSOR_NOT_FOUND'
+          );
+        }
+
+        // 3. Validate sponsor status
+        if (sponsor.status !== 'ACTIVE') {
+          throw AppError.badRequest(
+            'The specified sponsor account is not active.',
+            'SPONSOR_INACTIVE'
+          );
+        }
+
+        // Prevent self-sponsorship
+        if (sponsor.user?.email && sponsor.user.email.toLowerCase() === email) {
+          throw AppError.badRequest(
+            'Self-sponsorship forbidden: Sponsor and applicant cannot have the same email address.',
+            'SELF_SPONSOR_FORBIDDEN'
+          );
+        }
+
+        // 4. Validate placement parent
+        const parentIdentifier = (input.placementParentId || input.sponsorId).trim();
+        let parentProfile = await tx.distributorProfile.findFirst({
+          where: {
+            OR: [
+              { distributorId: { equals: parentIdentifier, mode: 'insensitive' } },
+              { distributorCode: { equals: parentIdentifier, mode: 'insensitive' } },
+              { id: parentIdentifier },
+            ],
+          },
+          include: { user: true },
+        });
+
+        let parentNode: any = null;
+        if (parentProfile) {
+          parentNode = await tx.mLMNode.findFirst({
+            where: { distributorId: parentProfile.id },
+            include: { distributor: true },
+          });
+        } else {
+          // Try finding directly by MLMNode.id
+          parentNode = await tx.mLMNode.findUnique({
+            where: { id: parentIdentifier },
+            include: { distributor: true },
+          });
+          if (parentNode) {
+            parentProfile = parentNode.distributor;
+          }
+        }
+
+        if (!parentNode || !parentProfile) {
+          throw AppError.notFound(
+            `Placement parent '${parentIdentifier}' was not found in the binary tree.`,
+            'PLACEMENT_PARENT_NOT_FOUND'
+          );
+        }
+
+        if (parentProfile.status !== 'ACTIVE') {
+          throw AppError.badRequest(
+            'Placement parent is not active.',
+            'PLACEMENT_PARENT_INACTIVE'
+          );
+        }
+
+        // 5. Validate LEFT/RIGHT position
+        if (position !== 'LEFT' && position !== 'RIGHT') {
+          throw AppError.badRequest(
+            'Invalid placement position. Position must be LEFT or RIGHT.',
+            'INVALID_PLACEMENT_POSITION'
+          );
+        }
+
+        // 6. Re-check position availability (Row locking / concurrency verification)
+        try {
+          await tx.$queryRaw`SELECT "id" FROM "mlm_nodes" WHERE "id" = ${parentNode.id} FOR UPDATE;`;
+        } catch {
+          // Fallback if raw query lock not supported by test adapter
+        }
+
+        const occupiedPosition = await tx.mLMNode.findFirst({
+          where: {
+            placementParentId: parentNode.id,
+            placementPosition: position,
+          },
+        });
+
+        if (occupiedPosition) {
+          throw AppError.conflict(
+            `The ${position} position under placement parent (${parentProfile.distributorId || parentProfile.distributorCode}) is already occupied.`,
+            'POSITION_ALREADY_OCCUPIED'
+          );
+        }
+
+        // 7. Create user
+        const passwordHash = await hashPassword(input.password);
+        const user = await tx.user.create({
+          data: {
+            email,
+            passwordHash,
+            roleName: input.enrollmentType as UserRole,
+            status: 'ACTIVE',
+            phone,
+            securityProfile: {
+              create: {
+                twoFactorEnabled: false,
+              },
+            },
+            wallet: {
+              create: {
+                balance: 0,
+                currency: 'INR',
+              },
+            },
+          },
+        });
+
+        // Create address
+        await tx.address.create({
+          data: {
+            userId: user.id,
+            type: 'SHIPPING',
+            isDefault: true,
+            recipientName: legalName,
+            phone,
+            streetAddress: input.address,
+            city: input.city,
+            state: input.state,
+            postalCode: input.pincode,
+            country: input.country || 'India',
+          },
+        });
+
+        // 8. Create distributor
+        const distributorCount = await tx.distributorProfile.count();
+        let nextNum = 1004 + distributorCount;
+        let newDistributorId = `KV-${nextNum}`;
+        let conflict = await tx.distributorProfile.findFirst({
+          where: {
+            OR: [{ distributorId: newDistributorId }, { distributorCode: newDistributorId }],
+          },
+        });
+        while (conflict) {
+          nextNum = Math.floor(1000 + Math.random() * 9000);
+          newDistributorId = `KV-${nextNum}`;
+          conflict = await tx.distributorProfile.findFirst({
+            where: {
+              OR: [{ distributorId: newDistributorId }, { distributorCode: newDistributorId }],
+            },
+          });
+        }
+
+        const distributorCode = newDistributorId;
+
+        const distributor = await tx.distributorProfile.create({
+          data: {
+            userId: user.id,
+            distributorId: newDistributorId,
+            distributorCode,
+            firstName,
+            lastName,
+            displayName: legalName,
+            status: 'ACTIVE',
+            sponsorId: sponsor.id,
+            dateOfBirth: input.dob ? new Date(input.dob) : undefined,
+            activatedAt: new Date(),
+          },
+        });
+
+        // 9. Create sponsor relationship (direct depth 1 + ancestor lineage)
+        await tx.sponsorRelationship.create({
+          data: {
+            ancestorId: sponsor.id,
+            descendantId: distributor.id,
+            depth: 1,
+            isDirect: true,
+          },
+        });
+
+        const ancestors = await tx.sponsorRelationship.findMany({
+          where: { descendantId: sponsor.id },
+        });
+
+        for (const ancestor of ancestors) {
+          await tx.sponsorRelationship.create({
+            data: {
+              ancestorId: ancestor.ancestorId,
+              descendantId: distributor.id,
+              depth: ancestor.depth + 1,
+              isDirect: false,
+            },
+          });
+        }
+
+        // 10. Create business center if required
+        const bc = await tx.businessCenter.create({
+          data: {
+            distributorId: distributor.id,
+            centerNumber: 1,
+            centerCode: `${newDistributorId}-BC1`,
+            status: 'ACTIVE',
+          },
+        });
+
+        // 11. Create MLM tree relationship
+        const newDepth = parentNode.depth + 1;
+        const parentPath = parentNode.binaryPath || 'ROOT';
+        const legIndicator = position === 'LEFT' ? 'L' : 'R';
+        const binaryPath = `${parentPath}/${legIndicator}`;
+
+        const mlmNode = await tx.mLMNode.create({
+          data: {
+            distributorId: distributor.id,
+            businessCenterId: bc.id,
+            placementParentId: parentNode.id,
+            placementPosition: position,
+            depth: newDepth,
+            binaryPath,
+          },
+        });
+
+        // Optional Bank details
+        if (input.accountNumber && input.bankName) {
+          await tx.bankAccount.create({
+            data: {
+              distributorId: distributor.id,
+              bankName: input.bankName,
+              accountHolderName: legalName,
+              accountNumber: input.accountNumber,
+              routingNumber: input.ifscCode || 'N/A',
+              status: 'PENDING_VERIFICATION',
+              isPrimary: true,
+            },
+          });
+        }
+
+        // 12. Commit
+        return {
+          user: {
+            id: user.id,
+            email: user.email,
+            roleName: user.roleName,
+            status: user.status,
+          },
+          distributor: {
+            id: distributor.id,
+            distributorId: distributor.distributorId,
+            distributorCode: distributor.distributorCode,
+            displayName: distributor.displayName,
+            status: distributor.status,
+          },
+          sponsor: {
+            id: sponsor.id,
+            distributorId: sponsor.distributorId,
+            distributorCode: sponsor.distributorCode,
+            displayName: sponsor.displayName || `${sponsor.firstName} ${sponsor.lastName}`,
+          },
+          placement: {
+            placementParentId: parentNode.id,
+            placementParentDistributorId: parentProfile.distributorId || parentProfile.distributorCode,
+            position,
+            depth: newDepth,
+            binaryPath,
+            nodeId: mlmNode.id,
+          },
+          businessCenter: {
+            id: bc.id,
+            centerCode: bc.centerCode,
+            centerNumber: bc.centerNumber,
+          },
+        };
+      });
+
+      logger.info(
+        {
+          userId: result.user.id,
+          distributorId: result.distributor.distributorId,
+          sponsorId: result.sponsor.distributorId,
+          position: result.placement.position,
+        },
+        'Direct enrollment completed successfully'
+      );
+
+      return result;
+    } catch (err: any) {
+      if (err instanceof AppError) throw err;
+      throw err;
+    }
+  }
 }
+

@@ -20,8 +20,12 @@ pnpm-debug.log*
 # Testing & Coverage
 coverage/
 
+# Local Embedded Database
+.pgdata/
+
 # OS and Editor
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+

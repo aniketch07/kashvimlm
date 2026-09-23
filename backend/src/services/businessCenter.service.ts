@@ -281,6 +281,12 @@ export class BusinessCenterService {
       rightVolume: rightVol,
       accumulatedLeftVolume: leftVol * 4,
       accumulatedRightVolume: rightVol * 4,
+      nodeId: null,
+      placementParentId: null,
+      placementPosition: null,
+      depth: null,
+      createdAt: new Date('2026-01-15T08:00:00.000Z'),
+      updatedAt: new Date('2026-01-15T08:00:00.000Z'),
     };
 
     const tree: BusinessCenterTreeNode = {

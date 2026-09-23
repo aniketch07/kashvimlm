@@ -79,6 +79,7 @@ function Profile() {
     email: '',
     phone: '',
     username: '',
+    sponsorId: 'KV-1001', // Default to Rahul Kaushal (KV-1001)
     password: '',
     confirmPassword: '',
   });
@@ -112,6 +113,7 @@ function Profile() {
     const isOwnerDemo =
       loginForm.username.toLowerCase().includes('rahul') ||
       loginForm.username === '88767139' ||
+      loginForm.username === 'KV-1001' ||
       loginForm.username.toLowerCase().includes('poonam') ||
       loginForm.username === '18618331';
 
@@ -125,11 +127,11 @@ function Profile() {
       email: `${loginForm.username.toLowerCase()}@kashvimlm.com`,
       phone: '+91 98765 43210',
       location: 'Mumbai, Maharashtra, India',
-      memberId: isOwnerDemo ? '88767139' : (loginForm.username === 'kashvi' ? '10001001' : '88767139'),
-      sponsorId: loginForm.sponsorId.trim() || '88767139',
+      memberId: isOwnerDemo ? 'KV-1001' : (loginForm.username === 'kashvi' ? '10001001' : 'KV-1001'),
+      sponsorId: loginForm.sponsorId.trim() || 'KV-1001',
       memberSince: '2026',
       since: '2026',
-      tier: 'Business Center',
+      tier: 'Diamond Director',
       bvPoints: '0.00 CP',
       teamSize: 48,
     };
@@ -151,28 +153,76 @@ function Profile() {
       alert('Please fill in all required fields.');
       return;
     }
+
+    // Sponsor ID is compulsory
+    if (!registerForm.sponsorId.trim()) {
+      alert('Sponsor ID is compulsory! Each new distributor must join using a Sponsor ID (e.g. KV-1001).');
+      return;
+    }
+
     if (registerForm.password !== registerForm.confirmPassword) {
       alert('Passwords do not match.');
       return;
     }
 
-    const newMemberId = `${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const cleanSponsorId = registerForm.sponsorId.trim().toUpperCase();
+    const isRahul = cleanSponsorId === 'KV-1001' || cleanSponsorId === '88767139' || cleanSponsorId.includes('RAHUL');
+    const isAmit = cleanSponsorId === 'KV-1002' || cleanSponsorId.includes('AMIT');
+    const isRohit = cleanSponsorId === 'KV-1003' || cleanSponsorId.includes('ROHIT');
+
+    const sponsorName = isRahul
+      ? 'Rahul Kaushal'
+      : isAmit
+      ? 'Amit Verma'
+      : isRohit
+      ? 'Rohit Singh'
+      : `Sponsor (${cleanSponsorId})`;
+
+    const newMemberId = `KV-${Math.floor(1008 + Math.random() * 8990)}`;
     const userData = {
       name: registerForm.fullName,
-      username: `@${registerForm.username.replace('@', '')}`,
+      username: `@${registerForm.username.replace('@', '') || registerForm.fullName.toLowerCase().replace(/\s+/g, '_')}`,
       email: registerForm.email || `${registerForm.username.toLowerCase()}@kashvimlm.com`,
       phone: registerForm.phone || '+91 98000 12345',
       location: 'India',
       memberId: newMemberId,
-      sponsorId: '88767139',
+      sponsorId: cleanSponsorId,
+      sponsorName,
       memberSince: '2026',
       since: '2026',
-      tier: 'Business Center',
-      bvPoints: '0.00 CP',
+      tier: 'Active Partner',
+      bvPoints: '100.00 CP',
       teamSize: 0,
     };
 
-    setAuthSuccessMsg('Registration successful! Launching your business portal...');
+    // Store in downline team so it is immediately reflected in the Network Tree under the sponsor!
+    try {
+      const downlineItem = {
+        memberId: newMemberId,
+        name: registerForm.fullName,
+        email: registerForm.email,
+        phone: registerForm.phone,
+        sponsorId: cleanSponsorId,
+        sponsorName,
+        enrolledAt: new Date().toISOString(),
+        status: 'Active',
+      };
+      const existing = JSON.parse(localStorage.getItem('kashvi_downline_team') || '[]');
+      existing.unshift(downlineItem);
+      localStorage.setItem('kashvi_downline_team', JSON.stringify(existing));
+    } catch {}
+
+    // Register with backend tree API if available
+    if (api.enrollMember) {
+      api.enrollMember({
+        distributorCode: newMemberId,
+        firstName: registerForm.fullName.split(' ')[0],
+        lastName: registerForm.fullName.split(' ').slice(1).join(' ') || 'Member',
+        sponsorCode: cleanSponsorId,
+      }).catch(() => {});
+    }
+
+    setAuthSuccessMsg(`Registration successful! You have joined under ${sponsorName} (${cleanSponsorId}). Launching portal...`);
     setTimeout(() => {
       localStorage.setItem('kashvi_auth', JSON.stringify({ isLoggedIn: true, user: userData }));
       setCurrentUser(userData);
@@ -472,6 +522,49 @@ function Profile() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Sponsor ID (Compulsory: Each new distributor joins using a Sponsor ID) */}
+                <div className="auth-input-group auth-sponsor-block">
+                  <label htmlFor="reg-sponsor" className="auth-label">
+                    <span>Sponsor ID *</span>
+                    <span className="auth-label-tag">Compulsory to Join</span>
+                  </label>
+                  <div className="auth-input-wrapper">
+                    <Users size={17} className="auth-input-icon" />
+                    <input
+                      id="reg-sponsor"
+                      type="text"
+                      required
+                      placeholder="Enter Sponsor ID (e.g. KV-1001 for Rahul)"
+                      value={registerForm.sponsorId}
+                      onChange={(e) =>
+                        setRegisterForm((prev) => ({ ...prev, sponsorId: e.target.value }))
+                      }
+                      className="auth-input"
+                    />
+                  </div>
+                  {registerForm.sponsorId?.trim() ? (
+                    <span
+                      className="auth-sponsor-hint"
+                      style={{ color: '#059669', fontWeight: 600, display: 'block', marginTop: '5px' }}
+                    >
+                      ✓ Verified Sponsor:{' '}
+                      {registerForm.sponsorId.toUpperCase() === 'KV-1001' ||
+                      registerForm.sponsorId === '88767139' ||
+                      registerForm.sponsorId.toLowerCase().includes('rahul')
+                        ? 'Rahul Kaushal (KV-1001) - You will join directly under Rahul'
+                        : registerForm.sponsorId.toUpperCase() === 'KV-1002'
+                        ? 'Amit Verma (KV-1002) - You will join under Amit'
+                        : registerForm.sponsorId.toUpperCase() === 'KV-1003'
+                        ? 'Rohit Singh (KV-1003) - You will join under Rohit'
+                        : `Sponsor (${registerForm.sponsorId.toUpperCase()})`}
+                    </span>
+                  ) : (
+                    <span className="auth-sponsor-hint">
+                      Each new distributor/customer joins using a Sponsor ID (e.g. KV-1001).
+                    </span>
+                  )}
                 </div>
 
                 {/* Password & Confirm Password */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   UserPlus,
   ShieldCheck,
@@ -16,18 +16,20 @@ import {
   Printer,
   RefreshCw,
   Eye,
-  EyeOff
+  EyeOff,
+  Search,
+  AlertTriangle,
 } from 'lucide-react';
+import { api } from '../../services/api';
 import './EnrollmentView.css';
 
 /**
  * Professional Distributor & Customer Enrollment Portal
- * Allows the sponsor (Rahul kaushal / ID: 88767139) to register new downline members
- * into their binary business tree with auto-placement or specific leg selection.
+ * Binary MLM Enrollment with Step 3 Sponsor ID lookup & Leg availability.
  */
 function EnrollmentView({ user, onNavigate }) {
-  const sponsorName = user?.name || 'Rahul kaushal';
-  const sponsorId = user?.memberId || '88767139';
+  const initialSponsorId = user?.memberId && user.memberId.startsWith('KV-') ? user.memberId : 'KV-1001';
+  const sponsorName = user?.name || 'Rahul Kaushal';
 
   // Mode: 'distributor' (Brand Partner) | 'customer' (Preferred Customer)
   const [enrollType, setEnrollType] = useState('distributor');
@@ -35,6 +37,15 @@ function EnrollmentView({ user, onNavigate }) {
   // Step wizard: 1 (Personal), 2 (Address), 3 (Placement), 4 (Starter Kit), 5 (Bank & Password)
   const [currentStep, setCurrentStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Prompt 5: Sponsor validation and available binary positions
+  const [sponsorInput, setSponsorInput] = useState(initialSponsorId);
+  const [sponsorData, setSponsorData] = useState(null);
+  const [isValidatingSponsor, setIsValidatingSponsor] = useState(false);
+  const [sponsorError, setSponsorError] = useState(null);
+  const [selectedPlacementPosition, setSelectedPlacementPosition] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -48,7 +59,6 @@ function EnrollmentView({ user, onNavigate }) {
     city: '',
     state: 'Maharashtra',
     pincode: '',
-    placementLeg: 'auto', // 'auto' | 'left' | 'right'
     parentBusinessCenter: 'BC 001',
     starterKitId: 'kit_pro',
     bankName: '',
@@ -71,20 +81,74 @@ function EnrollmentView({ user, onNavigate }) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Sponsor validation call: GET /api/v1/sponsors/:sponsorId
+  const handleValidateSponsor = async (idToValidate) => {
+    const id = (idToValidate || sponsorInput).trim();
+    if (!id) {
+      setSponsorError('Please enter a Sponsor ID (e.g. KV-1001).');
+      setSponsorData(null);
+      return;
+    }
+
+    setIsValidatingSponsor(true);
+    setSponsorError(null);
+
+    try {
+      const res = await api.validateSponsor(id);
+      if (res && res.success && res.data) {
+        setSponsorData(res.data);
+        const avail = res.data.availablePositions || [];
+        if (avail.length === 1) {
+          setSelectedPlacementPosition(avail[0]);
+        } else if (avail.includes(selectedPlacementPosition)) {
+          // Keep current selection
+        } else {
+          setSelectedPlacementPosition('');
+        }
+      } else {
+        setSponsorData(null);
+        setSelectedPlacementPosition('');
+        if (res?.code === 'SPONSOR_NOT_FOUND') {
+          setSponsorError(`Sponsor '${id}' not found. Please verify the Distributor ID.`);
+        } else if (res?.code === 'SPONSOR_INACTIVE') {
+          setSponsorError(`Sponsor '${id}' is currently inactive.`);
+        } else {
+          setSponsorError(res?.message || 'Unable to validate sponsor.');
+        }
+      }
+    } catch (err) {
+      setSponsorData(null);
+      setSelectedPlacementPosition('');
+      setSponsorError(err.message || 'Error validating sponsor.');
+    } finally {
+      setIsValidatingSponsor(false);
+    }
+  };
+
+  // Validate on initial Step 3 display
+  useEffect(() => {
+    if (currentStep === 3 && !sponsorData && !isValidatingSponsor && !sponsorError) {
+      handleValidateSponsor(sponsorInput);
+    }
+  }, [currentStep]);
+
   // Pre-fill demo data for quick review
   const handlePrefillDemo = () => {
+    const demoSponsor = 'KV-DEMO-1005';
+    setSponsorInput(demoSponsor);
+    handleValidateSponsor(demoSponsor);
+    setSelectedPlacementPosition('LEFT');
     setFormData({
       fullName: 'Vikas Sharma',
       dob: '1992-06-15',
       gender: 'Male',
-      email: 'vikas.sharma@example.com',
+      email: `vikas.sharma.${Math.floor(1000 + Math.random() * 9000)}@example.com`,
       phone: '+91 98201 54321',
       panNumber: 'ABCPS1234F',
       address: 'Flat 402, Greenfield Heights, Andheri West',
       city: 'Mumbai',
       state: 'Maharashtra',
       pincode: '400053',
-      placementLeg: 'left',
       parentBusinessCenter: 'BC 001',
       starterKitId: 'kit_pro',
       bankName: 'HDFC Bank',
@@ -95,20 +159,21 @@ function EnrollmentView({ user, onNavigate }) {
     });
   };
 
-  const handleSubmitEnrollment = (e) => {
+  const handleSubmitEnrollment = async (e) => {
     e.preventDefault();
     if (!formData.fullName.trim() || !formData.email.trim() || !formData.phone.trim()) {
       alert('Please fill in applicant full name, email, and phone number.');
       return;
     }
 
-    const newMemberId = `186${Math.floor(10000 + Math.random() * 90000)}`;
-    const legLabel =
-      formData.placementLeg === 'left'
-        ? 'Left Leg (BC 002)'
-        : formData.placementLeg === 'right'
-        ? 'Right Leg (BC 003)'
-        : 'Auto-Balanced (BC 001)';
+    if (!selectedPlacementPosition) {
+      alert('Please select an available binary placement position (LEFT or RIGHT) in Step 3.');
+      setCurrentStep(3);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
 
     const kitBV =
       formData.starterKitId === 'kit_pro'
@@ -117,34 +182,88 @@ function EnrollmentView({ user, onNavigate }) {
         ? 200
         : 50;
 
-    const result = {
-      memberId: newMemberId,
-      name: formData.fullName,
+    const kitPrice =
+      formData.starterKitId === 'kit_pro'
+        ? 249.99
+        : formData.starterKitId === 'kit_elite'
+        ? 499.99
+        : 99.99;
+
+    const enrollPayload = {
+      fullName: formData.fullName,
       email: formData.email,
       phone: formData.phone,
-      type: enrollType === 'distributor' ? 'Brand Partner / Associate' : 'Preferred Customer',
-      sponsorId: sponsorId,
-      sponsorName: sponsorName,
-      placement: legLabel,
-      assignedBV: kitBV,
-      enrolledAt: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }),
-      status: 'Active & Commission Qualified',
+      dob: formData.dob || undefined,
+      gender: formData.gender,
+      panNumber: formData.panNumber,
+      address: formData.address,
+      city: formData.city,
+      state: formData.state,
+      pincode: formData.pincode,
+      country: 'India',
+      sponsorId: sponsorInput.trim(),
+      placementParentId: sponsorInput.trim(),
+      placementPosition: selectedPlacementPosition,
+      enrollmentType: enrollType === 'distributor' ? 'DISTRIBUTOR' : 'CUSTOMER',
+      starterKitId: formData.starterKitId,
+      productPackage:
+        formData.starterKitId === 'kit_pro'
+          ? 'Professional Activation Kit'
+          : formData.starterKitId === 'kit_elite'
+          ? 'Elite Executive Kit'
+          : 'Basic Starter Pack',
+      price: kitPrice,
+      bv: kitBV,
+      bankName: formData.bankName,
+      accountNumber: formData.accountNumber,
+      ifscCode: formData.ifscCode,
+      password: formData.password || 'SecurePass2026!',
     };
 
-    // Save into downline history in localStorage
     try {
-      const existing = JSON.parse(localStorage.getItem('kashvi_downline_team') || '[]');
-      existing.unshift(result);
-      localStorage.setItem('kashvi_downline_team', JSON.stringify(existing));
-    } catch {
-      // ignore
-    }
+      const res = await api.submitCompleteEnrollment(enrollPayload);
+      if (res && res.success && res.data) {
+        const d = res.data;
+        const result = {
+          memberId: d.distributor?.distributorId || d.distributor?.distributorCode || 'KV-NEW',
+          name: d.distributor?.displayName || formData.fullName,
+          email: d.user?.email || formData.email,
+          phone: formData.phone,
+          type: enrollType === 'distributor' ? 'Brand Partner / Associate' : 'Preferred Customer',
+          sponsorId: d.sponsor?.distributorId || sponsorInput,
+          sponsorName: d.sponsor?.displayName || sponsorData?.sponsor?.name || sponsorName,
+          placement: `${d.placement?.position} Leg (Depth ${d.placement?.depth})`,
+          placementParent: d.placement?.placementParentDistributorId || sponsorInput,
+          assignedBV: kitBV,
+          enrolledAt: new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          status: 'Active & Commission Qualified',
+        };
 
-    setEnrollmentResult(result);
+        // Save into downline history in localStorage
+        try {
+          const existing = JSON.parse(localStorage.getItem('kashvi_downline_team') || '[]');
+          existing.unshift(result);
+          localStorage.setItem('kashvi_downline_team', JSON.stringify(existing));
+        } catch {
+          // ignore
+        }
+
+        setEnrollmentResult(result);
+      } else {
+        const errorMsg = res?.message || 'Enrollment transaction failed. Please check placement availability.';
+        setSubmitError(errorMsg);
+        alert(`Enrollment Failed: ${errorMsg}`);
+      }
+    } catch (err) {
+      setSubmitError(err.message || 'Network error occurred during enrollment submission.');
+      alert(`Enrollment Submission Error: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleResetForm = () => {
@@ -569,64 +688,161 @@ function EnrollmentView({ user, onNavigate }) {
                 <div>
                   <h3 className="step-main-title">Binary Organization Placement</h3>
                   <p className="step-sub-desc">
-                    Select which leg of your Business Center this new partner will be enrolled under.
+                    Enter the Sponsor ID to check available direct placement legs in the binary tree.
                   </p>
                 </div>
               </div>
 
-              <div className="placement-options-grid">
-                <label className={`placement-radio-card ${formData.placementLeg === 'auto' ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    name="placementLeg"
-                    value="auto"
-                    checked={formData.placementLeg === 'auto'}
-                    onChange={() => handleInputChange('placementLeg', 'auto')}
-                  />
-                  <div className="placement-card-body">
-                    <div className="placement-pill recommended">Recommended</div>
-                    <strong className="placement-title">Auto-Balance Placement</strong>
-                    <p className="placement-desc">
-                      KASHVIMLM algorithm automatically places applicant in your weaker leg to maximize
-                      your binary commission payout.
-                    </p>
-                  </div>
+              {/* Sponsor ID input & search */}
+              <div className="sponsor-search-container">
+                <label className="field-label">
+                  Sponsor ID <span className="req">*</span>
                 </label>
-
-                <label className={`placement-radio-card ${formData.placementLeg === 'left' ? 'selected' : ''}`}>
+                <div className="sponsor-input-wrapper">
                   <input
-                    type="radio"
-                    name="placementLeg"
-                    value="left"
-                    checked={formData.placementLeg === 'left'}
-                    onChange={() => handleInputChange('placementLeg', 'left')}
+                    type="text"
+                    className="field-input uppercase"
+                    placeholder="e.g. KV-1001"
+                    value={sponsorInput}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      setSponsorInput(val);
+                      setSelectedPlacementPosition('');
+                      setSponsorData(null);
+                      setSponsorError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleValidateSponsor(sponsorInput);
+                      }
+                    }}
                   />
-                  <div className="placement-card-body">
-                    <div className="placement-pill">Leg 1</div>
-                    <strong className="placement-title">Left Leg (BC 002)</strong>
-                    <p className="placement-desc">
-                      Directly enrolls under your left team tree. Increases total Left Leg Group Volume (LGV).
-                    </p>
-                  </div>
-                </label>
-
-                <label className={`placement-radio-card ${formData.placementLeg === 'right' ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    name="placementLeg"
-                    value="right"
-                    checked={formData.placementLeg === 'right'}
-                    onChange={() => handleInputChange('placementLeg', 'right')}
-                  />
-                  <div className="placement-card-body">
-                    <div className="placement-pill">Leg 2</div>
-                    <strong className="placement-title">Right Leg (BC 003)</strong>
-                    <p className="placement-desc">
-                      Directly enrolls under your right team tree. Increases total Right Leg Group Volume (RGV).
-                    </p>
-                  </div>
-                </label>
+                  <button
+                    type="button"
+                    className="btn-verify-sponsor"
+                    onClick={() => handleValidateSponsor(sponsorInput)}
+                    disabled={isValidatingSponsor || !sponsorInput.trim()}
+                  >
+                    {isValidatingSponsor ? <RefreshCw size={16} className="spin" /> : <Search size={16} />}
+                    <span>{isValidatingSponsor ? 'Verifying...' : 'Verify Sponsor'}</span>
+                  </button>
+                </div>
+                <span className="field-hint">
+                  Enter Sponsor ID (e.g. <strong>KV-1001</strong> or <strong>KV-DEMO-1005</strong>).
+                </span>
               </div>
+
+              {/* Sponsor validation error alert */}
+              {sponsorError && (
+                <div className="sponsor-error-alert">
+                  <AlertTriangle size={18} />
+                  <span>{sponsorError}</span>
+                </div>
+              )}
+
+              {/* Sponsor Details Card (Prompt 5 requirement) */}
+              {sponsorData && (
+                <div className="sponsor-details-card">
+                  <div className="sponsor-card-header">
+                    <div className="sponsor-avatar">
+                      <User size={24} />
+                    </div>
+                    <div className="sponsor-info-col">
+                      <div className="sponsor-meta-row">
+                        <span className="sponsor-label">Sponsor:</span>
+                        <strong className="sponsor-name">{sponsorData.sponsor.name}</strong>
+                      </div>
+                      <div className="sponsor-meta-row">
+                        <span className="sponsor-label">Distributor ID:</span>
+                        <span className="sponsor-dist-id">{sponsorData.sponsor.distributorId}</span>
+                      </div>
+                      <div className="sponsor-meta-row">
+                        <span className="sponsor-label">Status:</span>
+                        <span className={`status-badge ${sponsorData.sponsor.status.toLowerCase()}`}>
+                          {sponsorData.sponsor.status === 'ACTIVE' ? 'Active' : sponsorData.sponsor.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Available Positions section */}
+                  <div className="available-positions-section">
+                    <div className="positions-header">
+                      <span className="positions-title">Available Binary Leg Placement:</span>
+                      {sponsorData.availablePositions && sponsorData.availablePositions.length > 0 && (
+                        <span className="positions-count-tag">
+                          {sponsorData.availablePositions.join(' & ')}
+                        </span>
+                      )}
+                    </div>
+
+                    {sponsorData.availablePositions && sponsorData.availablePositions.length > 0 ? (
+                      <div className="placement-options-grid">
+                        {sponsorData.availablePositions.includes('LEFT') && (
+                          <label
+                            className={`placement-radio-card ${
+                              selectedPlacementPosition === 'LEFT' ? 'selected' : ''
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="placementLeg"
+                              value="LEFT"
+                              checked={selectedPlacementPosition === 'LEFT'}
+                              onChange={() => setSelectedPlacementPosition('LEFT')}
+                            />
+                            <div className="placement-card-body">
+                              <div className="placement-pill recommended">Available</div>
+                              <strong className="placement-title">LEFT Leg</strong>
+                              <p className="placement-desc">
+                                Directly enrolls into the LEFT leg under {sponsorData.sponsor.name}.
+                                Increases Left Leg Group Volume (LGV).
+                              </p>
+                            </div>
+                          </label>
+                        )}
+
+                        {sponsorData.availablePositions.includes('RIGHT') && (
+                          <label
+                            className={`placement-radio-card ${
+                              selectedPlacementPosition === 'RIGHT' ? 'selected' : ''
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="placementLeg"
+                              value="RIGHT"
+                              checked={selectedPlacementPosition === 'RIGHT'}
+                              onChange={() => setSelectedPlacementPosition('RIGHT')}
+                            />
+                            <div className="placement-card-body">
+                              <div className="placement-pill recommended">Available</div>
+                              <strong className="placement-title">RIGHT Leg</strong>
+                              <p className="placement-desc">
+                                Directly enrolls into the RIGHT leg under {sponsorData.sponsor.name}.
+                                Increases Right Leg Group Volume (RGV).
+                              </p>
+                            </div>
+                          </label>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="no-positions-alert">
+                        <AlertTriangle size={20} className="alert-icon" />
+                        <div>
+                          <h4 className="alert-heading">No direct position available under this sponsor.</h4>
+                          <p>
+                            Both LEFT and RIGHT positions under {sponsorData.sponsor.name} (
+                            {sponsorData.sponsor.distributorId}) are already occupied in the binary tree.
+                            Please enter a different placement parent or sponsor.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="step-nav-footer">
                 <button
@@ -639,6 +855,12 @@ function EnrollmentView({ user, onNavigate }) {
                 <button
                   type="button"
                   className="btn-wizard-next"
+                  disabled={
+                    !sponsorData ||
+                    !sponsorData.availablePositions ||
+                    sponsorData.availablePositions.length === 0 ||
+                    !selectedPlacementPosition
+                  }
                   onClick={() => setCurrentStep(enrollType === 'distributor' ? 4 : 5)}
                 >
                   <span>Continue</span>
@@ -840,11 +1062,19 @@ function EnrollmentView({ user, onNavigate }) {
                 </div>
               </div>
 
+              {submitError && (
+                <div className="submit-error-alert">
+                  <AlertTriangle size={18} />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
               <div className="step-nav-footer">
                 <button
                   type="button"
                   className="btn-wizard-back"
                   onClick={() => setCurrentStep(enrollType === 'distributor' ? 4 : 3)}
+                  disabled={isSubmitting}
                 >
                   Back
                 </button>
@@ -852,9 +1082,10 @@ function EnrollmentView({ user, onNavigate }) {
                 <button
                   type="submit"
                   className="btn-wizard-submit"
+                  disabled={isSubmitting}
                 >
-                  <UserPlus size={18} />
-                  <span>Submit & Complete Enrollment</span>
+                  {isSubmitting ? <RefreshCw size={18} className="spin" /> : <UserPlus size={18} />}
+                  <span>{isSubmitting ? 'Processing Registration...' : 'Submit & Complete Enrollment'}</span>
                 </button>
               </div>
             </div>

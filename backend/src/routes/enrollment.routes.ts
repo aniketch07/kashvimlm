@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { EnrollmentController } from '../controllers/enrollment.controller';
 import { validate } from '../middleware/validate';
 import {
+  completeEnrollmentSchema,
   createEnrollmentSchema,
   enrollmentIdParamSchema,
   step1PersonalInfoSchema,
@@ -13,6 +14,13 @@ import {
 } from '../validators/enrollment.validators';
 
 const router = Router();
+
+// POST /api/v1/enrollments/complete - Direct complete enrollment
+router.post(
+  '/complete',
+  validate({ body: completeEnrollmentSchema }),
+  EnrollmentController.complete
+);
 
 // POST /api/v1/enrollments - Initialize enrollment session
 router.post(

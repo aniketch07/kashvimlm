@@ -90,6 +90,40 @@ export const updateEnrollmentSchema = z.object({
   rejectionReason: z.string().trim().optional(),
 });
 
+export const completeEnrollmentSchema = z.object({
+  fullName: z.string().min(2, 'Full name must be at least 2 characters').trim(),
+  email: z.string().email('Please enter a valid email address').toLowerCase().trim(),
+  phone: z.string().min(7, 'Phone number must be at least 7 digits').trim(),
+  dob: z.string().optional(),
+  gender: z.string().optional(),
+  panNumber: z.string().optional(),
+
+  address: z.string().min(3, 'Address is required').trim(),
+  city: z.string().min(2, 'City is required').trim(),
+  state: z.string().min(2, 'State is required').trim(),
+  pincode: z.string().min(3, 'Pincode is required').trim(),
+  country: z.string().default('India'),
+
+  sponsorId: z.string().min(1, 'Sponsor ID is required').trim(),
+  placementParentId: z.string().trim().optional(),
+  placementPosition: z.preprocess(
+    (val) => (typeof val === 'string' ? val.toUpperCase().trim() : val),
+    z.enum(['LEFT', 'RIGHT'])
+  ),
+  businessCenter: z.string().trim().optional(),
+
+  enrollmentType: z.enum(['DISTRIBUTOR', 'CUSTOMER']).default('DISTRIBUTOR'),
+  starterKitId: z.string().trim().optional(),
+  productPackage: z.string().default('Starter Pack'),
+  price: z.coerce.number().default(0),
+  bv: z.coerce.number().default(0),
+
+  bankName: z.string().optional(),
+  accountNumber: z.string().optional(),
+  ifscCode: z.string().optional(),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
 export type CreateEnrollmentInput = z.infer<typeof createEnrollmentSchema>;
 export type Step1PersonalInfoInput = z.infer<typeof step1PersonalInfoSchema>;
 export type Step2AddressInput = z.infer<typeof step2AddressSchema>;
@@ -97,3 +131,5 @@ export type Step3TreePlacementInput = z.infer<typeof step3TreePlacementSchema>;
 export type Step4StarterKitInput = z.infer<typeof step4StarterKitSchema>;
 export type Step5BankSecurityInput = z.infer<typeof step5BankSecuritySchema>;
 export type UpdateEnrollmentInput = z.infer<typeof updateEnrollmentSchema>;
+export type CompleteEnrollmentInput = z.infer<typeof completeEnrollmentSchema>;
+
