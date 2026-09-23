@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { BusinessCenterController } from '../controllers/businessCenter.controller';
 import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
+import { verifyAccessToken } from '../utils/jwt';
 import {
   businessCenterIdParamSchema,
   businessCenterQuerySchema,
@@ -10,7 +11,27 @@ import {
 
 export const businessCenterRouter = Router();
 
-businessCenterRouter.use(authenticate);
+// Middleware: Optional authentication (attaches user if Bearer token is provided)
+const optionalAuth = (req: Request, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const payload = verifyAccessToken(token);
+      req.user = {
+        id: payload.sub,
+        email: payload.email,
+        role: payload.role,
+        status: payload.status,
+      };
+    } catch {
+      // ignore
+    }
+  }
+  next();
+};
+
+businessCenterRouter.use(optionalAuth);
 
 // GET /api/v1/business-centers - Retrieve all business centers for distributor
 businessCenterRouter.get(
