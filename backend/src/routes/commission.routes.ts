@@ -1,8 +1,9 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { CommissionController } from '../controllers/commission.controller';
 import { authenticate } from '../middleware/auth';
 import { authorizeRoles } from '../middleware/role';
 import { validate } from '../middleware/validate';
+import { verifyAccessToken } from '../utils/jwt';
 import {
   calculateMilestoneBonusSchema,
   calculateRankBonusSchema,
@@ -14,15 +15,35 @@ import {
 
 const router = Router();
 
-// All commission endpoints require authentication
-router.use(authenticate);
+// Middleware: Optional authentication for current period (attaches user if Bearer token is present)
+const optionalAuth = (req: Request, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const payload = verifyAccessToken(token);
+      req.user = {
+        id: payload.sub,
+        email: payload.email,
+        role: payload.role,
+        status: payload.status,
+      };
+    } catch {
+      // ignore invalid token for optional auth
+    }
+  }
+  next();
+};
 
 // ==========================================
 // DISTRIBUTOR COMMISSION VIEWS
 // ==========================================
 
 // GET /api/v1/commissions/current - Current active period and qualification
-router.get('/current', CommissionController.getCurrentPeriod);
+router.get('/current', optionalAuth, CommissionController.getCurrentPeriod);
+
+// All remaining commission endpoints require authentication
+router.use(authenticate);
 
 // GET /api/v1/commissions/history - Historical commission periods
 router.get('/history', CommissionController.getPeriodHistory);
