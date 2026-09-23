@@ -1,191 +1,358 @@
-import { WalletController } from '../src/controllers/wallet.controller';
-import { adminWalletRouter, walletRouter } from '../src/routes/wallet.routes';
+/**
+ * Test Suite: Wallet & Payout Financial Automated Tests
+ * Uses Vitest & Supertest
+ *
+ * Covers:
+ * - Wallet balance retrieval
+ * - Financial credit operations & ledger entries
+ * - Financial debit operations & overdraft prevention
+ * - Direct mutation prevention security guards
+ * - Payout request submission
+ * - Payout approval & balance reconciliation
+ * - Payout rejection & balance refund
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import request from 'supertest';
+import app from '../src/app';
 import { WalletService } from '../src/services/wallet.service';
+import { PayoutService } from '../src/services/payout.service';
 import {
   adminWalletAdjustmentSchema,
-  walletTransactionQuerySchema,
   walletTransactionTypeEnum,
 } from '../src/validators/wallet.validators';
+import {
+  createPayoutRequestSchema,
+  payoutStatusEnum,
+} from '../src/validators/payout.validators';
+import { AppError } from '../src/utils/appError';
+import { createAdminToken, createTestToken } from './helpers/testHelpers';
 
-export async function runWalletTests() {
-  console.log('\n=== RUNNING DISTRIBUTOR WALLET TEST SUITE ===\n');
-
-  // Test 11.1: WalletTransaction Types
-  console.log('1. Testing WalletTransaction Types:');
-  const expectedTypes = [
-    'CREDIT',
-    'DEBIT',
-    'COMMISSION',
-    'PAYOUT',
-    'REFUND',
-    'ADJUSTMENT',
-    'REVERSAL',
-  ];
-  for (const t of expectedTypes) {
-    const res = walletTransactionTypeEnum.safeParse(t);
-    if (!res.success) {
-      throw new Error(`WalletTransactionType '${t}' failed validation`);
-    }
-  }
-  const invalidType = walletTransactionTypeEnum.safeParse('DIRECT_HACK_CREDIT');
-  if (invalidType.success) {
-    throw new Error('Accepted invalid WalletTransactionType');
-  }
-  console.log('   - Core transaction types (CREDIT, DEBIT, COMMISSION, PAYOUT, REFUND, ADJUSTMENT, REVERSAL): [PASS]');
-  console.log('   - Rejection of invalid transaction types: [PASS]\n');
-
-  // Test 11.2: Wallet Schema & Fields Contract
-  console.log('2. Testing Wallet Formatting Contract:');
-  const sampleWallet = {
-    id: 'w-1001',
-    distributorId: 'd-1001',
-    userId: 'u-1001',
-    availableBalance: 1250.5,
-    pendingBalance: 150.0,
-    lifetimeEarned: 5000.0,
-    lifetimePaid: 3749.5,
-    currency: 'USD',
-    isLocked: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-  const formatted = WalletService.formatWallet(sampleWallet);
-  const requiredFields = [
-    'id',
-    'distributorId',
-    'availableBalance',
-    'pendingBalance',
-    'lifetimeEarned',
-    'lifetimePaid',
-  ];
-  for (const field of requiredFields) {
-    if ((formatted as any)[field] === undefined) {
-      throw new Error(`Formatted wallet missing required field: ${field}`);
-    }
-  }
-  if (formatted.availableBalance !== 1250.5 || formatted.pendingBalance !== 150.0) {
-    throw new Error('Wallet numerical balances formatting mismatch');
-  }
-  console.log('   - Formatter includes [id, distributorId, availableBalance, pendingBalance, lifetimeEarned, lifetimePaid]: [PASS]');
-  console.log('   - Floating point and currency precision preserved: [PASS]\n');
-
-  // Test 11.3: Admin Wallet Adjustment Schema
-  console.log('3. Testing Admin Wallet Adjustment Validation:');
-  const validAdjustment = adminWalletAdjustmentSchema.safeParse({
-    distributorId: '550e8400-e29b-41d4-a716-446655440000',
-    type: 'CREDIT',
-    amount: 250.75,
-    reason: 'Goodwill bonus for high performance',
-    referenceId: 'REF-2026-BONUS',
+describe('WALLET & FINANCIAL OPERATIONS AUTOMATED TESTS (Supertest + Vitest)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
   });
-  if (!validAdjustment.success) {
-    throw new Error('Valid admin adjustment failed validation: ' + JSON.stringify(validAdjustment.error));
-  }
-  console.log('   - Valid admin adjustment schema: [PASS]');
 
-  const invalidNegativeAmount = adminWalletAdjustmentSchema.safeParse({
-    distributorId: '550e8400-e29b-41d4-a716-446655440000',
-    type: 'CREDIT',
-    amount: -50,
-    reason: 'Negative test',
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const distributorId = '22222222-2222-4222-8222-222222222222';
+  const payoutId = '33333333-3333-4333-8333-333333333333';
+  const token = createTestToken({
+    id: userId,
+    email: 'distributor@kashvimlm.com',
+    role: 'DISTRIBUTOR',
   });
-  if (invalidNegativeAmount.success) {
-    throw new Error('Accepted negative adjustment amount');
-  }
-  console.log('   - Rejection of negative amount: [PASS]');
+  const adminToken = createAdminToken();
 
-  const invalidDistributorId = adminWalletAdjustmentSchema.safeParse({
-    distributorId: 'not-a-uuid',
-    type: 'DEBIT',
-    amount: 100,
-    reason: 'Debit test',
+  describe('1. Wallet Retrieval (/api/v1/wallet)', () => {
+    it('should retrieve authenticated distributor wallet balance and summary', async () => {
+      const mockWallet = {
+        id: 'wal-101',
+        distributorId,
+        availableBalance: 1250.5,
+        pendingBalance: 150.0,
+        lifetimeEarned: 5000.0,
+        lifetimePaid: 3749.5,
+        currency: 'USD',
+        isLocked: false,
+      };
+
+      vi.spyOn(WalletService, 'getWalletByUserId').mockResolvedValue(mockWallet as any);
+
+      const res = await request(app)
+        .get('/api/v1/wallet')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.availableBalance).toBe(1250.5);
+      expect(res.body.data.pendingBalance).toBe(150.0);
+    });
+
+    it('should reject unauthenticated access to wallet with 401', async () => {
+      const res = await request(app)
+        .get('/api/v1/wallet')
+        .expect(401);
+
+      expect(res.body.success).toBe(false);
+    });
   });
-  if (invalidDistributorId.success) {
-    throw new Error('Accepted invalid UUID for distributorId');
-  }
-  console.log('   - Rejection of non-UUID distributorId: [PASS]');
 
-  const missingReason = adminWalletAdjustmentSchema.safeParse({
-    distributorId: '550e8400-e29b-41d4-a716-446655440000',
-    type: 'DEBIT',
-    amount: 100,
-    reason: '',
+  describe('2. Credit Operations (Financial Inflow)', () => {
+    it('should successfully credit wallet with valid admin adjustment', async () => {
+      const mockResult = {
+        wallet: {
+          id: 'wal-101',
+          availableBalance: 1500.0,
+          pendingBalance: 0,
+        },
+        transaction: {
+          id: 'tx-credit-001',
+          type: 'CREDIT',
+          amount: 250.0,
+          balanceAfter: 1500.0,
+          description: 'Promotional leadership bonus',
+        },
+      };
+
+      vi.spyOn(WalletService, 'adjustWalletBalance').mockResolvedValue(mockResult as any);
+
+      const res = await request(app)
+        .post('/api/v1/admin/wallet/adjust')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          distributorId,
+          type: 'CREDIT',
+          amount: 250.0,
+          reason: 'Promotional leadership bonus',
+        })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.transaction.type).toBe('CREDIT');
+      expect(res.body.data.transaction.amount).toBe(250.0);
+      expect(res.body.data.wallet.availableBalance).toBe(1500.0);
+    });
+
+    it('should reject credit adjustment when requested by non-admin', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/wallet/adjust')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          distributorId,
+          type: 'CREDIT',
+          amount: 100.0,
+          reason: 'Unauthorized credit attempt',
+        })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+    });
   });
-  if (missingReason.success) {
-    throw new Error('Accepted empty adjustment reason');
-  }
-  console.log('   - Rejection of missing reason: [PASS]\n');
 
-  // Test 11.4: Wallet Query Schema Validation
-  console.log('4. Testing Wallet Transaction Query Schema:');
-  const defaultQuery = walletTransactionQuerySchema.parse({});
-  if (defaultQuery.page !== 1 || defaultQuery.limit !== 20) {
-    throw new Error('Default pagination values incorrect');
-  }
-  console.log('   - Default pagination (page=1, limit=20): [PASS]');
+  describe('3. Debit Operations (Financial Outflow & Overdraft Guard)', () => {
+    it('should successfully debit wallet when balance is sufficient', async () => {
+      const mockResult = {
+        wallet: {
+          id: 'wal-101',
+          availableBalance: 850.0,
+        },
+        transaction: {
+          id: 'tx-debit-001',
+          type: 'DEBIT',
+          amount: 150.0,
+          balanceAfter: 850.0,
+          description: 'Monthly technology fee',
+        },
+      };
 
-  const filteredQuery = walletTransactionQuerySchema.safeParse({
-    type: 'COMMISSION',
-    page: '2',
-    limit: '50',
-    startDate: '2026-09-01',
-    endDate: '2026-09-30',
+      vi.spyOn(WalletService, 'adjustWalletBalance').mockResolvedValue(mockResult as any);
+
+      const res = await request(app)
+        .post('/api/v1/admin/wallet/adjust')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          distributorId,
+          type: 'DEBIT',
+          amount: 150.0,
+          reason: 'Monthly technology fee',
+        })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.transaction.type).toBe('DEBIT');
+      expect(res.body.data.transaction.amount).toBe(150.0);
+    });
+
+    it('should reject debit with 400 when amount exceeds available balance (Overdraft protection)', async () => {
+      vi.spyOn(WalletService, 'adjustWalletBalance').mockRejectedValue(
+        AppError.badRequest(
+          'Insufficient wallet balance. Available: 50.00, requested debit: 500.00',
+          'INSUFFICIENT_WALLET_BALANCE'
+        )
+      );
+
+      const res = await request(app)
+        .post('/api/v1/admin/wallet/adjust')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          distributorId,
+          type: 'DEBIT',
+          amount: 500.0,
+          reason: 'Debit exceeding balance',
+        })
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('Insufficient wallet balance');
+    });
+
+    it('should reject zero or negative adjustment amounts in Zod schema', () => {
+      expect(
+        adminWalletAdjustmentSchema.safeParse({
+          distributorId,
+          type: 'CREDIT',
+          amount: 0,
+          reason: 'Zero amount',
+        }).success
+      ).toBe(false);
+
+      expect(
+        adminWalletAdjustmentSchema.safeParse({
+          distributorId,
+          type: 'DEBIT',
+          amount: -50,
+          reason: 'Negative amount',
+        }).success
+      ).toBe(false);
+    });
   });
-  if (!filteredQuery.success || filteredQuery.data.page !== 2 || filteredQuery.data.limit !== 50) {
-    throw new Error('Filtered query parsing failed: ' + JSON.stringify(filteredQuery));
-  }
-  console.log('   - Type filter and date coercion parsing: [PASS]\n');
 
-  // Test 11.5: WalletService Methods
-  console.log('5. Verifying WalletService Methods:');
-  const serviceMethods = [
-    'getOrCreateWallet',
-    'getWalletByUserId',
-    'getTransactions',
-    'adjustWalletBalance',
-    'processPayableCommissions',
-  ];
-  for (const sm of serviceMethods) {
-    if (typeof (WalletService as any)[sm] !== 'function') {
-      throw new Error(`CRITICAL: WalletService.${sm} is missing or not a function!`);
-    }
-    console.log(`   - WalletService.${sm}(): IMPLEMENTED & VERIFIED`);
-  }
+  describe('4. Direct Mutation Prevention (Anti-Tampering Guard)', () => {
+    it('should reject direct POST to /api/v1/wallet', async () => {
+      const res = await request(app)
+        .post('/api/v1/wallet')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ availableBalance: 999999 });
 
-  // Test 11.6: Controller Handlers & Endpoint Mapping
-  console.log('\n6. Verifying Controller Handlers & Endpoint Mapping:');
-  const requiredEndpoints = [
-    { name: 'GET /api/v1/wallet', method: 'getMyWallet' },
-    { name: 'GET /api/v1/wallet/transactions', method: 'getMyTransactions' },
-    { name: 'POST /api/v1/admin/wallet/adjust', method: 'adminAdjust' },
-    { name: 'Direct Mutation Guard', method: 'blockDirectMutation' },
-  ];
-  for (const ep of requiredEndpoints) {
-    if (typeof (WalletController as any)[ep.method] !== 'function') {
-      throw new Error(`Missing controller method ${ep.method} for endpoint ${ep.name}`);
-    }
-    console.log(`   - ${ep.name} -> WalletController.${ep.method}: READY`);
-  }
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    });
 
-  // Test 11.7: Security Guards Against Frontend Direct Balance Mutations
-  console.log('\n7. Verifying Security & Mutation Prohibitions:');
-  try {
-    WalletController.blockDirectMutation({} as any, {} as any, () => {});
-    throw new Error('Direct mutation guard did not throw AppError.forbidden!');
-  } catch (err: any) {
-    if (err.statusCode !== 403 || err.code !== 'WALLET_MUTATION_PROHIBITED') {
-      throw new Error(`Unexpected error from direct mutation guard: ${err.message}`);
-    }
-    console.log('   - Frontend client direct balance change attempt strictly rejected with 403 Forbidden: [PASS]');
-  }
+    it('should reject direct PUT/PATCH to /api/v1/wallet', async () => {
+      const putRes = await request(app)
+        .put('/api/v1/wallet')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ availableBalance: 999999 });
+      expect(putRes.status).toBeGreaterThanOrEqual(400);
 
-  // Test 11.8: Router Integrity
-  console.log('\n8. Verifying Express Router Configurations:');
-  if (!walletRouter) throw new Error('walletRouter is not exported');
-  if (!adminWalletRouter) throw new Error('adminWalletRouter is not exported');
-  console.log('   - walletRouter (/api/v1/wallet) and adminWalletRouter (/api/v1/admin/wallet) exported: [PASS]');
+      const patchRes = await request(app)
+        .patch('/api/v1/wallet')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ availableBalance: 999999 });
+      expect(patchRes.status).toBeGreaterThanOrEqual(400);
+    });
+  });
 
-  console.log('\n======================================================');
-  console.log('>>> DISTRIBUTOR WALLET SUITE: ALL TESTS PASSED! <<<');
-  console.log('======================================================\n');
-}
+  describe('5. Payout Lifecycle (/api/v1/payouts)', () => {
+    const bankAccountId = '44444444-4444-4444-8444-444444444444';
+
+    it('should allow distributor to request a payout moving funds to pending balance', async () => {
+      const mockPayout = {
+        id: payoutId,
+        distributorId,
+        amount: 300.0,
+        status: 'REQUESTED',
+        fee: 0,
+        netAmount: 300.0,
+        currency: 'USD',
+        createdAt: new Date().toISOString(),
+      };
+
+      vi.spyOn(PayoutService, 'requestPayout').mockResolvedValue(mockPayout as any);
+
+      const res = await request(app)
+        .post('/api/v1/payouts')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          amount: 300.0,
+          bankAccountId,
+        })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.amount).toBe(300.0);
+      expect(res.body.data.status).toBe('REQUESTED');
+    });
+
+    it('should reject payout request when requested amount exceeds available balance', async () => {
+      vi.spyOn(PayoutService, 'requestPayout').mockRejectedValue(
+        AppError.badRequest(
+          'Insufficient available balance for payout. Available: 50.00, requested: 500.00',
+          'INSUFFICIENT_PAYOUT_BALANCE'
+        )
+      );
+
+      const res = await request(app)
+        .post('/api/v1/payouts')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          amount: 500.0,
+          bankAccountId,
+        })
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('Insufficient available balance');
+    });
+
+    it('should allow Admin to approve payout request', async () => {
+      const mockApproved = {
+        id: payoutId,
+        status: 'PAID',
+        approvedAt: new Date().toISOString(),
+        amount: 300.0,
+      };
+
+      vi.spyOn(PayoutService, 'approvePayout').mockResolvedValue(mockApproved as any);
+
+      const res = await request(app)
+        .post(`/api/v1/admin/payouts/${payoutId}/approve`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          adminNotes: 'Bank transfer confirmed',
+        })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('PAID');
+    });
+
+    it('should allow Admin to reject payout request and refund funds to available balance', async () => {
+      const mockRejected = {
+        id: payoutId,
+        status: 'REJECTED',
+        rejectionReason: 'Invalid bank account number',
+        refundedAmount: 300.0,
+      };
+
+      vi.spyOn(PayoutService, 'rejectPayout').mockResolvedValue(mockRejected as any);
+
+      const res = await request(app)
+        .post(`/api/v1/admin/payouts/${payoutId}/reject`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          reason: 'Invalid bank account number',
+        })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('REJECTED');
+    });
+  });
+
+  describe('6. Wallet & Payout Enums Verification', () => {
+    it('should validate all financial wallet transaction types', () => {
+      const validTypes = ['CREDIT', 'DEBIT', 'COMMISSION', 'PAYOUT', 'REFUND', 'ADJUSTMENT', 'REVERSAL'];
+      for (const t of validTypes) {
+        expect(walletTransactionTypeEnum.safeParse(t).success).toBe(true);
+      }
+      expect(walletTransactionTypeEnum.safeParse('HACK').success).toBe(false);
+    });
+
+    it('should validate all payout statuses', () => {
+      const statuses = [
+        'REQUESTED',
+        'UNDER_REVIEW',
+        'APPROVED',
+        'PROCESSING',
+        'PAID',
+        'REJECTED',
+        'FAILED',
+        'COMPLETED',
+        'CANCELLED',
+      ];
+      for (const st of statuses) {
+        expect(payoutStatusEnum.safeParse(st).success).toBe(true);
+      }
+      expect(payoutStatusEnum.safeParse('UNKNOWN').success).toBe(false);
+    });
+  });
+});

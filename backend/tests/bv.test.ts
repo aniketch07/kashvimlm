@@ -183,3 +183,10 @@ export async function runBVLedgerTests() {
   console.log('>>> IMMUTABLE BV LEDGER SUITE: ALL TESTS PASSED! <<<');
   console.log('========================================================\n');
 }
+
+describe('IMMUTABLE BV LEDGER SUITE', () => {
+  it('should pass all immutable BV ledger checks', async () => {
+    await runBVLedgerTests();
+  });
+});
+

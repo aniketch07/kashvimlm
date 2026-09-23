@@ -112,3 +112,10 @@ export async function runCommissionPeriodTests() {
   console.log('>>> COMMISSION PERIOD SUITE: ALL TESTS PASSED! <<<');
   console.log('======================================================\n');
 }
+
+describe('COMMISSION PERIOD SUITE', () => {
+  it('should pass all commission period rules and state machine tests', async () => {
+    await runCommissionPeriodTests();
+  });
+});
+

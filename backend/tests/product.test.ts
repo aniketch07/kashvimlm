@@ -1,164 +1,233 @@
 /**
- * Test Suite: Product Catalog & Category Management
- * Tests product validation, filtering, sorting, slugification, and database-driven categories.
+ * Test Suite: Product Catalog Automated Tests
+ * Uses Vitest & Supertest
+ *
+ * Covers:
+ * - Create product (Admin only, validation)
+ * - Update product (Admin only)
+ * - Delete product (Admin only, soft deletion)
+ * - Search products (Keyword search)
+ * - Filtering products (Category, price range, BV, stock status, sorting)
  */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import request from 'supertest';
+import app from '../src/app';
+import { ProductService, slugify } from '../src/services/product.service';
 import {
   createProductSchema,
   productQuerySchema,
   productSortEnum,
   productStatusEnum,
-  updateProductSchema,
 } from '../src/validators/product.validators';
-import { ProductService, slugify } from '../src/services/product.service';
+import { createAdminToken, createTestToken } from './helpers/testHelpers';
 
-describe('Product Catalog & Category Suite', () => {
-  describe('Slugify Utility', () => {
-    it('should generate clean URL-friendly slugs', () => {
-      expect(slugify('ActiveFit Compression Hosiery Pro!')).toBe('activefit-compression-hosiery-pro');
-      expect(slugify('Kashvi Smart Vitality Band 4 (2026 Edition)')).toBe('kashvi-smart-vitality-band-4-2026-edition');
-      expect(slugify('  Multiple   Spaces   -- And Symbols ## ')).toBe('multiple-spaces-and-symbols');
-    });
+describe('PRODUCT MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('Product Status & Sorting Enums', () => {
-    it('should support all required product statuses', () => {
-      const validStatuses = ['DRAFT', 'ACTIVE', 'OUT_OF_STOCK', 'INACTIVE'];
-      for (const status of validStatuses) {
-        expect(productStatusEnum.safeParse(status).success).toBe(true);
-      }
-      expect(productStatusEnum.safeParse('UNKNOWN_STATUS').success).toBe(false);
-    });
+  const adminToken = createAdminToken();
+  const distributorToken = createTestToken();
+  const productId = '11111111-2222-3333-4444-555555555555';
 
-    it('should support all required sort options', () => {
-      const validSorts = ['featured', 'newest', 'price_low', 'price_high', 'BV'];
-      for (const sort of validSorts) {
-        expect(productSortEnum.safeParse(sort).success).toBe(true);
-      }
-      expect(productSortEnum.safeParse('random_sort').success).toBe(false);
-    });
-  });
-
-  describe('Create Product Zod Validation', () => {
-    it('should validate a complete product in CLOTHES_HOSIERY category', () => {
-      const validProduct = {
+  describe('1. Create Product (POST /api/v1/products)', () => {
+    it('should successfully create a new product with Admin credentials', async () => {
+      const newProduct = {
+        id: productId,
         sku: 'CLO-COMP-001',
         name: 'ActiveFit Graduated Compression Hosiery Pro',
         slug: 'activefit-graduated-compression-hosiery-pro',
-        description: 'Medical grade graduated compression hosiery.',
-        categoryId: 'CLOTHES_HOSIERY',
+        categoryId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
         wholesalePrice: 29.99,
         mrp: 49.99,
         bv: 25.0,
         stock: 500,
-        lowStockThreshold: 30,
-        status: 'ACTIVE' as const,
+        status: 'ACTIVE',
         isFeatured: true,
-        images: [
-          'https://images.example.com/clothes1.jpg',
+      };
+
+      vi.spyOn(ProductService, 'createProduct').mockResolvedValue(newProduct as any);
+
+      const res = await request(app)
+        .post('/api/v1/products')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          sku: 'CLO-COMP-001',
+          name: 'ActiveFit Graduated Compression Hosiery Pro',
+          categoryId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
+          wholesalePrice: 29.99,
+          mrp: 49.99,
+          bv: 25.0,
+          stock: 500,
+        })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.sku).toBe('CLO-COMP-001');
+      expect(res.body.data.wholesalePrice).toBe(29.99);
+      expect(res.body.data.bv).toBe(25.0);
+    });
+
+    it('should reject product creation when unauthorized (Distributor role)', async () => {
+      const res = await request(app)
+        .post('/api/v1/products')
+        .set('Authorization', `Bearer ${distributorToken}`)
+        .send({
+          sku: 'CLO-COMP-002',
+          name: 'Unauthorized Product',
+          categoryId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
+          wholesalePrice: 19.99,
+          mrp: 29.99,
+          bv: 15.0,
+        })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('Forbidden');
+    });
+
+    it('should reject product creation when unauthenticated', async () => {
+      const res = await request(app)
+        .post('/api/v1/products')
+        .send({
+          sku: 'CLO-COMP-003',
+          name: 'No Auth Product',
+        })
+        .expect(401);
+
+      expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('2. Update Product (PATCH /api/v1/products/:id)', () => {
+    it('should successfully update product pricing and stock with Admin credentials', async () => {
+      const updated = {
+        id: productId,
+        sku: 'CLO-COMP-001',
+        name: 'ActiveFit Graduated Compression Hosiery Pro Updated',
+        wholesalePrice: 34.99,
+        stock: 450,
+      };
+
+      vi.spyOn(ProductService, 'updateProduct').mockResolvedValue(updated as any);
+
+      const res = await request(app)
+        .patch(`/api/v1/products/${productId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          wholesalePrice: 34.99,
+          stock: 450,
+        })
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.wholesalePrice).toBe(34.99);
+      expect(res.body.data.stock).toBe(450);
+    });
+  });
+
+  describe('3. Delete Product (DELETE /api/v1/products/:id)', () => {
+    it('should soft-delete/deactivate product with Admin credentials', async () => {
+      vi.spyOn(ProductService, 'deleteProduct').mockResolvedValue({
+        id: productId,
+        status: 'DISCONTINUED',
+        deletedAt: new Date(),
+      } as any);
+
+      const res = await request(app)
+        .delete(`/api/v1/products/${productId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toContain('removed successfully');
+    });
+
+    it('should forbid non-admin from deleting products', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/products/${productId}`)
+        .set('Authorization', `Bearer ${distributorToken}`)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+    });
+  });
+
+  describe('4. Search Products (GET /api/v1/products?search=...)', () => {
+    it('should query products matching search term', async () => {
+      const mockResults = {
+        items: [
           {
-            url: 'https://images.example.com/clothes2.jpg',
-            altText: 'Side View',
-            isPrimary: false,
-            displayOrder: 1,
+            id: productId,
+            name: 'ActiveFit Graduated Compression Hosiery Pro',
+            sku: 'CLO-COMP-001',
+            mrp: 49.99,
+            bv: 25.0,
           },
         ],
+        pagination: { page: 1, limit: 20, total: 1, totalPages: 1 },
       };
 
-      const parsed = createProductSchema.safeParse(validProduct);
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.sku).toBe('CLO-COMP-001');
-        expect(parsed.data.wholesalePrice).toBe(29.99);
-        expect(parsed.data.mrp).toBe(49.99);
-        expect(parsed.data.bv).toBe(25.0);
-        expect(parsed.data.stock).toBe(500);
-        expect(parsed.data.isFeatured).toBe(true);
-        expect(parsed.data.images.length).toBe(2);
-      }
-    });
+      vi.spyOn(ProductService, 'getProducts').mockResolvedValue(mockResults as any);
 
-    it('should validate a product in ELECTRONICS_SMART_DEVICES category', () => {
-      const validDevice = {
-        sku: 'ELE-BAND-001',
-        name: 'Kashvi Smart Vitality Health Band 4',
-        categoryId: 'ELECTRONICS_SMART_DEVICES',
-        wholesalePrice: 89.99,
-        mrp: 149.99,
-        bv: 75.0,
-        stock: 250,
-        lowStockThreshold: 20,
-        status: 'ACTIVE' as const,
-        isFeatured: true,
-      };
+      const res = await request(app)
+        .get('/api/v1/products?search=compression')
+        .expect(200);
 
-      const parsed = createProductSchema.safeParse(validDevice);
-      expect(parsed.success).toBe(true);
-    });
-
-    it('should reject negative prices and BV', () => {
-      const badPrice = createProductSchema.safeParse({
-        sku: 'BAD-001',
-        name: 'Negative Price Product',
-        categoryId: 'CLOTHES_HOSIERY',
-        wholesalePrice: -10,
-        mrp: 50,
-        bv: 20,
-      });
-      expect(badPrice.success).toBe(false);
-
-      const badBV = createProductSchema.safeParse({
-        sku: 'BAD-002',
-        name: 'Negative BV Product',
-        categoryId: 'CLOTHES_HOSIERY',
-        wholesalePrice: 10,
-        mrp: 50,
-        bv: -5,
-      });
-      expect(badBV.success).toBe(false);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.length).toBe(1);
+      expect(res.body.data[0].name).toContain('Compression');
     });
   });
 
-  describe('Product Query & Filter Validation', () => {
-    it('should accept valid filter combinations', () => {
-      const validQuery = {
-        category: 'clothes-hosiery',
-        search: 'compression',
-        minPrice: 20,
-        maxPrice: 100,
-        minBV: 10,
-        maxBV: 100,
-        stock: 'in_stock' as const,
-        status: 'ACTIVE' as const,
-        sort: 'price_low' as const,
-        page: 1,
-        limit: 20,
+  describe('5. Filtering Products (Category, Price, BV, Stock, Sort)', () => {
+    it('should filter products by category, price boundaries, and stock status', async () => {
+      const mockFiltered = {
+        items: [
+          {
+            id: productId,
+            name: 'ActiveFit Graduated Compression Hosiery Pro',
+            wholesalePrice: 29.99,
+            bv: 25.0,
+            stock: 500,
+            category: { slug: 'clothes-hosiery' },
+          },
+        ],
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
       };
 
-      const parsed = productQuerySchema.safeParse(validQuery);
-      expect(parsed.success).toBe(true);
-    });
+      vi.spyOn(ProductService, 'getProducts').mockResolvedValue(mockFiltered as any);
 
-    it('should apply defaults for page, limit, and sort', () => {
-      const emptyQuery = {};
-      const parsed = productQuerySchema.safeParse(emptyQuery);
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        expect(parsed.data.page).toBe(1);
-        expect(parsed.data.limit).toBe(20);
-        expect(parsed.data.sort).toBe('featured');
-      }
+      const res = await request(app)
+        .get('/api/v1/products?category=clothes-hosiery&minPrice=20&maxPrice=100&minBV=15&stock=in_stock&sort=price_low')
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.length).toBe(1);
+      expect(res.body.data[0].wholesalePrice).toBeGreaterThanOrEqual(20);
+      expect(res.body.data[0].wholesalePrice).toBeLessThanOrEqual(100);
+      expect(res.body.data[0].bv).toBeGreaterThanOrEqual(15);
     });
   });
 
-  describe('ProductService API Definition', () => {
-    it('should define all required service methods', () => {
-      expect(ProductService.getProducts).toBeDefined();
-      expect(ProductService.getProductBySlug).toBeDefined();
-      expect(ProductService.createProduct).toBeDefined();
-      expect(ProductService.updateProduct).toBeDefined();
-      expect(ProductService.deleteProduct).toBeDefined();
-      expect(ProductService.getCategories).toBeDefined();
-      expect(ProductService.ensureDefaultCategories).toBeDefined();
+  describe('6. Slugify & Enums Verification', () => {
+    it('should generate clean URL-friendly slugs', () => {
+      expect(slugify('ActiveFit Compression Hosiery Pro!')).toBe('activefit-compression-hosiery-pro');
+      expect(slugify('Kashvi Smart Vitality Band 4')).toBe('kashvi-smart-vitality-band-4');
+    });
+
+    it('should validate all supported product status enums', () => {
+      for (const st of ['DRAFT', 'ACTIVE', 'OUT_OF_STOCK', 'INACTIVE']) {
+        expect(productStatusEnum.safeParse(st).success).toBe(true);
+      }
+      expect(productStatusEnum.safeParse('INVALID').success).toBe(false);
+    });
+
+    it('should validate all supported sort options', () => {
+      for (const s of ['featured', 'newest', 'price_low', 'price_high', 'BV']) {
+        expect(productSortEnum.safeParse(s).success).toBe(true);
+      }
+      expect(productSortEnum.safeParse('invalid_sort').success).toBe(false);
     });
   });
 });

@@ -167,3 +167,9 @@ export async function runBusinessCenterTests() {
   console.log('>>> BUSINESS CENTERS SUITE: ALL TESTS PASSED! <<<');
   console.log('======================================================\n');
 }
+
+describe('BUSINESS CENTERS SUITE', () => {
+  it('should pass all business center configuration and logic checks', async () => {
+    await runBusinessCenterTests();
+  });
+});

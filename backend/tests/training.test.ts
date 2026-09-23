@@ -128,3 +128,9 @@ export async function runTrainingTests() {
   console.log('>>> TRAINING SYSTEM SUITE: ALL TESTS PASSED! <<<');
   console.log('======================================================\n');
 }
+
+describe('TRAINING SYSTEM SUITE', () => {
+  it('should pass all training modules, progress, and certification checks', async () => {
+    await runTrainingTests();
+  });
+});

@@ -198,3 +198,9 @@ export async function runPayoutTests() {
   console.log('>>> PAYOUT SYSTEM SUITE: ALL TESTS PASSED! <<<');
   console.log('======================================================\n');
 }
+
+describe('PAYOUT SYSTEM SUITE', () => {
+  it('should pass all payout lifecycle, validation, and endpoint checks', async () => {
+    await runPayoutTests();
+  });
+});

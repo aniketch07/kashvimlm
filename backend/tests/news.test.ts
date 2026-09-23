@@ -184,3 +184,9 @@ export async function runNewsTests() {
   console.log('>>> NEWS MANAGEMENT SUITE: ALL TESTS PASSED! <<<');
   console.log('======================================================\n');
 }
+
+describe('NEWS MANAGEMENT SUITE', () => {
+  it('should pass all news management configuration and logic checks', async () => {
+    await runNewsTests();
+  });
+});

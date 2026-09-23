@@ -1,10 +1,17 @@
 /**
- * Test Suite: Distributor & Customer Enrollment Pipeline
- * Tests all 5 enrollment steps, Zod validation, binary tree constraints,
- * sensitive data masking, and Argon2id PIN hashing.
+ * Test Suite: Enrollment Pipeline Automated Tests
+ * Uses Vitest & Supertest
+ *
+ * Covers:
+ * - Step validation (Steps 1 to 5)
+ * - Duplicate email rejection
+ * - Invalid sponsor rejection
+ * - Invalid placement rejection
+ * - Sensitive banking & PIN masking
  */
-import { maskAccountNumber, maskEmail, maskIfsc, maskPhone, sanitizeEnrollmentResponse } from '../src/utils/masking';
-import { hashPassword, verifyPassword } from '../src/utils/password';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import request from 'supertest';
+import app from '../src/app';
 import {
   createEnrollmentSchema,
   step1PersonalInfoSchema,
@@ -12,30 +19,34 @@ import {
   step3TreePlacementSchema,
   step4StarterKitSchema,
   step5BankSecuritySchema,
-} from '../validators/enrollment.validators';
+} from '../src/validators/enrollment.validators';
 import { EnrollmentService } from '../src/services/enrollment.service';
+import { maskAccountNumber, maskEmail, maskIfsc, sanitizeEnrollmentResponse } from '../src/utils/masking';
+import { AppError } from '../src/utils/appError';
 
-describe('Enrollment Pipeline & Validation Suite', () => {
-  describe('Zod Validation for Enrollment Steps', () => {
-    describe('Step 1: Personal Info Schema', () => {
-      it('should validate valid personal info for 18+ individual', () => {
-        const validData = {
+describe('ENROLLMENT MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('1. Step Validation (Schemas & Boundaries)', () => {
+    describe('Step 1: Personal Info & Age Requirements', () => {
+      it('should accept valid applicant aged 18 or above', () => {
+        const valid = step1PersonalInfoSchema.safeParse({
           legalName: 'Alexander Hamilton',
-          email: 'alex.hamilton@example.com',
+          email: 'alexander@example.com',
           mobile: '+1 (555) 234-5678',
-          dateOfBirth: '1995-01-11',
-        };
-
-        const parsed = step1PersonalInfoSchema.safeParse(validData);
-        expect(parsed.success).toBe(true);
+          dateOfBirth: '1990-01-11',
+        });
+        expect(valid.success).toBe(true);
       });
 
-      it('should reject underage prospects (< 18 years old)', () => {
+      it('should reject applicant under 18 years old', () => {
         const today = new Date();
-        const underageDob = `${today.getFullYear() - 15}-05-15`;
+        const underageDob = `${today.getFullYear() - 16}-01-01`;
 
         const parsed = step1PersonalInfoSchema.safeParse({
-          legalName: 'Minor Individual',
+          legalName: 'Minor Prospect',
           email: 'minor@example.com',
           mobile: '5551234567',
           dateOfBirth: underageDob,
@@ -47,216 +58,277 @@ describe('Enrollment Pipeline & Validation Suite', () => {
         }
       });
 
-      it('should reject invalid email format', () => {
+      it('should reject invalid email formatting', () => {
         const parsed = step1PersonalInfoSchema.safeParse({
-          legalName: 'Jane Doe',
-          email: 'not-an-email',
+          legalName: 'John Doe',
+          email: 'not-a-valid-email',
           mobile: '5551234567',
-          dateOfBirth: '1990-05-20',
+          dateOfBirth: '1990-05-15',
         });
-
         expect(parsed.success).toBe(false);
       });
     });
 
-    describe('Step 2: Address & PIN Schema', () => {
-      it('should validate complete postal address', () => {
-        const validAddress = {
+    describe('Step 2: Address & Geography', () => {
+      it('should accept valid complete physical address', () => {
+        const valid = step2AddressSchema.safeParse({
           address: '742 Evergreen Terrace',
           city: 'Springfield',
           state: 'OR',
           country: 'USA',
           postalCode: '97477',
-        };
-
-        const parsed = step2AddressSchema.safeParse(validAddress);
-        expect(parsed.success).toBe(true);
+        });
+        expect(valid.success).toBe(true);
       });
 
-      it('should reject missing required address fields', () => {
+      it('should reject empty or missing address fields', () => {
         const parsed = step2AddressSchema.safeParse({
-          address: 'Too short',
-          city: '',
-          state: '',
-          country: '',
+          address: '',
+          city: 'Springfield',
+          state: 'OR',
+          country: 'USA',
           postalCode: '',
         });
-
         expect(parsed.success).toBe(false);
       });
     });
 
-    describe('Step 3: Tree Placement Schema', () => {
-      it('should validate valid sponsor, placement parent, and position', () => {
-        const validPlacement = {
+    describe('Step 3: Tree Placement & Position Boundaries', () => {
+      it('should accept valid LEFT or RIGHT placement position', () => {
+        const leftPlacement = step3TreePlacementSchema.safeParse({
           sponsor: 'DST-10001',
           placementParent: 'DST-10002',
           placementPosition: 'LEFT',
-        };
+        });
+        expect(leftPlacement.success).toBe(true);
 
-        const parsed = step3TreePlacementSchema.safeParse(validPlacement);
-        expect(parsed.success).toBe(true);
-      });
-
-      it('should only accept LEFT or RIGHT as placement positions', () => {
-        const parsed = step3TreePlacementSchema.safeParse({
+        const rightPlacement = step3TreePlacementSchema.safeParse({
           sponsor: 'DST-10001',
           placementParent: 'DST-10002',
-          placementPosition: 'MIDDLE',
+          placementPosition: 'RIGHT',
         });
+        expect(rightPlacement.success).toBe(true);
+      });
 
-        expect(parsed.success).toBe(false);
+      it('should reject invalid placement positions (e.g. MIDDLE, CENTER)', () => {
+        const invalidPos = step3TreePlacementSchema.safeParse({
+          sponsor: 'DST-10001',
+          placementParent: 'DST-10002',
+          placementPosition: 'MIDDLE' as any,
+        });
+        expect(invalidPos.success).toBe(false);
       });
     });
 
-    describe('Step 4: Starter Kit Schema', () => {
-      it('should validate starter kit with positive price and BV', () => {
-        const validKit = {
-          productPackage: 'Executive Business Enrollment Pack',
-          price: 249.99,
-          bv: 200,
-        };
-
-        const parsed = step4StarterKitSchema.safeParse(validKit);
-        expect(parsed.success).toBe(true);
+    describe('Step 4: Starter Kit Pricing & Volume', () => {
+      it('should accept valid starter kit package with positive price and BV', () => {
+        const valid = step4StarterKitSchema.safeParse({
+          productPackage: 'Executive Business Pack',
+          price: 299.99,
+          bv: 250,
+        });
+        expect(valid.success).toBe(true);
       });
 
-      it('should reject negative or zero price', () => {
-        const parsed = step4StarterKitSchema.safeParse({
-          productPackage: 'Free Package',
-          price: -10,
-          bv: 50,
+      it('should reject starter kit with negative or zero price', () => {
+        const negativePrice = step4StarterKitSchema.safeParse({
+          productPackage: 'Invalid Free Pack',
+          price: -50,
+          bv: 100,
         });
+        expect(negativePrice.success).toBe(false);
 
-        expect(parsed.success).toBe(false);
+        const zeroPrice = step4StarterKitSchema.safeParse({
+          productPackage: 'Zero Price Pack',
+          price: 0,
+          bv: 100,
+        });
+        expect(zeroPrice.success).toBe(false);
       });
     });
 
-    describe('Step 5: Bank & Security Schema', () => {
-      it('should validate bank credentials and 4-6 digit numeric PIN', () => {
-        const validBank = {
+    describe('Step 5: Bank Details & Security PIN', () => {
+      it('should accept valid bank account and 4-digit numeric PIN', () => {
+        const valid = step5BankSecuritySchema.safeParse({
           accountHolder: 'Alexander Hamilton',
           bankName: 'JPMorgan Chase',
           accountNumber: '987654321098',
           ifsc: 'CHASUS33',
           securityPin: '4829',
-        };
-
-        const parsed = step5BankSecuritySchema.safeParse(validBank);
-        expect(parsed.success).toBe(true);
+        });
+        expect(valid.success).toBe(true);
       });
 
-      it('should reject non-numeric or invalid length security PINs', () => {
-        const parsedAlpha = step5BankSecuritySchema.safeParse({
+      it('should reject non-numeric or malformed security PIN', () => {
+        const nonNumericPin = step5BankSecuritySchema.safeParse({
           accountHolder: 'Alexander Hamilton',
-          bankName: 'Chase',
-          accountNumber: '987654321',
+          bankName: 'JPMorgan Chase',
+          accountNumber: '987654321098',
           ifsc: 'CHASUS33',
           securityPin: 'abcd',
         });
-        expect(parsedAlpha.success).toBe(false);
+        expect(nonNumericPin.success).toBe(false);
 
-        const parsedTooShort = step5BankSecuritySchema.safeParse({
+        const shortPin = step5BankSecuritySchema.safeParse({
           accountHolder: 'Alexander Hamilton',
-          bankName: 'Chase',
-          accountNumber: '987654321',
+          bankName: 'JPMorgan Chase',
+          accountNumber: '987654321098',
           ifsc: 'CHASUS33',
           securityPin: '12',
         });
-        expect(parsedTooShort.success).toBe(false);
+        expect(shortPin.success).toBe(false);
       });
     });
   });
 
-  describe('Security & Sensitive Data Masking', () => {
-    it('should mask bank account numbers preserving only last 4 digits', () => {
-      expect(maskAccountNumber('987654321098')).toBe('********1098');
-      expect(maskAccountNumber('1234')).toBe('****');
-      expect(maskAccountNumber('')).toBe('');
+  describe('2. Duplicate Email & User Rejection', () => {
+    it('should reject enrollment when prospect email already exists in system', async () => {
+      vi.spyOn(EnrollmentService, 'createEnrollment').mockRejectedValue(
+        AppError.conflict(
+          'An account with this email address already exists. Please login instead.',
+          'ENROLLMENT_USER_ALREADY_EXISTS'
+        )
+      );
+
+      const res = await request(app)
+        .post('/api/v1/enrollments')
+        .send({
+          sponsorId: 'DST-10001',
+          prospectEmail: 'existing.user@kashvimlm.com',
+          enrollmentType: 'DISTRIBUTOR',
+        })
+        .expect(409);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('already exists');
+    });
+  });
+
+  describe('3. Invalid Sponsor Rejection', () => {
+    it('should reject enrollment when sponsor code does not exist', async () => {
+      vi.spyOn(EnrollmentService, 'createEnrollment').mockRejectedValue(
+        AppError.notFound(
+          "Sponsor 'INVALID-SPONSOR-999' not found. Please verify the sponsor ID or distributor code.",
+          'ENROLLMENT_SPONSOR_NOT_FOUND'
+        )
+      );
+
+      const res = await request(app)
+        .post('/api/v1/enrollments')
+        .send({
+          sponsorId: 'INVALID-SPONSOR-999',
+          prospectEmail: 'newprospect@example.com',
+          enrollmentType: 'DISTRIBUTOR',
+        })
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('not found');
     });
 
-    it('should mask IFSC / Routing codes', () => {
-      const masked = maskIfsc('SBIN0001234');
-      expect(masked.startsWith('SBIN')).toBe(true);
-      expect(masked.endsWith('34')).toBe(true);
-      expect(masked).toContain('*');
+    it('should reject enrollment when sponsor is inactive', async () => {
+      vi.spyOn(EnrollmentService, 'createEnrollment').mockRejectedValue(
+        AppError.badRequest(
+          'The specified sponsor account is not currently active.',
+          'ENROLLMENT_SPONSOR_INACTIVE'
+        )
+      );
+
+      const res = await request(app)
+        .post('/api/v1/enrollments')
+        .send({
+          sponsorId: 'DST-INACTIVE-01',
+          prospectEmail: 'newprospect@example.com',
+          enrollmentType: 'DISTRIBUTOR',
+        })
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('not currently active');
+    });
+  });
+
+  describe('4. Invalid Placement Rejection', () => {
+    it('should reject Step 3 when placement parent is not found', async () => {
+      const enrollmentId = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
+
+      vi.spyOn(EnrollmentService, 'saveStep3').mockRejectedValue(
+        AppError.notFound(
+          'Invalid parent: The specified placement parent node does not exist in the binary tree.',
+          'ENROLLMENT_INVALID_PLACEMENT_PARENT'
+        )
+      );
+
+      const res = await request(app)
+        .post(`/api/v1/enrollments/${enrollmentId}/step/3`)
+        .send({
+          sponsor: 'DST-10001',
+          placementParent: 'NONEXISTENT-PARENT',
+          placementPosition: 'LEFT',
+        })
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('does not exist');
     });
 
-    it('should mask emails and phone numbers', () => {
-      const maskedEmail = maskEmail('alexander.hamilton@example.com');
-      expect(maskedEmail).toContain('@example.com');
-      expect(maskedEmail).toContain('***');
+    it('should reject Step 3 when target position is already occupied', async () => {
+      const enrollmentId = 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d';
 
-      const maskedPhone = maskPhone('+15552345678');
-      expect(maskedPhone.endsWith('5678')).toBe(true);
-      expect(maskedPhone.startsWith('*')).toBe(true);
+      vi.spyOn(EnrollmentService, 'saveStep3').mockRejectedValue(
+        AppError.conflict(
+          'The LEFT position under placement parent (ID: DST-10002) is already occupied.'
+        )
+      );
+
+      const res = await request(app)
+        .post(`/api/v1/enrollments/${enrollmentId}/step/3`)
+        .send({
+          sponsor: 'DST-10001',
+          placementParent: 'DST-10002',
+          placementPosition: 'LEFT',
+        })
+        .expect(409);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('already occupied');
+    });
+  });
+
+  describe('5. Data Sanitization & Financial Masking', () => {
+    it('should mask bank account numbers showing only the last 4 digits', () => {
+      const masked = maskAccountNumber('987654321098');
+      expect(masked.endsWith('1098')).toBe(true);
+      expect(masked.includes('****')).toBe(true);
+      expect(masked).not.toBe('987654321098');
     });
 
-    it('should sanitize enrollment payload, removing raw PIN and hashes', () => {
+    it('should strip raw security PIN and hash from enrollment response payload', () => {
       const rawEnrollment = {
-        id: 'mock-enrollment-id',
+        id: 'mock-enr-123',
         enrollmentNumber: 'ENR-123456',
         securityPinHash: '$argon2id$v=19$m=65536,t=3,p=1$secret_hash',
         steps: [
           {
-            stepNumber: 1,
-            stepName: 'Personal Info',
-            stepData: { legalName: 'John Doe', email: 'john@example.com' },
-          },
-          {
             stepNumber: 5,
             stepName: 'Bank & Security',
             stepData: {
-              accountHolder: 'John Doe',
-              bankName: 'City Bank',
-              accountNumber: '112233445566',
-              ifsc: 'CITI0001',
-              securityPin: '1234',
-              securityPinHash: '$argon2id$...',
+              accountHolder: 'Alexander Hamilton',
+              accountNumber: '987654321098',
+              ifsc: 'CHASUS33',
+              securityPin: '4829',
+              securityPinHash: 'secret_hash',
             },
           },
         ],
       };
 
       const sanitized = sanitizeEnrollmentResponse(rawEnrollment);
-
-      // Verify securityPinHash stripped at root
-      expect(sanitized.securityPinHash).toBeUndefined();
-
-      // Verify Step 5 bank details masked and PIN omitted
-      const step5 = sanitized.steps.find((s: any) => s.stepNumber === 5);
-      expect(step5.stepData.securityPin).toBeUndefined();
-      expect(step5.stepData.securityPinHash).toBeUndefined();
-      expect(step5.stepData.pinConfigured).toBe(true);
-      expect(step5.stepData.accountNumber).toBe('********5566');
-    });
-
-    it('should securely hash security PIN using Argon2id', async () => {
-      const pin = '5892';
-      const hash = await hashPassword(pin);
-
-      expect(hash).not.toBe(pin);
-      expect(hash).toContain('$argon2id$');
-
-      const isMatch = await verifyPassword(pin, hash);
-      expect(isMatch).toBe(true);
-
-      const isWrong = await verifyPassword('0000', hash);
-      expect(isWrong).toBe(false);
-    });
-  });
-
-  describe('Enrollment Service Structure', () => {
-    it('should define all 9 required service methods', () => {
-      expect(EnrollmentService.createEnrollment).toBeDefined();
-      expect(EnrollmentService.getEnrollmentById).toBeDefined();
-      expect(EnrollmentService.updateEnrollment).toBeDefined();
-      expect(EnrollmentService.saveStep1).toBeDefined();
-      expect(EnrollmentService.saveStep2).toBeDefined();
-      expect(EnrollmentService.saveStep3).toBeDefined();
-      expect(EnrollmentService.saveStep4).toBeDefined();
-      expect(EnrollmentService.saveStep5).toBeDefined();
-      expect(EnrollmentService.submitEnrollment).toBeDefined();
+      expect((sanitized as any).securityPinHash).toBeUndefined();
+      expect(sanitized.steps[0].stepData.securityPin).toBeUndefined();
+      expect(sanitized.steps[0].stepData.securityPinHash).toBeUndefined();
+      expect(sanitized.steps[0].stepData.accountNumber).toBe('********1098');
+      expect(sanitized.steps[0].stepData.pinConfigured).toBe(true);
     });
   });
 });

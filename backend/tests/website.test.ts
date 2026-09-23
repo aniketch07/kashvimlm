@@ -270,3 +270,9 @@ export async function runWebsiteTests() {
   console.log('>>> DISTRIBUTOR WEBSITE SUITE: ALL TESTS PASSED! <<<');
   console.log('======================================================\n');
 }
+
+describe('DISTRIBUTOR WEBSITE SUITE', () => {
+  it('should pass all replicated website storefront checks', async () => {
+    await runWebsiteTests();
+  });
+});

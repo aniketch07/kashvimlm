@@ -211,11 +211,11 @@ function DistributorDashboard({ user, onSignOut }) {
     );
   };
 
-  // Member data (Owner: Rahul kaushal)
-  const memberName = user?.name || 'Rahul kaushal';
-  const memberId = user?.memberId || '88767139';
+  // Member data (Owner: Rahul Example)
+  const memberName = user?.name || 'Rahul Example';
+  const memberId = user?.memberId || 'KV-DEMO-1001';
   const memberSince = user?.since || '2026';
-  const memberRank = user?.tier || 'Business Center';
+  const memberRank = user?.tier || 'Gold Executive';
 
   // Format today's date dynamically
   const todayDateStr = new Intl.DateTimeFormat('en-US', {

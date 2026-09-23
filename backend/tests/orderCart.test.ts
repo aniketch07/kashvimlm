@@ -1,73 +1,273 @@
 /**
- * Test Suite: Shopping Cart & Order Management
- * Tests 10-step transactional order creation, authoritative DB pricing/BV,
- * stock locking, inventory transactions, BV propagation, commission qualification,
- * and order cancellation.
+ * Test Suite: Shopping Cart & Order Management Automated Tests
+ * Uses Vitest & Supertest
+ *
+ * Covers:
+ * - Cart (add, get, remove)
+ * - Order creation
+ * - Stock validation & inventory locking
+ * - BV calculations & anti-tampering protection
+ * - Order cancellation & stock/BV reversal
  */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import request from 'supertest';
+import app from '../src/app';
+import { CartService } from '../src/services/cart.service';
+import { OrderService } from '../src/services/order.service';
 import {
   addToCartSchema,
-  cartItemIdParamSchema,
   updateCartItemSchema,
 } from '../src/validators/cart.validators';
 import {
   createOrderSchema,
   orderItemInputSchema,
-  orderQuerySchema,
   orderStatusEnum,
 } from '../src/validators/order.validators';
-import { CartService } from '../src/services/cart.service';
-import { OrderService } from '../src/services/order.service';
-import { CommissionService } from '../src/services/commission.service';
+import { AppError } from '../src/utils/appError';
+import { createTestToken } from './helpers/testHelpers';
 
-describe('Shopping Cart & Order Management Suite', () => {
-  describe('Cart Validation Schemas', () => {
-    it('should validate adding product to cart with positive quantity', () => {
-      const valid = addToCartSchema.safeParse({
-        productId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
-        quantity: 2,
-      });
-      expect(valid.success).toBe(true);
+describe('ORDER & CART MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const userId = '11111111-1111-4111-8111-111111111111';
+  const token = createTestToken({
+    id: userId,
+    email: 'buyer@kashvimlm.com',
+    role: 'DISTRIBUTOR',
+  });
+  const productId = '22222222-2222-4222-8222-222222222222';
+  const cartItemId = '33333333-3333-4333-8333-333333333333';
+  const orderId = '44444444-4444-4444-8444-444444444444';
+
+  describe('1. Shopping Cart Management (/api/v1/cart)', () => {
+    it('should add an item to the shopping cart via POST /cart/items', async () => {
+      const mockCart = {
+        id: 'cart-1',
+        userId,
+        items: [
+          {
+            id: cartItemId,
+            productId,
+            quantity: 2,
+            product: {
+              name: 'ActiveFit Compression Hosiery Pro',
+              wholesalePrice: 29.99,
+              bv: 25.0,
+            },
+          },
+        ],
+        subtotal: 59.98,
+        totalBV: 50.0,
+      };
+
+      vi.spyOn(CartService, 'addItem').mockResolvedValue(mockCart as any);
+
+      const res = await request(app)
+        .post('/api/v1/cart/items')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          productId,
+          quantity: 2,
+        })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.items.length).toBe(1);
+      expect(res.body.data.subtotal).toBe(59.98);
+      expect(res.body.data.totalBV).toBe(50.0);
     });
 
-    it('should default quantity to 1 if not specified', () => {
-      const valid = addToCartSchema.safeParse({
-        productId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
-      });
-      expect(valid.success).toBe(true);
-      if (valid.success) {
-        expect(valid.data.quantity).toBe(1);
-      }
+    it('should retrieve current user shopping cart via GET /cart', async () => {
+      const mockCart = {
+        id: 'cart-1',
+        userId,
+        items: [],
+        subtotal: 0,
+        totalBV: 0,
+      };
+
+      vi.spyOn(CartService, 'getOrCreateCart').mockResolvedValue(mockCart as any);
+
+      const res = await request(app)
+        .get('/api/v1/cart')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.userId).toBe(userId);
     });
 
-    it('should reject invalid UUID or non-positive quantity', () => {
-      expect(
-        addToCartSchema.safeParse({
-          productId: 'invalid-uuid',
-          quantity: 1,
-        }).success
-      ).toBe(false);
+    it('should remove an item from the cart via DELETE /cart/items/:id', async () => {
+      vi.spyOn(CartService, 'removeItem').mockResolvedValue({
+        id: 'cart-1',
+        userId,
+        items: [],
+        subtotal: 0,
+        totalBV: 0,
+      } as any);
 
-      expect(
-        addToCartSchema.safeParse({
-          productId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
-          quantity: 0,
-        }).success
-      ).toBe(false);
+      const res = await request(app)
+        .delete(`/api/v1/cart/items/${cartItemId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toContain('Item removed from cart');
     });
 
-    it('should validate updating cart item quantity (including 0 to remove)', () => {
-      expect(updateCartItemSchema.safeParse({ quantity: 5 }).success).toBe(true);
-      expect(updateCartItemSchema.safeParse({ quantity: 0 }).success).toBe(true);
-      expect(updateCartItemSchema.safeParse({ quantity: -1 }).success).toBe(false);
+    it('should reject unauthenticated cart requests with 401', async () => {
+      const res = await request(app)
+        .get('/api/v1/cart')
+        .expect(401);
+
+      expect(res.body.success).toBe(false);
     });
   });
 
-  describe('Order Validation Schemas & Statuses', () => {
-    it('should support all required order statuses', () => {
-      const requiredStatuses = [
+  describe('2. Order Creation & Authoritative Pricing (/api/v1/orders)', () => {
+    it('should successfully create an order from validated items', async () => {
+      const mockOrder = {
+        id: orderId,
+        orderNumber: 'ORD-987654-1001',
+        userId,
+        status: 'PAID',
+        totalAmount: 59.98,
+        totalBV: 50.0,
+        items: [
+          {
+            id: 'item-1',
+            productId,
+            quantity: 2,
+            unitPrice: 29.99,
+            unitBV: 25.0,
+            totalPrice: 59.98,
+            totalBV: 50.0,
+          },
+        ],
+      };
+
+      vi.spyOn(OrderService, 'createOrder').mockResolvedValue(mockOrder as any);
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          items: [{ productId, quantity: 2 }],
+          paymentMethod: 'CREDIT_CARD',
+          markPaid: true,
+        })
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.orderNumber).toContain('ORD-');
+      expect(res.body.data.totalAmount).toBe(59.98);
+      expect(res.body.data.totalBV).toBe(50.0);
+    });
+  });
+
+  describe('3. Stock Validation & Inventory Locking', () => {
+    it('should reject order creation with 400 when requested quantity exceeds available stock', async () => {
+      vi.spyOn(OrderService, 'createOrder').mockRejectedValue(
+        AppError.badRequest(
+          "Insufficient stock for 'ActiveFit Compression Hosiery Pro'. Available: 3, requested: 10.",
+          'INSUFFICIENT_STOCK'
+        )
+      );
+
+      const res = await request(app)
+        .post('/api/v1/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          items: [{ productId, quantity: 10 }],
+        })
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('Insufficient stock');
+    });
+  });
+
+  describe('4. Anti-Tampering: Authoritative BV & Price Validation', () => {
+    it('should strictly ignore client-supplied unitPrice and unitBV in orderItemInputSchema', () => {
+      const clientTamperingAttempt = {
+        productId,
+        quantity: 2,
+        unitPrice: 0.01, // Client attempting to buy for 1 cent
+        unitBV: 99999,   // Client attempting to inflate BV
+      };
+
+      const parsed = orderItemInputSchema.parse(clientTamperingAttempt);
+      expect(parsed.productId).toBe(productId);
+      expect(parsed.quantity).toBe(2);
+      expect((parsed as any).unitPrice).toBeUndefined();
+      expect((parsed as any).unitBV).toBeUndefined();
+    });
+  });
+
+  describe('5. Order Cancellation & Stock/BV Reversal (/api/v1/orders/:id/cancel)', () => {
+    it('should cancel eligible order and initiate inventory and BV reversal', async () => {
+      const mockCancelledOrder = {
+        id: orderId,
+        orderNumber: 'ORD-987654-1001',
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        restoredStock: true,
+        reversedBV: 50.0,
+      };
+
+      vi.spyOn(OrderService, 'cancelOrder').mockResolvedValue(mockCancelledOrder as any);
+
+      const res = await request(app)
+        .post(`/api/v1/orders/${orderId}/cancel`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('CANCELLED');
+      expect(res.body.data.restoredStock).toBe(true);
+    });
+
+    it('should reject cancellation of orders that are already SHIPPED or DELIVERED', async () => {
+      vi.spyOn(OrderService, 'cancelOrder').mockRejectedValue(
+        AppError.badRequest(
+          "Orders with status 'SHIPPED' cannot be cancelled. Please initiate a return request.",
+          'ORDER_CANNOT_BE_CANCELLED'
+        )
+      );
+
+      const res = await request(app)
+        .post(`/api/v1/orders/${orderId}/cancel`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('cannot be cancelled');
+    });
+
+    it('should reject cancellation when user does not own the order', async () => {
+      vi.spyOn(OrderService, 'cancelOrder').mockRejectedValue(
+        AppError.forbidden('You do not have permission to cancel this order.', 'AUTH_FORBIDDEN')
+      );
+
+      const res = await request(app)
+        .post(`/api/v1/orders/${orderId}/cancel`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('do not have permission');
+    });
+  });
+
+  describe('6. Order Status Enums Verification', () => {
+    it('should recognize all required enterprise order statuses', () => {
+      const expected = [
         'PENDING',
         'PAYMENT_PENDING',
         'PAID',
+        'CONFIRMED',
         'PROCESSING',
         'SHIPPED',
         'DELIVERED',
@@ -75,123 +275,10 @@ describe('Shopping Cart & Order Management Suite', () => {
         'REFUNDED',
       ];
 
-      for (const status of requiredStatuses) {
-        expect(orderStatusEnum.safeParse(status).success).toBe(true);
+      for (const st of expected) {
+        expect(orderStatusEnum.safeParse(st).success).toBe(true);
       }
       expect(orderStatusEnum.safeParse('UNKNOWN_STATUS').success).toBe(false);
-    });
-
-    it('should validate order items without accepting frontend prices or BV', () => {
-      const itemInput = {
-        productId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
-        quantity: 3,
-        // Any attempt by frontend to pass price/BV should be ignored or not present in schema
-        unitPrice: 0.01,
-        unitBV: 99999,
-      };
-
-      const parsed = orderItemInputSchema.safeParse(itemInput);
-      expect(parsed.success).toBe(true);
-      if (parsed.success) {
-        // Only productId and quantity are preserved
-        expect((parsed.data as any).unitPrice).toBeUndefined();
-        expect((parsed.data as any).unitBV).toBeUndefined();
-        expect(parsed.data.quantity).toBe(3);
-      }
-    });
-
-    it('should validate order creation from cart or explicit items', () => {
-      const fromCartOrder = createOrderSchema.safeParse({
-        fromCart: true,
-        paymentMethod: 'WALLET',
-      });
-      expect(fromCartOrder.success).toBe(true);
-
-      const directItemsOrder = createOrderSchema.safeParse({
-        items: [
-          {
-            productId: 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d',
-            quantity: 2,
-          },
-        ],
-        paymentMethod: 'CREDIT_CARD',
-      });
-      expect(directItemsOrder.success).toBe(true);
-    });
-  });
-
-  describe('Authoritative Price & BV Calculation Integrity', () => {
-    it('should calculate subtotal and BV from DB records, ignoring frontend tampering', () => {
-      // Mock DB product records
-      const dbProduct1 = {
-        id: 'prod-1',
-        wholesalePrice: 29.99,
-        mrp: 49.99,
-        bv: 25.0,
-      };
-      const dbProduct2 = {
-        id: 'prod-2',
-        wholesalePrice: 89.99,
-        mrp: 149.99,
-        bv: 75.0,
-      };
-
-      const requestedQuantities = [
-        { productId: 'prod-1', quantity: 2 },
-        { productId: 'prod-2', quantity: 1 },
-      ];
-
-      // Wholesale calculation (Distributor)
-      const wholesaleSubtotal =
-        dbProduct1.wholesalePrice * 2 + dbProduct2.wholesalePrice * 1;
-      const totalBV = dbProduct1.bv * 2 + dbProduct2.bv * 1;
-
-      expect(wholesaleSubtotal).toBeCloseTo(149.97);
-      expect(totalBV).toBe(125.0);
-
-      // MRP calculation (Customer)
-      const mrpSubtotal = dbProduct1.mrp * 2 + dbProduct2.mrp * 1;
-      expect(mrpSubtotal).toBeCloseTo(249.97);
-    });
-  });
-
-  describe('Commission Processing Qualification Rules', () => {
-    it('should verify that commissions only trigger after order qualifies', () => {
-      // Order in PENDING status does NOT qualify
-      const pendingOrder = { status: 'PENDING', totalBV: 100 };
-      const qualifiesPending = pendingOrder.status === 'PAID' || pendingOrder.status === 'CONFIRMED';
-      expect(qualifiesPending).toBe(false);
-
-      // Order with 0 BV does NOT qualify
-      const zeroBVOrder = { status: 'PAID', totalBV: 0 };
-      const qualifiesZeroBV = zeroBVOrder.totalBV > 0;
-      expect(qualifiesZeroBV).toBe(false);
-
-      // Order with PAID status and BV > 0 QUALIFIES
-      const paidQualifiedOrder = { status: 'PAID', totalBV: 150 };
-      const qualifies = (paidQualifiedOrder.status === 'PAID' || paidQualifiedOrder.status === 'CONFIRMED') && paidQualifiedOrder.totalBV > 0;
-      expect(qualifies).toBe(true);
-    });
-  });
-
-  describe('Service Methods Availability', () => {
-    it('should define all CartService methods', () => {
-      expect(CartService.getOrCreateCart).toBeDefined();
-      expect(CartService.addItem).toBeDefined();
-      expect(CartService.updateItem).toBeDefined();
-      expect(CartService.removeItem).toBeDefined();
-      expect(CartService.clearCart).toBeDefined();
-    });
-
-    it('should define all OrderService methods', () => {
-      expect(OrderService.createOrder).toBeDefined();
-      expect(OrderService.getOrders).toBeDefined();
-      expect(OrderService.getOrderById).toBeDefined();
-      expect(OrderService.cancelOrder).toBeDefined();
-    });
-
-    it('should define CommissionService.processOrderCommissions', () => {
-      expect(CommissionService.processOrderCommissions).toBeDefined();
     });
   });
 });

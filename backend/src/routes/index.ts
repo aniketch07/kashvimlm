@@ -84,4 +84,16 @@ import { newsRouter, adminNewsRouter } from './news.routes';
 apiRouter.use('/news', newsRouter);
 apiRouter.use('/admin/news', adminNewsRouter);
 
+// Customer Support & Helpdesk: /api/v1/support
+import { supportRouter } from './support.routes';
+apiRouter.use('/support', supportRouter);
+
+// User Notifications & Inbox: /api/v1/notifications
+import { notificationRouter } from './notification.routes';
+apiRouter.use('/notifications', notificationRouter);
+
+// Admin Control & Audit Logs: /api/v1/admin
+import { adminRouter } from './admin.routes';
+apiRouter.use('/admin', adminRouter);
+
 export default apiRouter;
