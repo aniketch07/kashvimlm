@@ -21,6 +21,7 @@ import {
   Shield,
   TrendingUp,
   Globe,
+  Network,
 } from 'lucide-react';
 import './DistributorDashboard.css';
 
@@ -28,6 +29,7 @@ import './DistributorDashboard.css';
 import EnrollmentView from './EnrollmentView';
 import ShopView from './ShopView';
 import ProductManagerView from './ProductManagerView';
+import NetworkTreeView from './NetworkTreeView';
 import { getStoredCatalog } from '../../data/productCatalog';
 import { api } from '../../services/api.js';
 
@@ -404,6 +406,17 @@ function DistributorDashboard({ user, onSignOut }) {
           >
             <PackagePlus size={20} />
             <span className="rail-tooltip">Add Product &amp; Price</span>
+          </button>
+
+          {/* 5. Network Tree (MLM Binary Tree) */}
+          <button
+            type="button"
+            className={`rail-icon-btn ${activeNavIcon === 'network_tree' ? 'active' : ''}`}
+            onClick={() => setActiveNavIcon('network_tree')}
+            title="Network Tree"
+          >
+            <Network size={20} />
+            <span className="rail-tooltip">Network Tree</span>
           </button>
         </aside>
 
@@ -1457,6 +1470,13 @@ function DistributorDashboard({ user, onSignOut }) {
               onUpdateCatalog={setCatalog}
               onNavigate={setActiveNavIcon}
             />
+          )}
+
+          {/* ===================================================================
+              ROLE 5: NETWORK TREE (MLM Binary Genealogy Tree)
+              =================================================================== */}
+          {activeNavIcon === 'network_tree' && (
+            <NetworkTreeView user={user} onNavigate={setActiveNavIcon} />
           )}
         </main>
       </div>

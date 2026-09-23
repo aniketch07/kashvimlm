@@ -508,4 +508,49 @@ export const api = {
     }
     return null;
   },
+
+  // 8. MLM Binary Network Tree (Database-Driven)
+  async getBinaryTree(rootId = 'root-demo', depth = 3) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/tree/binary/${encodeURIComponent(rootId)}?depth=${depth}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Get binary tree failed:', err.message);
+    }
+    return null;
+  },
+
+  async getNextAvailableSlot(nodeId, preferredLeg = 'BALANCED') {
+    try {
+      const res = await fetch(`${API_BASE_URL}/tree/next-slot/${encodeURIComponent(nodeId)}?preferredLeg=${preferredLeg}`);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+    } catch (err) {
+      console.warn('[API] Get next slot failed:', err.message);
+    }
+    return null;
+  },
+
+  async placeDistributorInTree(placementData) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/tree/place`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(placementData),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data.data;
+      }
+      throw new Error(data.message || 'Placement failed');
+    } catch (err) {
+      console.warn('[API] Tree placement failed:', err.message);
+      throw err;
+    }
+  },
 };
