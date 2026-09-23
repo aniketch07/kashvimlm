@@ -892,6 +892,10 @@ export class CommissionService {
       .filter((c) => c.type === 'FRONTLINE')
       .reduce((sum, c) => sum + Number(c.amount), 0);
 
+    const rankBonus = activeCommissions
+      .filter((c) => c.type === 'RANK')
+      .reduce((sum, c) => sum + Number(c.amount), 0);
+
     // Qualification Check
     const personalBV = Number(distributor.lifetimePV);
     const requiredPersonalBV = 100;
@@ -900,7 +904,7 @@ export class CommissionService {
     const qualificationStatus = isQualified ? 'Commission Qualified' : 'Not Commission Qualified';
 
     const totalEstimatedCommission = Number(
-      (totalBase + pcBonus + milestoneBonus + frontlineBonus).toFixed(2)
+      (totalBase + pcBonus + milestoneBonus + frontlineBonus + rankBonus).toFixed(2)
     );
 
     return {
@@ -911,16 +915,16 @@ export class CommissionService {
       qualificationStatus,
       breakdown: [
         {
-          name: 'Base Commission',
+          name: 'Binary Commission',
           amount: Number(totalBase.toFixed(2)),
           description:
-            'Base Commission is calculated weekly on balanced Commission Volume Points (CVP) across your active Business Centers.',
+            'Binary Commission is calculated weekly on balanced Commission Volume Points (CVP) across your active Business Centers.',
         },
         {
-          name: 'PC Order Bonus',
-          amount: Number(pcBonus.toFixed(2)),
+          name: 'Frontline Bonus',
+          amount: Number(frontlineBonus.toFixed(2)),
           description:
-            'Cash bonus on initial and repeat orders made by your enrolled Preferred Customers.',
+            'Matching leadership bonus earned on the base/binary commission of your personally sponsored partners.',
         },
         {
           name: 'Milestone Bonus',
@@ -929,10 +933,16 @@ export class CommissionService {
             'Incentive bonuses awarded when achieving key volume and frontline growth milestones.',
         },
         {
-          name: 'Frontline Bonus',
-          amount: Number(frontlineBonus.toFixed(2)),
+          name: 'Rank Bonus',
+          amount: Number(rankBonus.toFixed(2)),
           description:
-            'Matching bonuses earned on the base commission of your personally sponsored partners.',
+            'One-time advancement awards and leadership pool rewards upon achieving higher ranks.',
+        },
+        {
+          name: 'Customer/PC Bonus',
+          amount: Number(pcBonus.toFixed(2)),
+          description:
+            'Cash bonus on initial and repeat orders made by your enrolled Preferred Customers.',
         },
       ],
     };

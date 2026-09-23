@@ -42,6 +42,9 @@ const optionalAuth = (req: Request, _res: Response, next: NextFunction) => {
 // GET /api/v1/commissions/current - Current active period and qualification
 router.get('/current', optionalAuth, CommissionController.getCurrentPeriod);
 
+// GET /api/v1/commissions/summary - 5-stream commission breakdown summary
+router.get('/summary', optionalAuth, CommissionController.getSummary);
+
 // All remaining commission endpoints require authentication
 router.use(authenticate);
 
