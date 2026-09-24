@@ -52,3 +52,17 @@ export const passwordResetRateLimiter = rateLimit({
   },
   skip: () => isTest,
 });
+
+export const treeRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isTest ? 10000 : 120, // Max 120 tree queries per 15 minutes per IP
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many network tree requests from this IP. Please try again after 15 minutes.',
+    code: 'TREE_RATE_LIMIT_EXCEEDED',
+  },
+  skip: () => isTest,
+});
+

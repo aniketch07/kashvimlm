@@ -6,6 +6,20 @@ import { AuditService } from '../audit/audit.service.js';
 import { AuditAction } from '../audit/audit.types.js';
 
 export class DistributorController {
+  static async getMeReferralLink(req: any, res: Response): Promise<void> {
+    const targetMemberId = req.user?.distributorId || req.user?.memberId || 'KV-1001';
+    const baseUrl = req.query.baseUrl || req.headers['x-base-url'];
+    const data = await DistributorService.getReferralLink(targetMemberId, baseUrl);
+    res.status(200).json({ success: true, data });
+  }
+
+  static async getReferralLink(req: any, res: Response): Promise<void> {
+    const targetMemberId = req.params.memberId || req.user?.distributorId || req.user?.memberId || 'KV-1001';
+    const baseUrl = req.query.baseUrl || req.headers['x-base-url'];
+    const data = await DistributorService.getReferralLink(targetMemberId, baseUrl);
+    res.status(200).json({ success: true, data });
+  }
+
   static async getProfile(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       // Do not trust frontend IDs: fallback to authenticated user's member ID

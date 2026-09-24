@@ -60,3 +60,24 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction): 
     );
   }
 };
+
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const payload = verifyAccessToken(token);
+      if (payload.status !== 'BLOCKED' && payload.status !== 'SUSPENDED') {
+        req.user = {
+          id: payload.sub,
+          email: payload.email,
+          role: payload.role,
+          status: payload.status,
+        };
+      }
+    } catch {
+      // Ignored for optional authentication
+    }
+  }
+  next();
+};

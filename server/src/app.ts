@@ -139,6 +139,7 @@ app.use('/api/v1/enrollment', enrollmentRoutes);
 app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/tree', mlmTreeRoutes);
+app.use('/api/v1/network-tree', mlmTreeRoutes);
 app.use('/api/v1/bv', bvEngineRoutes);
 app.use('/api/v1/commissions', commissionEngineRoutes);
 app.use('/api/v1/wallet', walletRoutes);

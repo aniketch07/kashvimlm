@@ -1222,6 +1222,86 @@ Powered by **Node.js, Express, TypeScript, PostgreSQL, and Prisma ORM**.
         },
       },
     },
+    '/api/v1/tree/move': {
+      post: {
+        tags: ['11. Business Centers'],
+        summary: 'Admin Move Distributor (Prompt 16: Immutable Tree Audit Record)',
+        description: 'Moves a distributor node to a new parent and position. Requires Reason, Old Parent, Old Position, New Parent, New Position, Admin ID, and Timestamp.',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['memberId', 'reason', 'oldParent', 'oldPosition', 'newParent', 'newPosition'],
+                properties: {
+                  memberId: { type: 'string', example: 'KV-1007' },
+                  reason: { type: 'string', example: 'Strategic branch rebalancing approved by compliance.' },
+                  oldParent: { type: 'string', example: 'KV-1002' },
+                  oldPosition: { type: 'string', example: 'RIGHT' },
+                  newParent: { type: 'string', example: 'KV-1003' },
+                  newPosition: { type: 'string', example: 'RIGHT' },
+                  adminId: { type: 'string', example: 'usr-admin-001' },
+                  timestamp: { type: 'string', example: '2026-09-24T12:00:00Z' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Distributor moved and immutable TREE_MEMBER_MOVED audit record created.' },
+          400: { description: 'Validation failed: Reason, Old Parent, Old Position, New Parent, New Position, or Admin ID missing.' },
+        },
+      },
+    },
+    '/api/v1/tree/audit-logs': {
+      get: {
+        tags: ['11. Business Centers'],
+        summary: 'Get MLM Tree Operation Audit Logs',
+        description: 'Returns immutable compliance logs for SPONSOR_ASSIGNED, DISTRIBUTOR_CREATED, TREE_MEMBER_PLACED, TREE_MEMBER_MOVED, TREE_MEMBER_REMOVED, TREE_POSITION_CHANGED.',
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: 'memberId', in: 'query', schema: { type: 'string' }, description: 'Filter by distributor/member ID' },
+          { name: 'event', in: 'query', schema: { type: 'string' }, description: 'Filter by tree event (e.g. TREE_MEMBER_MOVED)' },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 50 } },
+          { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        ],
+        responses: {
+          200: { description: 'List of tree audit records with actorId, memberId, sponsorId, placementParentId, position, oldValue, newValue, IP, userAgent, timestamp.' },
+        },
+      },
+    },
+    '/api/v1/admin/tree/move': {
+      post: {
+        tags: ['17. Admin'],
+        summary: 'Admin Move Distributor in MLM Binary Tree',
+        description: 'Requires Reason, Old Parent, Old Position, New Parent, New Position, Admin ID, Timestamp. Generates immutable audit record.',
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['memberId', 'reason', 'oldParent', 'oldPosition', 'newParent', 'newPosition'],
+                properties: {
+                  memberId: { type: 'string', example: 'KV-1007' },
+                  reason: { type: 'string', example: 'Network restructuring' },
+                  oldParent: { type: 'string', example: 'KV-1002' },
+                  oldPosition: { type: 'string', example: 'RIGHT' },
+                  newParent: { type: 'string', example: 'KV-1003' },
+                  newPosition: { type: 'string', example: 'RIGHT' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Distributor moved and immutable audit record created.' },
+        },
+      },
+    },
 
     // =========================================================================
     // 12. TRAINING

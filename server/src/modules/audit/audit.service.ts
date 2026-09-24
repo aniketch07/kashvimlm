@@ -1,6 +1,12 @@
 import { Request } from 'express';
 import { query } from '../../config/db.js';
-import { AuditAction, AuditLogEntry, CreateAuditLogParams, AuditLogFilterOptions } from './audit.types.js';
+import {
+  AuditAction,
+  AuditLogEntry,
+  CreateAuditLogParams,
+  AuditLogFilterOptions,
+  TreeAuditLogParams,
+} from './audit.types.js';
 
 export class AuditService {
   /**
@@ -166,9 +172,164 @@ export class AuditService {
       oldValue: null,
       newValue: { status: 'Session Terminated' },
       ipAddress: '103.21.14.88',
+      ip: '103.21.14.88',
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
       createdAt: '2026-09-21T18:00:00Z',
+      timestamp: '2026-09-21T18:00:00Z',
       user: { id: 'usr-demo-001', username: 'rahul_kaushal', email: 'rahul.kaushal@kashvimlm.com' },
+    },
+    // Prompt 16 — MLM Binary Tree Audit Records
+    {
+      id: 'audit-tree-001',
+      actorId: 'usr-demo-001',
+      action: AuditAction.SPONSOR_ASSIGNED,
+      entityType: 'MlmTree',
+      entityId: 'KV-1004',
+      memberId: 'KV-1004',
+      sponsorId: 'KV-1001',
+      placementParentId: 'KV-1002',
+      position: 'LEFT',
+      oldValue: null,
+      newValue: {
+        memberId: 'KV-1004',
+        fullName: 'Priya Sharma',
+        sponsorId: 'KV-1001',
+        sponsorName: 'Rahul Kaushal',
+      },
+      ipAddress: '103.21.14.88',
+      ip: '103.21.14.88',
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      createdAt: '2026-09-22T09:10:00Z',
+      timestamp: '2026-09-22T09:10:00Z',
+      user: { id: 'usr-demo-001', username: 'rahul_kaushal', email: 'rahul.kaushal@kashvimlm.com' },
+    },
+    {
+      id: 'audit-tree-002',
+      actorId: 'usr-demo-001',
+      action: AuditAction.DISTRIBUTOR_CREATED,
+      entityType: 'Distributor',
+      entityId: 'KV-1004',
+      memberId: 'KV-1004',
+      sponsorId: 'KV-1001',
+      placementParentId: 'KV-1002',
+      position: 'LEFT',
+      oldValue: null,
+      newValue: {
+        memberId: 'KV-1004',
+        fullName: 'Priya Sharma',
+        rank: 'Associate',
+        sponsorId: 'KV-1001',
+        status: 'Active',
+      },
+      ipAddress: '103.21.14.88',
+      ip: '103.21.14.88',
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      createdAt: '2026-09-22T09:10:02Z',
+      timestamp: '2026-09-22T09:10:02Z',
+      user: { id: 'usr-demo-001', username: 'rahul_kaushal', email: 'rahul.kaushal@kashvimlm.com' },
+    },
+    {
+      id: 'audit-tree-003',
+      actorId: 'usr-demo-001',
+      action: AuditAction.TREE_MEMBER_PLACED,
+      entityType: 'MlmTree',
+      entityId: 'KV-1004',
+      memberId: 'KV-1004',
+      sponsorId: 'KV-1001',
+      placementParentId: 'KV-1002',
+      position: 'LEFT',
+      oldValue: null,
+      newValue: {
+        memberId: 'KV-1004',
+        placementParentId: 'KV-1002',
+        position: 'LEFT',
+        treePath: '/KV-1001/KV-1002/KV-1004',
+      },
+      ipAddress: '103.21.14.88',
+      ip: '103.21.14.88',
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+      createdAt: '2026-09-22T09:10:05Z',
+      timestamp: '2026-09-22T09:10:05Z',
+      user: { id: 'usr-demo-001', username: 'rahul_kaushal', email: 'rahul.kaushal@kashvimlm.com' },
+    },
+    {
+      id: 'audit-tree-004',
+      actorId: 'usr-admin-001',
+      action: AuditAction.TREE_POSITION_CHANGED,
+      entityType: 'MlmTree',
+      entityId: 'KV-1005',
+      memberId: 'KV-1005',
+      sponsorId: 'KV-1001',
+      placementParentId: 'KV-1002',
+      position: 'RIGHT',
+      oldValue: { position: 'LEFT' },
+      newValue: {
+        position: 'RIGHT',
+        reason: 'Dual-leg balance adjustment for upcoming weekly cycle bonus',
+      },
+      ipAddress: '192.168.1.100',
+      ip: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      createdAt: '2026-09-22T11:30:00Z',
+      timestamp: '2026-09-22T11:30:00Z',
+      user: { id: 'usr-admin-001', username: 'executive_admin', email: 'admin@kashvimlm.com' },
+    },
+    {
+      id: 'audit-tree-005',
+      actorId: 'usr-admin-001',
+      action: AuditAction.TREE_MEMBER_MOVED,
+      entityType: 'MlmTree',
+      entityId: 'KV-1007',
+      memberId: 'KV-1007',
+      sponsorId: 'KV-1001',
+      placementParentId: 'KV-1003',
+      position: 'RIGHT',
+      reason: 'Network lineage correction approved by compliance committee.',
+      oldValue: {
+        oldParent: 'KV-1002',
+        oldPosition: 'RIGHT',
+      },
+      newValue: {
+        newParent: 'KV-1003',
+        newPosition: 'RIGHT',
+        reason: 'Network lineage correction approved by compliance committee.',
+        adminId: 'usr-admin-001',
+      },
+      ipAddress: '192.168.1.100',
+      ip: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0',
+      createdAt: '2026-09-22T14:45:00Z',
+      timestamp: '2026-09-22T14:45:00Z',
+      user: { id: 'usr-admin-001', username: 'executive_admin', email: 'admin@kashvimlm.com' },
+    },
+    {
+      id: 'audit-tree-006',
+      actorId: 'usr-admin-001',
+      action: AuditAction.TREE_MEMBER_REMOVED,
+      entityType: 'MlmTree',
+      entityId: 'KV-9999',
+      memberId: 'KV-9999',
+      sponsorId: 'KV-1001',
+      placementParentId: 'KV-1003',
+      position: 'LEFT',
+      reason: 'Mutual agreement account separation and downline consolidation.',
+      oldValue: {
+        memberId: 'KV-9999',
+        status: 'Active',
+        parent: 'KV-1003',
+        position: 'LEFT',
+      },
+      newValue: {
+        status: 'REMOVED',
+        reason: 'Mutual agreement account separation and downline consolidation.',
+        adminId: 'usr-admin-001',
+      },
+      ipAddress: '192.168.1.100',
+      ip: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      createdAt: '2026-09-23T08:15:00Z',
+      timestamp: '2026-09-23T08:15:00Z',
+      user: { id: 'usr-admin-001', username: 'executive_admin', email: 'admin@kashvimlm.com' },
     },
   ];
 
@@ -182,51 +343,128 @@ export class AuditService {
       action,
       entityType,
       entityId = null,
+      memberId = null,
+      sponsorId = null,
+      placementParentId = null,
+      position = null,
+      reason = null,
       oldValue = null,
       newValue = null,
-      ipAddress = '127.0.0.1',
+      ipAddress = params.ip || '127.0.0.1',
+      ip = params.ipAddress || '127.0.0.1',
       userAgent = 'Unknown',
+      timestamp = params.timestamp || new Date().toISOString(),
     } = params;
 
     const newId = `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const createdAt = new Date().toISOString();
+    const effectiveMemberId =
+      memberId ||
+      entityId ||
+      newValue?.memberId ||
+      oldValue?.memberId ||
+      null;
+    const effectiveSponsorId =
+      sponsorId ||
+      newValue?.sponsorId ||
+      oldValue?.sponsorId ||
+      null;
+    const effectiveParentId =
+      placementParentId ||
+      newValue?.parent ||
+      newValue?.placementParentId ||
+      newValue?.newParent ||
+      oldValue?.parent ||
+      oldValue?.oldParent ||
+      null;
+    const effectivePosition =
+      position ||
+      newValue?.position ||
+      newValue?.newPosition ||
+      oldValue?.position ||
+      oldValue?.oldPosition ||
+      null;
+    const effectiveReason =
+      reason ||
+      newValue?.reason ||
+      null;
 
     const entry: AuditLogEntry = {
       id: newId,
       actorId,
       action,
       entityType,
-      entityId,
+      entityId: entityId || effectiveMemberId,
+      memberId: effectiveMemberId,
+      sponsorId: effectiveSponsorId,
+      placementParentId: effectiveParentId,
+      position: effectivePosition,
+      reason: effectiveReason,
       oldValue,
       newValue,
-      ipAddress,
+      ipAddress: ipAddress || ip || '127.0.0.1',
+      ip: ip || ipAddress || '127.0.0.1',
       userAgent,
-      createdAt,
+      createdAt: timestamp,
+      timestamp,
     };
 
     // 1. Attempt PostgreSQL persistent insert
     try {
-      const res = await query(
-        `INSERT INTO audit_logs (id, actor_id, action, entity_type, entity_id, old_value, new_value, ip_address, user_agent, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         RETURNING *`,
-        [
-          entry.id,
-          entry.actorId,
-          entry.action,
-          entry.entityType,
-          entry.entityId,
-          entry.oldValue ? JSON.stringify(entry.oldValue) : null,
-          entry.newValue ? JSON.stringify(entry.newValue) : null,
-          entry.ipAddress,
-          entry.userAgent,
-          entry.createdAt,
-        ]
-      );
-      if (res && res.rows.length > 0) {
-        const row = res.rows[0];
-        entry.id = row.id;
-        entry.createdAt = row.created_at;
+      // First attempt with full columns (if schema extended)
+      try {
+        const res = await query(
+          `INSERT INTO audit_logs (id, actor_id, action, entity_type, entity_id, member_id, sponsor_id, placement_parent_id, position, reason, old_value, new_value, ip_address, user_agent, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+           RETURNING *`,
+          [
+            entry.id,
+            entry.actorId,
+            entry.action,
+            entry.entityType,
+            entry.entityId,
+            entry.memberId,
+            entry.sponsorId,
+            entry.placementParentId,
+            entry.position,
+            entry.reason,
+            entry.oldValue ? JSON.stringify(entry.oldValue) : null,
+            entry.newValue ? JSON.stringify(entry.newValue) : null,
+            entry.ipAddress,
+            entry.userAgent,
+            entry.createdAt,
+          ]
+        );
+        if (res && res.rows.length > 0) {
+          const row = res.rows[0];
+          entry.id = row.id;
+          entry.createdAt = row.created_at;
+          entry.timestamp = row.created_at;
+        }
+      } catch {
+        // Fallback to standard base audit table columns
+        const res = await query(
+          `INSERT INTO audit_logs (id, actor_id, action, entity_type, entity_id, old_value, new_value, ip_address, user_agent, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           RETURNING *`,
+          [
+            entry.id,
+            entry.actorId,
+            entry.action,
+            entry.entityType,
+            entry.entityId,
+            entry.oldValue ? JSON.stringify(entry.oldValue) : null,
+            entry.newValue ? JSON.stringify(entry.newValue) : null,
+            entry.ipAddress,
+            entry.userAgent,
+            entry.createdAt,
+          ]
+        );
+        if (res && res.rows.length > 0) {
+          const row = res.rows[0];
+          entry.id = row.id;
+          entry.createdAt = row.created_at;
+          entry.timestamp = row.created_at;
+        }
       }
     } catch {
       // Retain resilience when database is offline
@@ -240,6 +478,29 @@ export class AuditService {
   }
 
   /**
+   * Helper method to capture tree audit events with all standard fields
+   */
+  static async recordTreeEvent(params: TreeAuditLogParams): Promise<AuditLogEntry> {
+    return this.record({
+      action: params.event,
+      actorId: params.actorId || null,
+      entityType: 'MlmTree',
+      entityId: params.memberId,
+      memberId: params.memberId,
+      sponsorId: params.sponsorId || null,
+      placementParentId: params.placementParentId || null,
+      position: params.position || null,
+      oldValue: params.oldValue || null,
+      newValue: params.newValue || null,
+      ipAddress: params.ip || params.ipAddress || '127.0.0.1',
+      ip: params.ip || params.ipAddress || '127.0.0.1',
+      userAgent: params.userAgent || 'KashviMLM-Tree-Engine/1.0',
+      timestamp: params.timestamp || new Date().toISOString(),
+      reason: params.reason || null,
+    });
+  }
+
+  /**
    * Helper method to capture audit logs directly from an active Express HTTP request
    */
   static async recordFromRequest(
@@ -248,9 +509,10 @@ export class AuditService {
     entityType: string,
     entityId?: string | null,
     oldValue?: any,
-    newValue?: any
+    newValue?: any,
+    extraFields: Partial<CreateAuditLogParams> = {}
   ): Promise<AuditLogEntry> {
-    const actorId = (req as any).user?.id || null;
+    const actorId = (req as any).user?.id || (req as any).user?.memberId || null;
     const ipAddress =
       req.ip ||
       (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
@@ -266,7 +528,9 @@ export class AuditService {
       oldValue,
       newValue,
       ipAddress,
+      ip: ipAddress,
       userAgent,
+      ...extraFields,
     });
   }
 
@@ -274,7 +538,7 @@ export class AuditService {
    * Query audit logs with multi-field filtering, search, and pagination
    */
   static async getLogs(filters: AuditLogFilterOptions = {}): Promise<{ total: number; logs: AuditLogEntry[] }> {
-    const { action, entityType, entityId, actorId, limit = 50, offset = 0 } = filters;
+    const { action, entityType, entityId, actorId, memberId, limit = 50, offset = 0 } = filters;
 
     try {
       const conditions: string[] = [];
@@ -296,6 +560,11 @@ export class AuditService {
       if (actorId) {
         conditions.push(`al.actor_id = $${paramIdx++}`);
         values.push(actorId);
+      }
+      if (memberId) {
+        conditions.push(`(al.entity_id = $${paramIdx} OR al.old_value->>'memberId' = $${paramIdx} OR al.new_value->>'memberId' = $${paramIdx})`);
+        values.push(memberId);
+        paramIdx++;
       }
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -319,19 +588,30 @@ export class AuditService {
       );
 
       if (res && res.rows.length > 0) {
-        const logs: AuditLogEntry[] = res.rows.map((row: any) => ({
-          id: row.id,
-          actorId: row.actor_id,
-          action: row.action,
-          entityType: row.entity_type,
-          entityId: row.entity_id,
-          oldValue: typeof row.old_value === 'string' ? JSON.parse(row.old_value) : row.old_value,
-          newValue: typeof row.new_value === 'string' ? JSON.parse(row.new_value) : row.new_value,
-          ipAddress: row.ip_address,
-          userAgent: row.user_agent,
-          createdAt: row.created_at,
-          user: row.username ? { id: row.actor_id, username: row.username, email: row.email } : null,
-        }));
+        const logs: AuditLogEntry[] = res.rows.map((row: any) => {
+          const parsedOld = typeof row.old_value === 'string' ? JSON.parse(row.old_value) : row.old_value;
+          const parsedNew = typeof row.new_value === 'string' ? JSON.parse(row.new_value) : row.new_value;
+          return {
+            id: row.id,
+            actorId: row.actor_id,
+            action: row.action,
+            entityType: row.entity_type,
+            entityId: row.entity_id,
+            memberId: row.member_id || parsedNew?.memberId || parsedOld?.memberId || row.entity_id,
+            sponsorId: row.sponsor_id || parsedNew?.sponsorId || parsedOld?.sponsorId || null,
+            placementParentId: row.placement_parent_id || parsedNew?.placementParentId || parsedNew?.parent || parsedOld?.parent || null,
+            position: row.position || parsedNew?.position || parsedOld?.position || null,
+            reason: row.reason || parsedNew?.reason || null,
+            oldValue: parsedOld,
+            newValue: parsedNew,
+            ipAddress: row.ip_address,
+            ip: row.ip_address,
+            userAgent: row.user_agent,
+            createdAt: row.created_at,
+            timestamp: row.created_at,
+            user: row.username ? { id: row.actor_id, username: row.username, email: row.email } : null,
+          };
+        });
         return { total, logs };
       }
     } catch {
@@ -352,11 +632,58 @@ export class AuditService {
     if (actorId) {
       filtered = filtered.filter((l) => l.actorId === actorId);
     }
+    if (memberId) {
+      const m = memberId.toLowerCase();
+      filtered = filtered.filter(
+        (l) =>
+          l.memberId?.toLowerCase() === m ||
+          l.entityId?.toLowerCase() === m ||
+          l.oldValue?.memberId?.toLowerCase() === m ||
+          l.newValue?.memberId?.toLowerCase() === m
+      );
+    }
 
     const total = filtered.length;
     const paginated = filtered.slice(offset, offset + limit);
 
     return { total, logs: paginated };
+  }
+
+  /**
+   * Specifically query MLM Tree audit logs (SPONSOR_ASSIGNED, DISTRIBUTOR_CREATED, TREE_MEMBER_PLACED, TREE_MEMBER_MOVED, TREE_MEMBER_REMOVED, TREE_POSITION_CHANGED)
+   */
+  static async getTreeAuditLogs(filters: {
+    memberId?: string;
+    event?: string;
+    action?: string;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ total: number; logs: AuditLogEntry[] }> {
+    const treeEvents = [
+      AuditAction.SPONSOR_ASSIGNED,
+      AuditAction.DISTRIBUTOR_CREATED,
+      AuditAction.TREE_MEMBER_PLACED,
+      AuditAction.TREE_MEMBER_MOVED,
+      AuditAction.TREE_MEMBER_REMOVED,
+      AuditAction.TREE_POSITION_CHANGED,
+    ];
+
+    const requestedEvent = filters.event || filters.action;
+    const { total, logs } = await this.getLogs({
+      action: requestedEvent,
+      memberId: filters.memberId,
+      limit: filters.limit || 50,
+      offset: filters.offset || 0,
+    });
+
+    if (!requestedEvent) {
+      const treeOnly = logs.filter((l) =>
+        treeEvents.includes(l.action as AuditAction) || l.entityType === 'MlmTree'
+      );
+      return { total: treeOnly.length, logs: treeOnly };
+    }
+
+    return { total, logs };
   }
 
   /**
@@ -373,17 +700,26 @@ export class AuditService {
       );
       if (res && res.rows.length > 0) {
         const row = res.rows[0];
+        const parsedOld = typeof row.old_value === 'string' ? JSON.parse(row.old_value) : row.old_value;
+        const parsedNew = typeof row.new_value === 'string' ? JSON.parse(row.new_value) : row.new_value;
         return {
           id: row.id,
           actorId: row.actor_id,
           action: row.action,
           entityType: row.entity_type,
           entityId: row.entity_id,
-          oldValue: typeof row.old_value === 'string' ? JSON.parse(row.old_value) : row.old_value,
-          newValue: typeof row.new_value === 'string' ? JSON.parse(row.new_value) : row.new_value,
+          memberId: row.member_id || parsedNew?.memberId || parsedOld?.memberId || row.entity_id,
+          sponsorId: row.sponsor_id || parsedNew?.sponsorId || parsedOld?.sponsorId || null,
+          placementParentId: row.placement_parent_id || parsedNew?.placementParentId || parsedNew?.parent || parsedOld?.parent || null,
+          position: row.position || parsedNew?.position || parsedOld?.position || null,
+          reason: row.reason || parsedNew?.reason || null,
+          oldValue: parsedOld,
+          newValue: parsedNew,
           ipAddress: row.ip_address,
+          ip: row.ip_address,
           userAgent: row.user_agent,
           createdAt: row.created_at,
+          timestamp: row.created_at,
           user: row.username ? { id: row.actor_id, username: row.username, email: row.email } : null,
         };
       }

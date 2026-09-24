@@ -5,6 +5,9 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import Contact from './pages/Contact';
 import Profile from './pages/Profile';
+import Join from './pages/Join';
+import NetworkTreePage from './pages/NetworkTreePage';
+import AdminNetworkTreePage from './pages/AdminNetworkTreePage';
 
 /**
  * Inner layout component that inspects the current route and auth status.
@@ -43,7 +46,11 @@ function AppContent() {
   }, [location.pathname]);
 
   const isDashboardView =
-    (location.pathname === '/profile' || location.pathname === '/dashboard') && isLoggedIn;
+    (location.pathname === '/profile' ||
+      location.pathname === '/dashboard' ||
+      location.pathname === '/network-tree' ||
+      location.pathname === '/admin/network-tree') &&
+    isLoggedIn;
 
   return (
     <div className={`app-wrapper ${isDashboardView ? 'dashboard-mode' : ''}`}>
@@ -54,6 +61,9 @@ function AppContent() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/dashboard" element={<Profile />} />
+          <Route path="/network-tree" element={<NetworkTreePage />} />
+          <Route path="/admin/network-tree" element={<AdminNetworkTreePage />} />
+          <Route path="/join" element={<Join />} />
           <Route path="*" element={<Home />} />
         </Routes>
       </main>

@@ -33,6 +33,10 @@ apiRouter.use('/dashboard', dashboardRouter);
 // MLM Binary & Sponsor Tree Endpoints: /api/v1/tree
 apiRouter.use('/tree', mlmTreeRouter);
 
+// Binary MLM Network Tree API (Prompt 7): /api/v1/network-tree
+import { networkTreeRouter } from './networkTree.routes';
+apiRouter.use('/network-tree', networkTreeRouter);
+
 // Distributor & Customer Enrollment Pipeline: /api/v1/enrollments
 apiRouter.use('/enrollments', enrollmentRouter);
 

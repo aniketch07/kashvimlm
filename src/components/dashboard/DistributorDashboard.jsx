@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   BarChart3,
   Users,
@@ -29,7 +29,7 @@ import './DistributorDashboard.css';
 import EnrollmentView from './EnrollmentView';
 import ShopView from './ShopView';
 import ProductManagerView from './ProductManagerView';
-import NetworkTreeView from './NetworkTreeView';
+import NetworkTreePage from '../../pages/NetworkTreePage';
 import { getStoredCatalog } from '../../data/productCatalog';
 import { api } from '../../services/api.js';
 
@@ -61,14 +61,23 @@ import elecPhoneImg from '../../assets/home/elec_phone.png';
  * - The Spotlight product carousel with price, BV volume, and share modal
  * - Comprehensive functional modals for every action button
  */
-function DistributorDashboard({ user, onSignOut }) {
+function DistributorDashboard({ user, onSignOut, defaultNav }) {
   const navigate = useNavigate();
+  const location = useLocation();
+
   // ---------------------------------------------------------------------------
   // State Management
   // ---------------------------------------------------------------------------
   const [hideCommission, setHideCommission] = useState(false);
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'training'
-  const [activeNavIcon, setActiveNavIcon] = useState('dashboard'); // 'dashboard' | 'enroll' | 'shop' | 'manage_products'
+  const [internalNav, setInternalNav] = useState(() => defaultNav || 'dashboard');
+  const activeNavIcon = location.pathname === '/network-tree' ? 'network_tree' : internalNav;
+  const setActiveNavIcon = (nav) => {
+    setInternalNav(nav);
+    if (nav !== 'network_tree' && location.pathname === '/network-tree') {
+      navigate('/dashboard');
+    }
+  };
   const [toastMessage, setToastMessage] = useState('');
 
   // Catalog State synced with localStorage
@@ -359,61 +368,85 @@ function DistributorDashboard({ user, onSignOut }) {
 
       {/* Main Layout: Left Vertical Nav Rail + Scrollable Content */}
       <div className="kashvimlm-body-wrapper">
-        {/* Left Vertical Icon Navigation Bar (Configured to 4 roles) */}
-        <aside className="kashvimlm-left-rail">
-          {/* 1. Dashboard Overview */}
+        {/* Left Vertical Icon Navigation Bar */}
+        <aside className="kashvimlm-left-rail" aria-label="Sidebar Navigation">
+          {/* 1. Dashboard */}
           <button
             type="button"
             className={`rail-icon-btn ${activeNavIcon === 'dashboard' ? 'active' : ''}`}
             onClick={() => {
               setActiveNavIcon('dashboard');
               setActiveTab('home');
+              navigate('/dashboard');
             }}
-            title="Dashboard Overview"
+            title="Dashboard"
+            aria-label="Dashboard"
           >
             <BarChart3 size={20} />
             <span className="rail-tooltip">Dashboard</span>
           </button>
 
-          {/* 2. Enroll Button (Role: Enroll new Brand Partner / Customer) */}
+          {/* 2. Enrollment */}
           <button
             type="button"
             className={`rail-icon-btn ${activeNavIcon === 'enroll' ? 'active' : ''}`}
-            onClick={() => setActiveNavIcon('enroll')}
-            title="Enroll New Distributor / Customer"
+            onClick={() => {
+              setActiveNavIcon('enroll');
+              if (location.pathname !== '/dashboard' && location.pathname !== '/profile') {
+                navigate('/dashboard');
+              }
+            }}
+            title="Enrollment"
+            aria-label="Enrollment"
           >
             <UserPlus size={20} />
-            <span className="rail-tooltip">Enroll</span>
+            <span className="rail-tooltip">Enrollment</span>
           </button>
 
-          {/* 3. Shop Button (Role: Distributor Store & Wholesale Ordering) */}
+          {/* 3. Shop */}
           <button
             type="button"
             className={`rail-icon-btn ${activeNavIcon === 'shop' ? 'active' : ''}`}
-            onClick={() => setActiveNavIcon('shop')}
-            title="Shop KASHVIMLM Products"
+            onClick={() => {
+              setActiveNavIcon('shop');
+              if (location.pathname !== '/dashboard' && location.pathname !== '/profile') {
+                navigate('/dashboard');
+              }
+            }}
+            title="Shop"
+            aria-label="Shop"
           >
             <ShoppingCart size={20} />
             <span className="rail-tooltip">Shop</span>
           </button>
 
-          {/* 4. Add Product Price & Details (Role: ID Owner Catalog Administration) */}
+          {/* 4. Product Management */}
           <button
             type="button"
             className={`rail-icon-btn ${activeNavIcon === 'manage_products' ? 'active' : ''}`}
-            onClick={() => setActiveNavIcon('manage_products')}
-            title="Add Product, Price & Details (ID Owner Only)"
+            onClick={() => {
+              setActiveNavIcon('manage_products');
+              if (location.pathname !== '/dashboard' && location.pathname !== '/profile') {
+                navigate('/dashboard');
+              }
+            }}
+            title="Product Management"
+            aria-label="Product Management"
           >
             <PackagePlus size={20} />
-            <span className="rail-tooltip">Add Product &amp; Price</span>
+            <span className="rail-tooltip">Product Management</span>
           </button>
 
-          {/* 5. Network Tree (MLM Binary Tree) */}
+          {/* 5. Network Tree */}
           <button
             type="button"
             className={`rail-icon-btn ${activeNavIcon === 'network_tree' ? 'active' : ''}`}
-            onClick={() => setActiveNavIcon('network_tree')}
+            onClick={() => {
+              setActiveNavIcon('network_tree');
+              navigate('/network-tree');
+            }}
             title="Network Tree"
+            aria-label="Network Tree"
           >
             <Network size={20} />
             <span className="rail-tooltip">Network Tree</span>
@@ -633,16 +666,12 @@ function DistributorDashboard({ user, onSignOut }) {
                   className="action-pill-btn"
                   onClick={() =>
                     handleCopyLink(
-                      `https://kashvimlm.com/join/${memberId}?type=${encodeURIComponent(
-                        selectedCustomerType === 'Select Customer Type'
-                          ? 'preferred'
-                          : selectedCustomerType
-                      )}`,
-                      'Customer Referral'
+                      `${window.location.origin}/join?ref=${memberId}`,
+                      'Distributor Referral'
                     )
                   }
                 >
-                  Copy
+                  Copy Referral Link
                 </button>
                 <button
                   type="button"
@@ -1476,7 +1505,7 @@ function DistributorDashboard({ user, onSignOut }) {
               ROLE 5: NETWORK TREE (MLM Binary Genealogy Tree)
               =================================================================== */}
           {activeNavIcon === 'network_tree' && (
-            <NetworkTreeView user={user} onNavigate={setActiveNavIcon} />
+            <NetworkTreePage embedded={true} />
           )}
         </main>
       </div>
@@ -1898,16 +1927,16 @@ function DistributorDashboard({ user, onSignOut }) {
                 <div className="link-item-row">
                   <div>
                     <strong>Associate Business Enrollment</strong>
-                    <p className="link-sub">Distributor sign-up page placed in your BC 001</p>
+                    <p className="link-sub">{`${window.location.origin}/join?ref=${memberId}`}</p>
                   </div>
                   <button
                     type="button"
                     className="btn-copy-small"
                     onClick={() =>
-                      handleCopyLink(`https://kashvimlm.com/enroll/${memberId}`, 'Associate Enrollment')
+                      handleCopyLink(`${window.location.origin}/join?ref=${memberId}`, 'Distributor Referral')
                     }
                   >
-                    Copy
+                    Copy Referral Link
                   </button>
                 </div>
               </div>

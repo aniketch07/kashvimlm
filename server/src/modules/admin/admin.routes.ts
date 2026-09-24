@@ -27,6 +27,11 @@ adminRoutes.post('/calculate-commissions', AdminController.triggerWeeklyCommissi
 adminRoutes.post('/settle-payouts', AdminController.triggerPayoutSettlement);
 adminRoutes.patch('/distributors/:memberId/status', AdminController.updateMemberStatus);
 
+// MLM Binary Tree Operations & Audit Trail (Prompt 16 & 17)
+adminRoutes.post('/tree/move', AdminController.moveDistributor);
+adminRoutes.get('/tree/audit-logs', AdminController.getTreeAuditLogs);
+adminRoutes.get('/network-tree', AdminController.getNetworkTree);
+
 // ============================================================================
 // Admin Support Desk Management: /api/v1/admin/support/tickets
 // ============================================================================

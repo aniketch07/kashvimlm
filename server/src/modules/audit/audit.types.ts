@@ -23,6 +23,14 @@ export enum AuditAction {
   KYC_APPROVED = 'KYC_APPROVED',
   KYC_REJECTED = 'KYC_REJECTED',
   ADMIN_ACTION = 'ADMIN_ACTION',
+
+  // MLM Binary Tree Audit Events (Prompt 16)
+  SPONSOR_ASSIGNED = 'SPONSOR_ASSIGNED',
+  DISTRIBUTOR_CREATED = 'DISTRIBUTOR_CREATED',
+  TREE_MEMBER_PLACED = 'TREE_MEMBER_PLACED',
+  TREE_MEMBER_MOVED = 'TREE_MEMBER_MOVED',
+  TREE_MEMBER_REMOVED = 'TREE_MEMBER_REMOVED',
+  TREE_POSITION_CHANGED = 'TREE_POSITION_CHANGED',
 }
 
 export interface AuditLogEntry {
@@ -31,11 +39,18 @@ export interface AuditLogEntry {
   action: AuditAction | string;
   entityType: string;
   entityId: string | null;
+  memberId?: string | null;
+  sponsorId?: string | null;
+  placementParentId?: string | null;
+  position?: string | null;
+  reason?: string | null;
   oldValue: any | null;
   newValue: any | null;
   ipAddress: string | null;
+  ip?: string | null;
   userAgent: string | null;
   createdAt: string;
+  timestamp?: string;
   user?: {
     id: string;
     username: string;
@@ -48,10 +63,46 @@ export interface CreateAuditLogParams {
   action: AuditAction | string;
   entityType: string;
   entityId?: string | null;
+  memberId?: string | null;
+  sponsorId?: string | null;
+  placementParentId?: string | null;
+  position?: string | null;
+  reason?: string | null;
   oldValue?: any;
   newValue?: any;
   ipAddress?: string | null;
+  ip?: string | null;
   userAgent?: string | null;
+  timestamp?: string;
+}
+
+export interface TreeAuditLogParams {
+  event: AuditAction | string;
+  actorId?: string | null;
+  memberId: string;
+  sponsorId?: string | null;
+  placementParentId?: string | null;
+  position?: string | null;
+  oldValue?: any;
+  newValue?: any;
+  ip?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  timestamp?: string;
+  reason?: string | null;
+}
+
+export interface AdminMoveDistributorParams {
+  adminId: string;
+  memberId: string;
+  oldParent: string;
+  oldPosition: string;
+  newParent: string;
+  newPosition: string;
+  reason: string;
+  timestamp?: string;
+  ip?: string;
+  userAgent?: string;
 }
 
 export interface AuditLogFilterOptions {
@@ -59,6 +110,7 @@ export interface AuditLogFilterOptions {
   entityType?: string;
   entityId?: string;
   actorId?: string;
+  memberId?: string;
   startDate?: string;
   endDate?: string;
   limit?: number;

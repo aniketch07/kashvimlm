@@ -416,26 +416,40 @@ enum AuditAction {
   KYC_APPROVED
   KYC_REJECTED
   ADMIN_ACTION
+
+  // MLM Binary Tree Audit Events (Prompt 16)
+  SPONSOR_ASSIGNED
+  DISTRIBUTOR_CREATED
+  TREE_MEMBER_PLACED
+  TREE_MEMBER_MOVED
+  TREE_MEMBER_REMOVED
+  TREE_POSITION_CHANGED
 }
 
 // 13. AUDIT LOGS (Immutable Compliance Ledger)
 model AuditLog {
-  id         String      @id @default(uuid())
-  actorId    String?     @map("actor_id")
-  user       User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  action     AuditAction
-  entityType String      @map("entity_type")
-  entityId   String?     @map("entity_id")
-  oldValue   Json?       @map("old_value")
-  newValue   Json?       @map("new_value")
-  ipAddress  String?     @map("ip_address")
-  userAgent  String?     @map("user_agent")
-  createdAt  DateTime    @default(now()) @map("created_at")
+  id                 String      @id @default(uuid())
+  actorId            String?     @map("actor_id")
+  user               User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action             AuditAction
+  entityType         String      @map("entity_type")
+  entityId           String?     @map("entity_id")
+  memberId           String?     @map("member_id")
+  sponsorId          String?     @map("sponsor_id")
+  placementParentId  String?     @map("placement_parent_id")
+  position           String?
+  reason             String?
+  oldValue           Json?       @map("old_value")
+  newValue           Json?       @map("new_value")
+  ipAddress          String?     @map("ip_address")
+  userAgent          String?     @map("user_agent")
+  createdAt          DateTime    @default(now()) @map("created_at")
 
   @@index([action])
   @@index([actorId])
   @@index([entityType])
   @@index([entityId])
+  @@index([memberId])
   @@index([createdAt])
   @@map("audit_logs")
 }

@@ -385,10 +385,12 @@ model DistributorProfile {
   wallet                Wallet?
   supportTickets        SupportTicket[]
 
-  @@index([distributorCode])
+  @@index([userId])
   @@index([distributorId])
+  @@index([distributorCode])
   @@index([sponsorId])
   @@index([status])
+  @@index([rankId])
   @@index([currentRankId])
   @@map("distributor_profiles")
 }
@@ -500,9 +502,11 @@ model MLMNode {
 
   // Constraint: One LEFT and one RIGHT child per parent node strictly enforced
   @@unique([placementParentId, placementPosition])
-  @@index([placementParentId])
   @@index([distributorId])
   @@index([businessCenterId])
+  @@index([placementParentId])
+  @@index([placementPosition])
+  @@index([placementParentId, placementPosition])
   @@map("mlm_nodes")
 }
 

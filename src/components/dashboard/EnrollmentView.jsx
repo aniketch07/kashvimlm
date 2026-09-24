@@ -28,7 +28,10 @@ import './EnrollmentView.css';
  * Binary MLM Enrollment with Step 3 Sponsor ID lookup & Leg availability.
  */
 function EnrollmentView({ user, onNavigate }) {
-  const initialSponsorId = user?.memberId && user.memberId.startsWith('KV-') ? user.memberId : 'KV-1001';
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlRef = urlParams.get('ref') || urlParams.get('sponsor');
+  const initialSponsorId = urlRef || (user?.memberId && user.memberId.startsWith('KV-') ? user.memberId : (user?.memberId || 'KV-1001'));
+  const sponsorId = user?.memberId || initialSponsorId || 'KV-1001';
   const sponsorName = user?.name || 'Rahul Kaushal';
 
   // Mode: 'distributor' (Brand Partner) | 'customer' (Preferred Customer)
@@ -38,7 +41,7 @@ function EnrollmentView({ user, onNavigate }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Prompt 5: Sponsor validation and available binary positions
+  // Prompt 5 & 6: Sponsor validation and available binary positions
   const [sponsorInput, setSponsorInput] = useState(initialSponsorId);
   const [sponsorData, setSponsorData] = useState(null);
   const [isValidatingSponsor, setIsValidatingSponsor] = useState(false);
@@ -108,22 +111,27 @@ function EnrollmentView({ user, onNavigate }) {
       } else {
         setSponsorData(null);
         setSelectedPlacementPosition('');
-        if (res?.code === 'SPONSOR_NOT_FOUND') {
-          setSponsorError(`Sponsor '${id}' not found. Please verify the Distributor ID.`);
-        } else if (res?.code === 'SPONSOR_INACTIVE') {
-          setSponsorError(`Sponsor '${id}' is currently inactive.`);
+        if (res?.code === 'SPONSOR_NOT_FOUND' || res?.code === 'SPONSOR_INACTIVE') {
+          setSponsorError('Invalid or inactive sponsor.');
         } else {
-          setSponsorError(res?.message || 'Unable to validate sponsor.');
+          setSponsorError(res?.message || 'Invalid or inactive sponsor.');
         }
       }
     } catch (err) {
       setSponsorData(null);
       setSelectedPlacementPosition('');
-      setSponsorError(err.message || 'Error validating sponsor.');
+      setSponsorError('Invalid or inactive sponsor.');
     } finally {
       setIsValidatingSponsor(false);
     }
   };
+
+  // Immediate validation if ref was supplied via URL query
+  useEffect(() => {
+    if (urlRef) {
+      handleValidateSponsor(urlRef);
+    }
+  }, [urlRef]);
 
   // Validate on initial Step 3 display
   useEffect(() => {
@@ -350,6 +358,23 @@ function EnrollmentView({ user, onNavigate }) {
             <div className="credential-row">
               <span className="cred-label">Official Status:</span>
               <span className="status-badge-active">{enrollmentResult.status}</span>
+            </div>
+
+            <div className="credential-row">
+              <span className="cred-label">Personal Referral Link:</span>
+              <div className="cred-val-wrap">
+                <span className="cred-val highlight">{`${window.location.origin}/join?ref=${enrollmentResult.memberId}`}</span>
+                <button
+                  type="button"
+                  className="cred-copy-btn"
+                  onClick={() =>
+                    handleCopy(`${window.location.origin}/join?ref=${enrollmentResult.memberId}`, 'refUrl')
+                  }
+                >
+                  {copiedKey === 'refUrl' ? <Check size={14} /> : <Copy size={14} />}
+                  <span>{copiedKey === 'refUrl' ? 'Copied' : 'Copy Referral Link'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -763,6 +788,24 @@ function EnrollmentView({ user, onNavigate }) {
                           {sponsorData.sponsor.status === 'ACTIVE' ? 'Active' : sponsorData.sponsor.status}
                         </span>
                       </div>
+                    </div>
+
+                    <div className="sponsor-card-copy-col">
+                      <button
+                        type="button"
+                        className="btn-copy-sponsor-link"
+                        onClick={() =>
+                          handleCopy(
+                            `${window.location.origin}/join?ref=${sponsorData.sponsor.distributorId}`,
+                            'sponsorRefLink'
+                          )
+                        }
+                      >
+                        {copiedKey === 'sponsorRefLink' ? <Check size={14} /> : <Copy size={14} />}
+                        <span>
+                          {copiedKey === 'sponsorRefLink' ? 'Copied Link!' : 'Copy Referral Link'}
+                        </span>
+                      </button>
                     </div>
                   </div>
 

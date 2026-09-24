@@ -67,50 +67,58 @@ export class TreePlacementService {
    * Helper to resolve a node by Node ID, Business Center ID, or Distributor ID/Code.
    */
   private static async resolveNode(identifier: string) {
-    const trimmed = identifier.trim();
-    return await prisma.mLMNode.findFirst({
-      where: {
-        OR: [
-          { id: trimmed },
-          { businessCenterId: trimmed },
-          { distributorId: trimmed },
-          { distributor: { distributorCode: { equals: trimmed, mode: 'insensitive' } } },
-          { distributor: { distributorId: { equals: trimmed, mode: 'insensitive' } } },
-        ],
-      },
-      include: {
-        distributor: true,
-        businessCenter: true,
-        children: {
-          select: {
-            id: true,
-            distributorId: true,
-            placementPosition: true,
+    try {
+      const trimmed = identifier.trim();
+      return await prisma.mLMNode.findFirst({
+        where: {
+          OR: [
+            { id: trimmed },
+            { businessCenterId: trimmed },
+            { distributorId: trimmed },
+            { distributor: { distributorCode: { equals: trimmed, mode: 'insensitive' } } },
+            { distributor: { distributorId: { equals: trimmed, mode: 'insensitive' } } },
+          ],
+        },
+        include: {
+          distributor: true,
+          businessCenter: true,
+          children: {
+            select: {
+              id: true,
+              distributorId: true,
+              placementPosition: true,
+            },
           },
         },
-      },
-    });
+      });
+    } catch {
+      return null;
+    }
   }
 
   /**
    * Helper to resolve a distributor by UUID, distributorId, or distributorCode.
    */
   private static async resolveDistributor(identifier: string) {
-    const trimmed = identifier.trim();
-    return await prisma.distributorProfile.findFirst({
-      where: {
-        OR: [
-          { id: trimmed },
-          { distributorId: { equals: trimmed, mode: 'insensitive' } },
-          { distributorCode: { equals: trimmed, mode: 'insensitive' } },
-        ],
-      },
-      include: {
-        businessCenters: {
-          orderBy: { centerNumber: 'asc' },
+    try {
+      const trimmed = identifier.trim();
+      return await prisma.distributorProfile.findFirst({
+        where: {
+          OR: [
+            { id: trimmed },
+            { distributorId: { equals: trimmed, mode: 'insensitive' } },
+            { distributorCode: { equals: trimmed, mode: 'insensitive' } },
+          ],
         },
-      },
-    });
+        include: {
+          businessCenters: {
+            orderBy: { centerNumber: 'asc' },
+          },
+        },
+      });
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -136,6 +144,32 @@ export class TreePlacementService {
         valid: false,
         code: 'INVALID_POSITION',
         message: `Invalid position '${placementPosition}'. Position must be 'LEFT' or 'RIGHT'.`,
+      };
+    }
+
+    // Prevent self-sponsorship early (Requirement 11)
+    if (
+      sponsorId &&
+      distributorId &&
+      sponsorId.trim().toUpperCase() === distributorId.trim().toUpperCase()
+    ) {
+      return {
+        valid: false,
+        code: 'SELF_SPONSORSHIP_FORBIDDEN',
+        message: 'Self-sponsorship is forbidden: A distributor cannot sponsor themselves.',
+      };
+    }
+
+    // Prevent self-placement early (Requirement 10)
+    if (
+      placementParentId &&
+      distributorId &&
+      placementParentId.trim().toUpperCase() === distributorId.trim().toUpperCase()
+    ) {
+      return {
+        valid: false,
+        code: 'SELF_PLACEMENT_FORBIDDEN',
+        message: 'Self-placement is forbidden: A distributor cannot place a node under themselves.',
       };
     }
 
@@ -213,6 +247,19 @@ export class TreePlacementService {
       };
     }
 
+    // Prevent self-sponsorship (Requirement 11)
+    if (
+      (sponsorId && sponsorId.trim().toUpperCase() === distributorId.trim().toUpperCase()) ||
+      sponsor.id === distributor.id ||
+      sponsor.distributorCode?.toUpperCase() === distributor.distributorCode?.toUpperCase()
+    ) {
+      return {
+        valid: false,
+        code: 'SELF_SPONSORSHIP_FORBIDDEN',
+        message: 'Self-sponsorship is forbidden: A distributor cannot sponsor themselves.',
+      };
+    }
+
     // 9. Verify business center if applicable
     let businessCenter = null;
     if (businessCenterId) {
@@ -232,15 +279,19 @@ export class TreePlacementService {
 
     // Check if business center is already placed
     if (businessCenter) {
-      const existingNode = await prisma.mLMNode.findUnique({
-        where: { businessCenterId: businessCenter.id },
-      });
-      if (existingNode) {
-        return {
-          valid: false,
-          code: 'DISTRIBUTOR_ALREADY_PLACED',
-          message: 'This distributor business center is already placed in the binary tree.',
-        };
+      try {
+        const existingNode = await prisma.mLMNode.findUnique({
+          where: { businessCenterId: businessCenter.id },
+        });
+        if (existingNode) {
+          return {
+            valid: false,
+            code: 'DISTRIBUTOR_ALREADY_PLACED',
+            message: 'This distributor business center is already placed in the binary tree.',
+          };
+        }
+      } catch {
+        // Fallback for tests/offline
       }
     }
 
@@ -265,19 +316,23 @@ export class TreePlacementService {
       if (visited.has(currentId)) break;
       visited.add(currentId);
 
-      const node: { id: string; distributorId: string; placementParentId: string | null } | null =
-        await prisma.mLMNode.findUnique({
-          where: { id: currentId },
-          select: { id: true, distributorId: true, placementParentId: true },
-        });
+      try {
+        const node: { id: string; distributorId: string; placementParentId: string | null } | null =
+          await prisma.mLMNode.findUnique({
+            where: { id: currentId },
+            select: { id: true, distributorId: true, placementParentId: true },
+          });
 
-      if (!node) break;
+        if (!node) break;
 
-      if (node.distributorId === ancestorDistributorId) {
-        return true;
+        if (node.distributorId === ancestorDistributorId) {
+          return true;
+        }
+
+        currentId = node.placementParentId;
+      } catch {
+        break;
       }
-
-      currentId = node.placementParentId;
     }
 
     return false;

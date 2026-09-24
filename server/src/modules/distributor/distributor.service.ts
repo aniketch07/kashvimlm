@@ -42,6 +42,21 @@ export class DistributorService {
     };
   }
 
+  static async getReferralLink(memberId: string, customBaseUrl?: string) {
+    const rawBase =
+      customBaseUrl ||
+      process.env.APP_URL ||
+      process.env.REFERRAL_BASE_URL ||
+      process.env.FRONTEND_URL ||
+      'https://YOURDOMAIN.com';
+    const baseUrl = rawBase.replace(/\/+$/, '');
+    const distId = memberId || 'KV-1001';
+    return {
+      distributorId: distId,
+      referralUrl: `${baseUrl}/join?ref=${distId}`,
+    };
+  }
+
   static async getBusinessCenters(memberId: string) {
     return [
       {

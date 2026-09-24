@@ -186,6 +186,57 @@ export class DistributorService {
     return await TreeService.getTeam(distributorId);
   }
 
+  /**
+   * Generates referral URL and returns referral link data.
+   * Format:
+   * {
+   *   distributorId: "KV-1001",
+   *   referralUrl: "https://YOURDOMAIN.com/join?ref=KV-1001"
+   * }
+   */
+  public static async getReferralLink(userIdOrDistributorId: string, customBaseUrl?: string) {
+    const identifier = (userIdOrDistributorId || '').trim();
+    if (!identifier) {
+      throw AppError.badRequest('Distributor identifier is required', 'DISTRIBUTOR_ID_REQUIRED');
+    }
+
+    const profile = await prisma.distributorProfile.findFirst({
+      where: {
+        OR: [
+          { userId: identifier },
+          { id: identifier },
+          { distributorId: { equals: identifier, mode: 'insensitive' } },
+          { distributorCode: { equals: identifier, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        distributorId: true,
+        distributorCode: true,
+        status: true,
+      },
+    });
+
+    if (!profile) {
+      throw AppError.notFound('Distributor profile not found.', 'DISTRIBUTOR_NOT_FOUND');
+    }
+
+    const distributorId = profile.distributorId || profile.distributorCode;
+    const rawBase =
+      customBaseUrl ||
+      process.env.APP_URL ||
+      process.env.REFERRAL_BASE_URL ||
+      process.env.FRONTEND_URL ||
+      'https://YOURDOMAIN.com';
+    const baseUrl = rawBase.replace(/\/+$/, '');
+    const referralUrl = `${baseUrl}/join?ref=${distributorId}`;
+
+    return {
+      distributorId,
+      referralUrl,
+    };
+  }
+
   private static formatProfile(p: any) {
     return {
       id: p.id,

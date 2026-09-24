@@ -77,6 +77,7 @@ function Navbar() {
 
   const navLinks = [
     { label: 'Home', path: '/' },
+    { label: 'Join / Register', path: '/join' },
     { label: 'Contact', path: '/contact' },
   ];
 

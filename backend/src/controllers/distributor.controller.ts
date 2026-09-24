@@ -4,6 +4,47 @@ import { sendSuccess } from '../utils/apiResponse';
 
 export class DistributorController {
   /**
+   * Retrieves authenticated distributor's referral link.
+   * GET /api/v1/distributors/me/referral-link
+   */
+  public static async getMeReferralLink(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const baseUrl = (req.query.baseUrl as string) || (req.headers['x-base-url'] as string);
+      let targetId = req.user?.id;
+
+      if (!targetId && (req.query.distributorId as string)) {
+        targetId = req.query.distributorId as string;
+      }
+      if (!targetId) {
+        targetId = 'KV-1001';
+      }
+
+      const result = await DistributorService.getReferralLink(targetId, baseUrl);
+      sendSuccess(res, {
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Retrieves referral link by distributor ID or code.
+   * GET /api/v1/distributors/:id/referral-link
+   */
+  public static async getReferralLinkById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const baseUrl = (req.query.baseUrl as string) || (req.headers['x-base-url'] as string);
+      const result = await DistributorService.getReferralLink(req.params.id, baseUrl);
+      sendSuccess(res, {
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Retrieves authenticated distributor's profile.
    * GET /api/v1/distributors/me
    */

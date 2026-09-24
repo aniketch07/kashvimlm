@@ -6,6 +6,7 @@ import { PayoutService } from '../payouts/payout.service.js';
 import { SupportService } from '../support/support.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AuditAction } from '../audit/audit.types.js';
+import { MlmTreeService } from '../mlmTree/mlmTree.service.js';
 
 export class AdminController {
   static async getAdminOverview(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -338,6 +339,126 @@ export class AdminController {
           reply: newMsg,
           ticket: refreshedTicket,
         },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/tree/move
+   * Admin Move Distributor (Prompt 16)
+   * Require: Reason, Old Parent, Old Position, New Parent, New Position, Admin ID, Timestamp
+   * Create an immutable audit record.
+   */
+  static async moveDistributor(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const memberId = req.params.memberId || req.body.memberId;
+      const { oldParent, oldPosition, newParent, newPosition, reason, timestamp } = req.body;
+      const adminId = req.user?.id || req.user?.memberId || req.body.adminId;
+
+      if (!reason || !reason.trim()) {
+        res.status(400).json({ success: false, message: 'Reason is required to move a distributor.' });
+        return;
+      }
+      if (!oldParent || !oldParent.trim()) {
+        res.status(400).json({ success: false, message: 'Old Parent is required to move a distributor.' });
+        return;
+      }
+      if (!oldPosition || !oldPosition.trim()) {
+        res.status(400).json({ success: false, message: 'Old Position is required to move a distributor.' });
+        return;
+      }
+      if (!newParent || !newParent.trim()) {
+        res.status(400).json({ success: false, message: 'New Parent is required to move a distributor.' });
+        return;
+      }
+      if (!newPosition || !newPosition.trim()) {
+        res.status(400).json({ success: false, message: 'New Position is required to move a distributor.' });
+        return;
+      }
+      if (!adminId || !adminId.trim()) {
+        res.status(400).json({ success: false, message: 'Admin ID is required to move a distributor.' });
+        return;
+      }
+      if (!memberId || !memberId.trim()) {
+        res.status(400).json({ success: false, message: 'Member ID is required to move a distributor.' });
+        return;
+      }
+
+      const ip =
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+        req.socket?.remoteAddress ||
+        '127.0.0.1';
+      const userAgent = (req.headers['user-agent'] as string) || 'KashviMLM-Admin-Console';
+
+      const result = await MlmTreeService.moveDistributor({
+        adminId: adminId.trim(),
+        memberId: memberId.trim(),
+        oldParent: oldParent.trim(),
+        oldPosition: oldPosition.trim(),
+        newParent: newParent.trim(),
+        newPosition: newPosition.trim(),
+        reason: reason.trim(),
+        timestamp: timestamp || new Date().toISOString(),
+        ip,
+        userAgent,
+      });
+
+      res.status(200).json(result);
+    } catch (err: any) {
+      if (err.message && err.message.includes('required')) {
+        res.status(400).json({ success: false, message: err.message });
+        return;
+      }
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/admin/tree/audit-logs
+   */
+  static async getTreeAuditLogs(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const memberId = (req.params.memberId || req.query.memberId) as string;
+      const event = (req.query.event || req.query.action) as string;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const result = await MlmTreeService.getTreeAuditLogs({
+        memberId,
+        event,
+        limit,
+        offset,
+      });
+
+      res.status(200).json({
+        success: true,
+        total: result.total,
+        count: result.logs.length,
+        offset,
+        limit,
+        data: result.logs,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/admin/network-tree
+   * Allows admin to inspect any network tree across the company without downline restrictions (Prompt 17: Test 15).
+   */
+  static async getNetworkTree(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const rootId = (req.query.memberId || req.query.rootId || 'KV-1001') as string;
+      const depth = parseInt(req.query.depth as string, 10) || 3;
+      const tree = MlmTreeService.getNetworkTree(rootId, depth);
+      res.status(200).json({
+        success: true,
+        message: 'Admin global network tree retrieved successfully.',
+        data: tree,
       });
     } catch (err) {
       next(err);

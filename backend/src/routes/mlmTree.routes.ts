@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { MlmTreeController } from '../controllers/mlmTree.controller';
+import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { getTreeQuerySchema, nextSlotQuerySchema, placeDistributorSchema } from '../validators/mlmTree.validators';
 
 const router = Router();
 
-// Place a distributor in the binary tree
-router.post('/place', validate({ body: placeDistributorSchema }), MlmTreeController.place);
+// Place a distributor in the binary tree (Authentication required to prevent unauthorized modification)
+router.post('/place', authenticate, validate({ body: placeDistributorSchema }), MlmTreeController.place);
 
 // Retrieve visual binary tree by Node ID or Business Center ID
 router.get('/binary/:rootId', validate({ query: getTreeQuerySchema }), MlmTreeController.getBinaryTree);
@@ -17,7 +18,8 @@ router.get('/sponsor/:distributorId', validate({ query: getTreeQuerySchema }), M
 // Recommend next available placement slot
 router.get('/next-slot/:nodeId', validate({ query: nextSlotQuerySchema }), MlmTreeController.getNextAvailableSlot);
 
-// Seed exact requested model tree: A -> LEFT (B -> C) & RIGHT (D -> E)
-router.post('/seed-model', MlmTreeController.seedModelTree);
+// Seed exact requested model tree: A -> LEFT (B -> C) & RIGHT (D -> E) (Admin only)
+router.post('/seed-model', authenticate, MlmTreeController.seedModelTree);
 
 export const mlmTreeRouter = router;
+

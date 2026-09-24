@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { query } from '../../config/db.js';
+import { AuditService } from '../audit/audit.service.js';
+import { AuditAction } from '../audit/audit.types.js';
 
 export interface EnrollApplicantDTO {
   sponsorId: string;
@@ -127,6 +129,72 @@ export class EnrollmentService {
       `UPDATE distributors SET team_size = team_size + 1 WHERE member_id = $1`,
       [dto.sponsorId.trim()]
     );
+
+    // 8b. Immutable Tree Audit Logging (Prompt 16)
+    // 1) SPONSOR_ASSIGNED
+    await AuditService.record({
+      action: AuditAction.SPONSOR_ASSIGNED,
+      actorId: newUser.id,
+      entityType: 'MlmTree',
+      entityId: newMemberId,
+      memberId: newMemberId,
+      sponsorId: dto.sponsorId.trim(),
+      placementParentId: dto.sponsorId.trim(),
+      position: (dto.placementLeg || 'AUTO').toUpperCase(),
+      oldValue: null,
+      newValue: {
+        memberId: newMemberId,
+        sponsorId: dto.sponsorId.trim(),
+        sponsorName: sponsorCheck.sponsor.full_name,
+      },
+      ipAddress: '127.0.0.1',
+      userAgent: 'KashviMLM-Enrollment-Service',
+    });
+
+    // 2) DISTRIBUTOR_CREATED
+    await AuditService.record({
+      action: AuditAction.DISTRIBUTOR_CREATED,
+      actorId: newUser.id,
+      entityType: 'Distributor',
+      entityId: newMemberId,
+      memberId: newMemberId,
+      sponsorId: dto.sponsorId.trim(),
+      placementParentId: dto.sponsorId.trim(),
+      position: (dto.placementLeg || 'AUTO').toUpperCase(),
+      oldValue: null,
+      newValue: {
+        memberId: newMemberId,
+        fullName: newDist.full_name,
+        email: newUser.email,
+        rank: newDist.rank || 'Associate',
+        qualificationStatus: 'Active',
+        assignedBV: kitBV,
+      },
+      ipAddress: '127.0.0.1',
+      userAgent: 'KashviMLM-Enrollment-Service',
+    });
+
+    // 3) TREE_MEMBER_PLACED
+    await AuditService.record({
+      action: AuditAction.TREE_MEMBER_PLACED,
+      actorId: newUser.id,
+      entityType: 'MlmTree',
+      entityId: newMemberId,
+      memberId: newMemberId,
+      sponsorId: dto.sponsorId.trim(),
+      placementParentId: dto.sponsorId.trim(),
+      position: (dto.placementLeg || 'AUTO').toUpperCase(),
+      oldValue: null,
+      newValue: {
+        memberId: newMemberId,
+        placementParentId: dto.sponsorId.trim(),
+        position: (dto.placementLeg || 'AUTO').toUpperCase(),
+        treePath: `/${dto.sponsorId}/${newMemberId}`,
+        businessCenter: 'BC 001',
+      },
+      ipAddress: '127.0.0.1',
+      userAgent: 'KashviMLM-Enrollment-Service',
+    });
 
     return {
       memberId: newMemberId,

@@ -824,10 +824,36 @@
 .sponsor-card-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid #f1f5f9;
   margin-bottom: 18px;
+}
+
+.sponsor-card-copy-col {
+  margin-left: auto;
+}
+
+.btn-copy-sponsor-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-copy-sponsor-link:hover {
+  background-color: #dcfce7;
+  border-color: #86efac;
 }
 
 .sponsor-avatar {

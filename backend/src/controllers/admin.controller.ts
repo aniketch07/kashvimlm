@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { prisma } from '../config/database';
 import { AuditService } from '../services/audit.service';
+import { NetworkTreeService } from '../services/networkTree.service';
 import { sendSuccess } from '../utils/apiResponse';
 
 export class AdminController {
@@ -808,5 +809,19 @@ export class AdminController {
 
   public static async getMetrics(req: Request, res: Response, next: NextFunction): Promise<void> {
     return AdminController.getDashboard(req, res, next);
+  }
+
+  public static async getNetworkTree(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const rootId = (req.query.memberId || req.query.rootId || 'KV-1001') as string;
+      const depth = req.query.depth ? parseInt(req.query.depth as string, 10) : 3;
+      const tree = await NetworkTreeService.getNetworkTree(rootId, depth);
+      sendSuccess(res, {
+        message: 'Admin global network tree retrieved successfully',
+        data: tree,
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 }

@@ -14,6 +14,7 @@ import request from 'supertest';
 import app from '../src/app';
 import { MlmTreeService } from '../src/services/mlmTree.service';
 import { AppError } from '../src/utils/appError';
+import { createTestToken } from './helpers/testHelpers';
 
 describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
   beforeEach(() => {
@@ -28,6 +29,12 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
   const bcA = '66666666-6666-4666-8666-666666666666';
   const bcB = '77777777-7777-4777-8777-777777777777';
   const bcC = '88888888-8888-4888-8888-888888888888';
+
+  const testToken = createTestToken({
+    id: distA,
+    email: 'admin@example.com',
+    role: 'ADMIN',
+  });
 
   describe('1. LEFT Placement in Binary Tree', () => {
     it('should successfully place a distributor on the LEFT leg', async () => {
@@ -51,6 +58,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distB,
           businessCenterId: bcB,
@@ -89,6 +97,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distC,
           businessCenterId: bcC,
@@ -114,6 +123,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distB,
           businessCenterId: bcB,
@@ -134,6 +144,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distC,
           businessCenterId: bcC,
@@ -156,6 +167,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distA,
           businessCenterId: bcA,
@@ -176,6 +188,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distA,
           businessCenterId: bcA,
@@ -199,6 +212,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distA,
           businessCenterId: bcA,
@@ -221,6 +235,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distA,
           businessCenterId: bcA,
@@ -243,6 +258,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distA,
           businessCenterId: bcB, // cross-business-center mismatch
@@ -265,6 +281,7 @@ describe('MLM TREE MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       const res = await request(app)
         .post('/api/v1/tree/place')
+        .set('Authorization', `Bearer ${testToken}`)
         .send({
           distributorId: distB,
           businessCenterId: bcB,

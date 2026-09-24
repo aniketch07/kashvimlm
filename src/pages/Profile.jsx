@@ -23,7 +23,7 @@ import './Profile.css';
  * - Includes a Register option with full distributor enrollment fields.
  * - Displays Member Profile Dashboard upon successful login.
  */
-function Profile() {
+function Profile({ defaultNav }) {
   // Check persisted auth session from localStorage
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     try {
@@ -676,7 +676,7 @@ function Profile() {
   // =========================================================================
   // VIEW 2: LOGGED-IN DISTRIBUTOR DASHBOARD (KASHVIMLM REPRODUCTION)
   // =========================================================================
-  return <DistributorDashboard user={currentUser} onSignOut={handleSignOut} />;
+  return <DistributorDashboard user={currentUser} onSignOut={handleSignOut} defaultNav={defaultNav} />;
 }
 
 export default Profile;

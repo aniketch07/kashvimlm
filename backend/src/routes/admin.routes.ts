@@ -73,4 +73,7 @@ router.get('/audit-logs', AdminController.getAuditLogs);
 router.delete('/audit-logs', AdminController.blockAuditDeletion);
 router.delete('/audit-logs/:id', AdminController.blockAuditDeletion);
 
+// 21. Global Network Tree Inspection (Prompt 17: Test 15 & 16)
+router.get('/network-tree', AdminController.getNetworkTree);
+
 export const adminRouter = router;

@@ -337,9 +337,14 @@ CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    action VARCHAR(50) NOT NULL, -- 'LOGIN', 'LOGOUT', 'USER_CREATED', 'USER_UPDATED', 'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DELETED', 'ORDER_CREATED', 'ORDER_CANCELLED', 'BV_CREDIT', 'BV_DEBIT', 'COMMISSION_CREATED', 'COMMISSION_REVERSED', 'WALLET_ADJUSTMENT', 'PAYOUT_APPROVED', 'PAYOUT_REJECTED', 'KYC_APPROVED', 'KYC_REJECTED', 'ADMIN_ACTION'
+    action VARCHAR(50) NOT NULL, -- 'LOGIN', 'LOGOUT', 'USER_CREATED', 'USER_UPDATED', 'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DELETED', 'ORDER_CREATED', 'ORDER_CANCELLED', 'BV_CREDIT', 'BV_DEBIT', 'COMMISSION_CREATED', 'COMMISSION_REVERSED', 'WALLET_ADJUSTMENT', 'PAYOUT_APPROVED', 'PAYOUT_REJECTED', 'KYC_APPROVED', 'KYC_REJECTED', 'ADMIN_ACTION', 'SPONSOR_ASSIGNED', 'DISTRIBUTOR_CREATED', 'TREE_MEMBER_PLACED', 'TREE_MEMBER_MOVED', 'TREE_MEMBER_REMOVED', 'TREE_POSITION_CHANGED'
     entity_type VARCHAR(100) NOT NULL,
     entity_id VARCHAR(100),
+    member_id VARCHAR(50),
+    sponsor_id VARCHAR(50),
+    placement_parent_id VARCHAR(50),
+    position VARCHAR(50),
+    reason TEXT,
     old_value JSONB,
     new_value JSONB,
     ip_address VARCHAR(50),
@@ -350,6 +355,7 @@ CREATE TABLE audit_logs (
 CREATE INDEX idx_audit_action ON audit_logs(action);
 CREATE INDEX idx_audit_actor_id ON audit_logs(actor_id);
 CREATE INDEX idx_audit_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX idx_audit_member_id ON audit_logs(member_id);
 CREATE INDEX idx_audit_created_at ON audit_logs(created_at);
 
 -- IMMUTABILITY ENFORCEMENT: Strictly prohibit DELETE and UPDATE operations on audit logs

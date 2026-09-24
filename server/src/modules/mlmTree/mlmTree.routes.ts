@@ -1,11 +1,26 @@
 import { Router } from 'express';
 import { MlmTreeController } from './mlmTree.controller.js';
-import { authenticateToken } from '../../middleware/auth.js';
+import { authenticateToken, optionalAuth } from '../../middleware/auth.js';
 
 const router = Router();
 
-router.get('/structure/:memberId?', authenticateToken, MlmTreeController.getTree);
-router.get('/node/:memberId?', authenticateToken, MlmTreeController.getTree);
-router.get('/placement-suggest', authenticateToken, MlmTreeController.getPlacementSuggestion);
+// Binary Tree Hierarchy & Topology
+router.get('/', optionalAuth, MlmTreeController.getMyNetworkTree);
+router.get('/search', MlmTreeController.searchNetworkTree);
+router.get('/member/:distributorId/summary', optionalAuth, MlmTreeController.getMemberNetworkSummary);
+router.get('/member/:distributorId', optionalAuth, MlmTreeController.getMemberNetworkTree);
+
+router.get('/structure/:memberId?', optionalAuth, MlmTreeController.getTree);
+router.get('/node/:memberId?', optionalAuth, MlmTreeController.getTree);
+router.get('/placement-suggest', optionalAuth, MlmTreeController.getPlacementSuggestion);
+
+// MLM Binary Tree Operations & Audit Logging (Prompt 16)
+router.post('/move', optionalAuth, MlmTreeController.moveDistributor);
+router.post('/place', optionalAuth, MlmTreeController.placeMember);
+router.post('/change-position', optionalAuth, MlmTreeController.changePosition);
+router.post('/remove', optionalAuth, MlmTreeController.removeMember);
+router.post('/sponsor', optionalAuth, MlmTreeController.assignSponsor);
+router.get('/audit-logs', optionalAuth, MlmTreeController.getTreeAuditLogs);
+router.get('/audit-logs/:memberId', optionalAuth, MlmTreeController.getTreeAuditLogs);
 
 export default router;
