@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { MlmTreeController } from '../controllers/mlmTree.controller';
 import { authenticate } from '../middleware/auth';
+import { authorizeRoles } from '../middleware/role';
 import { validate } from '../middleware/validate';
 import { getTreeQuerySchema, nextSlotQuerySchema, placeDistributorSchema } from '../validators/mlmTree.validators';
 
@@ -19,7 +20,7 @@ router.get('/sponsor/:distributorId', validate({ query: getTreeQuerySchema }), M
 router.get('/next-slot/:nodeId', validate({ query: nextSlotQuerySchema }), MlmTreeController.getNextAvailableSlot);
 
 // Seed exact requested model tree: A -> LEFT (B -> C) & RIGHT (D -> E) (Admin only)
-router.post('/seed-model', authenticate, MlmTreeController.seedModelTree);
+router.post('/seed-model', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), MlmTreeController.seedModelTree);
 
 export const mlmTreeRouter = router;
 
