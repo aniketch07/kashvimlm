@@ -1,26 +1,29 @@
 /**
- * Test Suite: TreePlacementService Automated Tests
+ * Test Suite: TreePlacementService Automated Tests (Prompt 4)
  *
  * Covers:
  * 1. LEFT placement
  * 2. RIGHT placement
- * 3. occupied LEFT
- * 4. occupied RIGHT
- * 5. self-placement
- * 6. circular placement
- * 7. invalid parent
- * 8. inactive parent
- * 9. concurrent placement
- * 10. getAvailablePositions & getChildren
+ * 3. Occupied LEFT position (POSITION_ALREADY_OCCUPIED)
+ * 4. Occupied RIGHT position (POSITION_ALREADY_OCCUPIED)
+ * 5. Tree full (TREE_FULL) when both LEFT and RIGHT are occupied
+ * 6. Invalid placement position (INVALID_PLACEMENT_POSITION)
+ * 7. Self-placement prevention (SELF_PLACEMENT_NOT_ALLOWED)
+ * 8. Circular placement prevention (CIRCULAR_RELATIONSHIP)
+ * 9. Invalid parent (PLACEMENT_PARENT_NOT_FOUND)
+ * 10. Inactive parent (PLACEMENT_PARENT_INACTIVE)
+ * 11. Concurrent placement & row locking protection
+ * 12. Helper methods: getAvailablePositions, getChildren, getParent, validateNoCircularRelationship
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TreePlacementService } from '../src/services/treePlacement.service';
 import { prisma } from '../src/config/database';
 import { PlacementPosition, Prisma } from '@prisma/client';
 
-describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
+describe('TREE PLACEMENT SERVICE TESTS (Prompt 4 — TreePlacementService)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(prisma.mLMNode, 'findUnique').mockResolvedValue(null);
   });
 
   const parentDistId = 'dist-parent-001';
@@ -74,7 +77,7 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
         const txMock = {
           $queryRaw: vi.fn().mockResolvedValue([]),
           mLMNode: {
-            findFirst: vi.fn().mockResolvedValue(null),
+            findMany: vi.fn().mockResolvedValue([]),
             findUnique: vi.fn().mockResolvedValue(null),
             create: vi.fn().mockResolvedValue(mockCreatedNode),
           },
@@ -140,7 +143,7 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
         const txMock = {
           $queryRaw: vi.fn().mockResolvedValue([]),
           mLMNode: {
-            findFirst: vi.fn().mockResolvedValue(null),
+            findMany: vi.fn().mockResolvedValue([{ placementPosition: 'LEFT' }]),
             findUnique: vi.fn().mockResolvedValue(null),
             create: vi.fn().mockResolvedValue(mockCreatedNode),
           },
@@ -230,10 +233,61 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
   });
 
   // --------------------------------------------------------------------------
-  // TEST 5: Self-Placement Prevention
+  // TEST 5: Tree Full (Both LEFT and RIGHT Occupied)
   // --------------------------------------------------------------------------
-  describe('5. Self-Placement Prevention', () => {
-    it('should return SELF_PLACEMENT_FORBIDDEN when distributor places under themselves', async () => {
+  describe('5. Tree Full Rejection', () => {
+    it('should return TREE_FULL when both LEFT and RIGHT positions are occupied', async () => {
+      vi.spyOn(prisma.distributorProfile, 'findFirst')
+        .mockResolvedValueOnce({
+          id: childDistId1,
+          distributorCode: 'KV-CHILD-1',
+          sponsorId: parentDistId,
+          businessCenters: [{ id: 'bc-1' }],
+        } as any)
+        .mockResolvedValueOnce({
+          id: parentDistId,
+          distributorCode: 'KV-PARENT',
+          status: 'ACTIVE',
+        } as any);
+
+      vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValueOnce({
+        id: parentNodeId,
+        distributorId: parentDistId,
+        distributor: { status: 'ACTIVE', distributorCode: 'KV-PARENT' },
+        children: [
+          { id: 'existing-left', placementPosition: 'LEFT' as const },
+          { id: 'existing-right', placementPosition: 'RIGHT' as const },
+        ],
+      } as any);
+
+      const result = await TreePlacementService.placeDistributor(childDistId1, parentNodeId, 'LEFT');
+
+      expect(result.success).toBe(false);
+      expect(result.code).toBe('TREE_FULL');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // TEST 6: Invalid Placement Position
+  // --------------------------------------------------------------------------
+  describe('6. Invalid Placement Position', () => {
+    it('should return INVALID_PLACEMENT_POSITION when position is not LEFT or RIGHT', async () => {
+      const result = await TreePlacementService.placeDistributor(
+        childDistId1,
+        parentNodeId,
+        'CENTER' as any
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.code).toBe('INVALID_PLACEMENT_POSITION');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // TEST 7: Self-Placement Prevention
+  // --------------------------------------------------------------------------
+  describe('7. Self-Placement Prevention', () => {
+    it('should return SELF_PLACEMENT_NOT_ALLOWED when distributor places under themselves', async () => {
       vi.spyOn(prisma.distributorProfile, 'findFirst')
         .mockResolvedValueOnce({
           id: parentDistId,
@@ -257,15 +311,15 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
       const result = await TreePlacementService.placeDistributor(parentDistId, parentNodeId, 'LEFT');
 
       expect(result.success).toBe(false);
-      expect(result.code).toBe('SELF_PLACEMENT_FORBIDDEN');
+      expect(result.code).toBe('SELF_PLACEMENT_NOT_ALLOWED');
     });
   });
 
   // --------------------------------------------------------------------------
-  // TEST 6: Circular Placement Prevention
+  // TEST 8: Circular Placement Prevention
   // --------------------------------------------------------------------------
-  describe('6. Circular Placement Prevention', () => {
-    it('should return CIRCULAR_PLACEMENT_FORBIDDEN when parent is already a descendant', async () => {
+  describe('8. Circular Placement Prevention', () => {
+    it('should return CIRCULAR_RELATIONSHIP when parent is already a descendant', async () => {
       const ancestorId = 'dist-ancestor-1';
       const descendantNodeId = 'node-descendant-3';
 
@@ -289,7 +343,7 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
         children: [],
       } as any);
 
-      // Walk up tree: descendantNodeId -> node-2 -> node-ancestor (matches ancestorId!)
+      // Walk up tree: descendantNodeId -> node-ancestor (matches ancestorId!)
       vi.spyOn(prisma.mLMNode, 'findUnique')
         .mockResolvedValueOnce({
           id: descendantNodeId,
@@ -305,15 +359,15 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
       const result = await TreePlacementService.placeDistributor(ancestorId, descendantNodeId, 'LEFT');
 
       expect(result.success).toBe(false);
-      expect(result.code).toBe('CIRCULAR_PLACEMENT_FORBIDDEN');
+      expect(result.code).toBe('CIRCULAR_RELATIONSHIP');
     });
   });
 
   // --------------------------------------------------------------------------
-  // TEST 7: Invalid Parent
+  // TEST 9: Invalid Parent
   // --------------------------------------------------------------------------
-  describe('7. Invalid Parent', () => {
-    it('should return PARENT_NOT_FOUND when placement parent does not exist', async () => {
+  describe('9. Invalid Parent', () => {
+    it('should return PLACEMENT_PARENT_NOT_FOUND when placement parent does not exist', async () => {
       vi.spyOn(prisma.distributorProfile, 'findFirst')
         .mockResolvedValueOnce({
           id: childDistId1,
@@ -332,15 +386,15 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
       const result = await TreePlacementService.placeDistributor(childDistId1, 'NONEXISTENT_PARENT', 'LEFT');
 
       expect(result.success).toBe(false);
-      expect(result.code).toBe('PARENT_NOT_FOUND');
+      expect(result.code).toBe('PLACEMENT_PARENT_NOT_FOUND');
     });
   });
 
   // --------------------------------------------------------------------------
-  // TEST 8: Inactive Parent
+  // TEST 10: Inactive Parent
   // --------------------------------------------------------------------------
-  describe('8. Inactive Parent', () => {
-    it('should return PARENT_INACTIVE when placement parent status is not ACTIVE', async () => {
+  describe('10. Inactive Parent', () => {
+    it('should return PLACEMENT_PARENT_INACTIVE when placement parent status is not ACTIVE', async () => {
       vi.spyOn(prisma.distributorProfile, 'findFirst')
         .mockResolvedValueOnce({
           id: childDistId1,
@@ -364,14 +418,14 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
       const result = await TreePlacementService.placeDistributor(childDistId1, parentNodeId, 'LEFT');
 
       expect(result.success).toBe(false);
-      expect(result.code).toBe('PARENT_INACTIVE');
+      expect(result.code).toBe('PLACEMENT_PARENT_INACTIVE');
     });
   });
 
   // --------------------------------------------------------------------------
-  // TEST 9: Concurrent Placement (Collision Handled by DB Unique Constraint)
+  // TEST 11: Concurrent Placement Protection (Row Locking & Unique Constraint)
   // --------------------------------------------------------------------------
-  describe('9. Concurrent Placement & Re-verification', () => {
+  describe('11. Concurrent Placement & Re-verification', () => {
     it('should return POSITION_ALREADY_OCCUPIED if concurrent transaction filled the slot', async () => {
       vi.spyOn(prisma.distributorProfile, 'findFirst')
         .mockResolvedValueOnce({
@@ -394,12 +448,12 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
         children: [],
       } as any);
 
-      // But inside transaction, row lock discovers someone took LEFT immediately before us!
+      // Inside transaction, row lock discovers someone took LEFT immediately before us!
       vi.spyOn(prisma, '$transaction').mockImplementation(async (callback: any) => {
         const txMock = {
           $queryRaw: vi.fn().mockResolvedValue([]),
           mLMNode: {
-            findFirst: vi.fn().mockResolvedValue({ id: 'concurrent-node', placementPosition: 'LEFT' }),
+            findMany: vi.fn().mockResolvedValue([{ placementPosition: 'LEFT' }]),
           },
         };
         return await callback(txMock);
@@ -447,9 +501,9 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
   });
 
   // --------------------------------------------------------------------------
-  // TEST 10: Helper Methods: getAvailablePositions & getChildren
+  // TEST 12: Helper Methods: getAvailablePositions, getChildren, getParent, validateNoCircularRelationship
   // --------------------------------------------------------------------------
-  describe('10. Helper Methods', () => {
+  describe('12. Helper & Query Methods', () => {
     it('getAvailablePositions should return ["LEFT", "RIGHT"] when node has 0 children', async () => {
       vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValueOnce({
         id: parentNodeId,
@@ -472,6 +526,31 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
       expect(positions).toEqual(['RIGHT']);
     });
 
+    it('getAvailablePositions should return ["LEFT"] when RIGHT is occupied', async () => {
+      vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValueOnce({
+        id: parentNodeId,
+      } as any);
+      vi.spyOn(prisma.mLMNode, 'findMany').mockResolvedValueOnce([
+        { placementPosition: 'RIGHT' as const },
+      ] as any);
+
+      const positions = await TreePlacementService.getAvailablePositions(parentNodeId);
+      expect(positions).toEqual(['LEFT']);
+    });
+
+    it('getAvailablePositions should return [] when both are occupied', async () => {
+      vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValueOnce({
+        id: parentNodeId,
+      } as any);
+      vi.spyOn(prisma.mLMNode, 'findMany').mockResolvedValueOnce([
+        { placementPosition: 'LEFT' as const },
+        { placementPosition: 'RIGHT' as const },
+      ] as any);
+
+      const positions = await TreePlacementService.getAvailablePositions(parentNodeId);
+      expect(positions).toEqual([]);
+    });
+
     it('getChildren should return list of child nodes', async () => {
       vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValueOnce({
         id: parentNodeId,
@@ -488,6 +567,67 @@ describe('TREE PLACEMENT SERVICE TESTS (TreePlacementService)', () => {
       const children = await TreePlacementService.getChildren(parentNodeId);
       expect(children).toHaveLength(1);
       expect(children[0].placementPosition).toBe('LEFT');
+    });
+
+    it('getParent should return parent node details', async () => {
+      vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValueOnce({
+        id: 'child-node-1',
+        placementParentId: parentNodeId,
+      } as any);
+
+      vi.spyOn(prisma.mLMNode, 'findUnique').mockResolvedValueOnce({
+        id: parentNodeId,
+        distributorId: parentDistId,
+        distributor: {
+          id: parentDistId,
+          distributorId: 'KV-PARENT',
+          distributorCode: 'KV-PARENT',
+          firstName: 'Parent',
+          lastName: 'Distributor',
+          displayName: 'Parent Distributor',
+          status: 'ACTIVE',
+        },
+        businessCenter: {
+          id: parentBcId,
+          centerCode: 'KV-PARENT-BC1',
+          centerNumber: 1,
+          status: 'ACTIVE',
+        },
+      } as any);
+
+      const parent = await TreePlacementService.getParent('child-node-1');
+      expect(parent).toBeDefined();
+      expect(parent?.id).toBe(parentNodeId);
+      expect(parent?.distributor.distributorCode).toBe('KV-PARENT');
+    });
+
+    it('getParent should return null for root node with no placementParentId', async () => {
+      vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValueOnce({
+        id: 'root-node-1',
+        placementParentId: null,
+      } as any);
+
+      const parent = await TreePlacementService.getParent('root-node-1');
+      expect(parent).toBeNull();
+    });
+
+    it('validateNoCircularRelationship should return true when no cycle exists', async () => {
+      vi.spyOn(prisma.mLMNode, 'findUnique').mockResolvedValue(null);
+
+      const isValid = await TreePlacementService.validateNoCircularRelationship('dist-new', 'node-parent');
+      expect(isValid).toBe(true);
+    });
+
+    it('validateNoCircularRelationship should throw error when throwOnError is true and cycle detected', async () => {
+      vi.spyOn(prisma.mLMNode, 'findUnique').mockResolvedValueOnce({
+        id: 'node-ancestor',
+        distributorId: 'dist-new', // Match -> cycle!
+        placementParentId: null,
+      } as any);
+
+      await expect(
+        TreePlacementService.validateNoCircularRelationship('dist-new', 'node-ancestor', true)
+      ).rejects.toThrowError();
     });
   });
 });

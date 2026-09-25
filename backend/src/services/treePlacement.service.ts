@@ -62,11 +62,64 @@ export interface ChildNodeInfo {
   };
 }
 
+export interface ParentNodeInfo {
+  id: string;
+  distributorId: string;
+  businessCenterId: string;
+  placementParentId: string | null;
+  placementPosition: PlacementPosition | null;
+  depth: number;
+  binaryPath: string | null;
+  distributor: {
+    id: string;
+    distributorId: string | null;
+    distributorCode: string;
+    firstName: string;
+    lastName: string;
+    displayName: string | null;
+    status: string;
+  };
+  businessCenter: {
+    id: string;
+    centerCode: string;
+    centerNumber: number;
+    status: string;
+  };
+}
+
+function getPlacementStatusCode(code?: string): number {
+  switch (code) {
+    case 'PLACEMENT_PARENT_NOT_FOUND':
+    case 'DISTRIBUTOR_NOT_FOUND':
+    case 'SPONSOR_NOT_FOUND':
+      return 404;
+    case 'POSITION_ALREADY_OCCUPIED':
+    case 'TREE_FULL':
+    case 'DISTRIBUTOR_ALREADY_PLACED':
+      return 409;
+    case 'INVALID_PLACEMENT_POSITION':
+    case 'SELF_PLACEMENT_NOT_ALLOWED':
+    case 'CIRCULAR_RELATIONSHIP':
+    case 'PLACEMENT_PARENT_INACTIVE':
+    default:
+      return 400;
+  }
+}
+
+/**
+ * TreePlacementService
+ * Backend service responsible for Binary MLM placement, validation, and tree queries.
+ *
+ * Enforces strict binary tree placement rules:
+ * - Every parent can have maximum 1 LEFT and maximum 1 RIGHT child.
+ * - Atomic database transactions with row-level pessimistic locking prevent race conditions.
+ * - Simultaneous requests can never create two children on the same leg.
+ */
 export class TreePlacementService {
   /**
    * Helper to resolve a node by Node ID, Business Center ID, or Distributor ID/Code.
    */
-  private static async resolveNode(identifier: string) {
+  public static async resolveNode(identifier: string) {
     try {
       const trimmed = identifier.trim();
       return await prisma.mLMNode.findFirst({
@@ -99,7 +152,7 @@ export class TreePlacementService {
   /**
    * Helper to resolve a distributor by UUID, distributorId, or distributorCode.
    */
-  private static async resolveDistributor(identifier: string) {
+  public static async resolveDistributor(identifier: string) {
     try {
       const trimmed = identifier.trim();
       return await prisma.distributorProfile.findFirst({
@@ -122,32 +175,45 @@ export class TreePlacementService {
   }
 
   /**
-   * Validates all 9 binary placement rules before insertion:
-   * 1. Verify distributor exists.
-   * 2. Verify sponsor exists.
-   * 3. Verify placement parent exists.
-   * 4. Verify placement parent is active.
-   * 5. Verify position is LEFT or RIGHT.
-   * 6. Verify position is empty.
+   * Validates all binary placement rules before insertion:
+   * 1. Validate distributor exists.
+   * 2. Validate sponsor exists.
+   * 3. Validate placement parent exists.
+   * 4. Validate placement position is 'LEFT' or 'RIGHT'.
+   * 5. Check parent status is 'ACTIVE'.
+   * 6. Check business center.
    * 7. Prevent self-placement.
    * 8. Prevent circular relationships.
-   * 9. Verify business center if applicable.
+   * 9. Check that parent tree is not full and selected position is empty.
    */
   public static async validatePlacement(
     input: ValidatePlacementInput
   ): Promise<PlacementValidationResult> {
     const { distributorId, placementParentId, placementPosition, sponsorId, businessCenterId } = input;
 
-    // 5. Verify position is LEFT or RIGHT
+    // 4. Validate placement position (must be 'LEFT' or 'RIGHT')
     if (placementPosition !== 'LEFT' && placementPosition !== 'RIGHT') {
       return {
         valid: false,
-        code: 'INVALID_POSITION',
-        message: `Invalid position '${placementPosition}'. Position must be 'LEFT' or 'RIGHT'.`,
+        code: 'INVALID_PLACEMENT_POSITION',
+        message: `Invalid placement position '${placementPosition}'. Position must be 'LEFT' or 'RIGHT'.`,
       };
     }
 
-    // Prevent self-sponsorship early (Requirement 11)
+    // 7. Prevent self-placement early (identifier check)
+    if (
+      placementParentId &&
+      distributorId &&
+      placementParentId.trim().toUpperCase() === distributorId.trim().toUpperCase()
+    ) {
+      return {
+        valid: false,
+        code: 'SELF_PLACEMENT_NOT_ALLOWED',
+        message: 'Self-placement is not allowed: A distributor cannot place a node under themselves.',
+      };
+    }
+
+    // Prevent self-sponsorship early
     if (
       sponsorId &&
       distributorId &&
@@ -160,20 +226,7 @@ export class TreePlacementService {
       };
     }
 
-    // Prevent self-placement early (Requirement 10)
-    if (
-      placementParentId &&
-      distributorId &&
-      placementParentId.trim().toUpperCase() === distributorId.trim().toUpperCase()
-    ) {
-      return {
-        valid: false,
-        code: 'SELF_PLACEMENT_FORBIDDEN',
-        message: 'Self-placement is forbidden: A distributor cannot place a node under themselves.',
-      };
-    }
-
-    // 1. Verify distributor exists
+    // 1. Validate distributor exists
     const distributor = await this.resolveDistributor(distributorId);
     if (!distributor) {
       return {
@@ -183,49 +236,62 @@ export class TreePlacementService {
       };
     }
 
-    // 3. Verify placement parent exists
+    // 3. Validate placement parent exists
     const placementParentNode = await this.resolveNode(placementParentId);
     if (!placementParentNode) {
       return {
         valid: false,
-        code: 'PARENT_NOT_FOUND',
-        message: `Placement parent node '${placementParentId}' does not exist in the binary tree.`,
+        code: 'PLACEMENT_PARENT_NOT_FOUND',
+        message: `Placement parent node '${placementParentId}' not found.`,
       };
     }
 
-    // 7. Prevent self-placement
+    // 7. Prevent self-placement (resolved DB entity check)
     if (placementParentNode.distributorId === distributor.id) {
       return {
         valid: false,
-        code: 'SELF_PLACEMENT_FORBIDDEN',
-        message: 'Self-placement is forbidden: A distributor cannot place a node under themselves.',
+        code: 'SELF_PLACEMENT_NOT_ALLOWED',
+        message: 'Self-placement is not allowed: A distributor cannot place a node under themselves.',
       };
     }
 
-    // 8. Prevent circular relationships (placement parent cannot be downline of distributor)
-    const isCircular = await this.isBinaryAncestor(distributor.id, placementParentNode.id);
+    // 8. Prevent circular relationships (placement parent cannot be a descendant of distributor)
+    const isCircular = !(await this.validateNoCircularRelationship(distributor.id, placementParentNode.id));
     if (isCircular) {
       return {
         valid: false,
-        code: 'CIRCULAR_PLACEMENT_FORBIDDEN',
-        message: 'Circular placement forbidden: The proposed placement parent is already a descendant of this distributor.',
+        code: 'CIRCULAR_RELATIONSHIP',
+        message: 'Circular relationship detected: The proposed placement parent is already a descendant of this distributor.',
       };
     }
 
-    // 4. Verify placement parent is active
+    // 5. Check parent status
     if (placementParentNode.distributor.status !== 'ACTIVE') {
       return {
         valid: false,
-        code: 'PARENT_INACTIVE',
+        code: 'PLACEMENT_PARENT_INACTIVE',
         message: `Placement parent '${placementParentNode.distributor.distributorCode}' is not ACTIVE (status: ${placementParentNode.distributor.status}).`,
       };
     }
 
-    // 6. Verify position is empty
-    const occupiedChild = placementParentNode.children.find(
-      (c) => c.placementPosition === placementPosition
+    // 9. Check tree capacity and that selected position is empty
+    const occupiedPositions = new Set(
+      placementParentNode.children
+        .map((c) => c.placementPosition)
+        .filter((pos): pos is 'LEFT' | 'RIGHT' => Boolean(pos))
     );
-    if (occupiedChild) {
+
+    // If both positions are already occupied
+    if (occupiedPositions.has('LEFT') && occupiedPositions.has('RIGHT')) {
+      return {
+        valid: false,
+        code: 'TREE_FULL',
+        message: `Placement parent '${placementParentNode.distributor.distributorCode}' tree is full: Both LEFT and RIGHT positions are occupied.`,
+      };
+    }
+
+    // If selected position is occupied
+    if (occupiedPositions.has(placementPosition as 'LEFT' | 'RIGHT')) {
       return {
         valid: false,
         code: 'POSITION_ALREADY_OCCUPIED',
@@ -233,7 +299,7 @@ export class TreePlacementService {
       };
     }
 
-    // 2. Verify sponsor exists
+    // 2. Validate sponsor exists
     const resolvedSponsorId = sponsorId || distributor.sponsorId || placementParentNode.distributorId;
     let sponsor = null;
     if (resolvedSponsorId) {
@@ -247,7 +313,7 @@ export class TreePlacementService {
       };
     }
 
-    // Prevent self-sponsorship (Requirement 11)
+    // Prevent self-sponsorship
     if (
       (sponsorId && sponsorId.trim().toUpperCase() === distributorId.trim().toUpperCase()) ||
       sponsor.id === distributor.id ||
@@ -260,7 +326,7 @@ export class TreePlacementService {
       };
     }
 
-    // 9. Verify business center if applicable
+    // 6. Check business center
     let businessCenter = null;
     if (businessCenterId) {
       businessCenter = await prisma.businessCenter.findUnique({
@@ -277,7 +343,7 @@ export class TreePlacementService {
       businessCenter = distributor.businessCenters[0] || null;
     }
 
-    // Check if business center is already placed
+    // Check if business center is already placed in the binary tree
     if (businessCenter) {
       try {
         const existingNode = await prisma.mLMNode.findUnique({
@@ -302,6 +368,35 @@ export class TreePlacementService {
       placementParent: placementParentNode,
       businessCenter,
     };
+  }
+
+  /**
+   * Validates that placing distributorId under parentNodeId will not create a circular relationship.
+   * Walks UP the binary tree from parentNodeId to the root node.
+   * If ancestor distributorId is encountered, circular relationship exists.
+   *
+   * @param distributorId Distributor ID attempting to be placed
+   * @param parentNodeId Target parent node ID
+   * @param throwOnError Whether to throw an AppError on failure
+   * @returns true if valid (no circular relationship), false if cycle detected
+   */
+  public static async validateNoCircularRelationship(
+    distributorId: string,
+    parentNodeId: string,
+    throwOnError: boolean = false
+  ): Promise<boolean> {
+    const isCircular = await this.isBinaryAncestor(distributorId, parentNodeId);
+    if (isCircular) {
+      if (throwOnError) {
+        throw new AppError(
+          'Circular relationship detected: The proposed placement parent is already a descendant of this distributor.',
+          400,
+          'CIRCULAR_RELATIONSHIP'
+        );
+      }
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -345,8 +440,9 @@ export class TreePlacementService {
    * 1. placeDistributor(distributorId, placementParentId, 'LEFT', options?)
    * 2. placeDistributor({ distributorId, placementParentId, placementPosition, sponsorId?, businessCenterId? })
    *
-   * Executes inside a PostgreSQL transaction with row-locking (SELECT ... FOR UPDATE)
-   * to guarantee zero race conditions / position collisions.
+   * Executes inside an atomic PostgreSQL database transaction with row-level locking (SELECT ... FOR UPDATE)
+   * to guarantee zero race conditions or duplicate positions.
+   * Two simultaneous requests can never create two LEFT children.
    */
   public static async placeDistributor(
     distributorIdOrOptions: string | PlaceDistributorOptions,
@@ -389,7 +485,7 @@ export class TreePlacementService {
 
     if (!validation.valid) {
       if (throwOnError) {
-        const status = validation.code === 'POSITION_ALREADY_OCCUPIED' ? 409 : 400;
+        const status = getPlacementStatusCode(validation.code);
         throw new AppError(validation.message || 'Placement validation failed', status, validation.code);
       }
       return {
@@ -418,24 +514,36 @@ export class TreePlacementService {
     // 4. ATOMIC DATABASE TRANSACTION WITH ROW LOCKING
     try {
       const placedNode = await prisma.$transaction(async (tx) => {
-        // A. PESSIMISTIC ROW LOCKING: Lock parent node row to prevent race conditions
+        // A. PESSIMISTIC ROW LOCKING: Lock parent node row to prevent concurrent race conditions
         try {
           await tx.$queryRaw`SELECT "id" FROM "mlm_nodes" WHERE "id" = ${placementParent.id} FOR UPDATE`;
-        } catch (rawErr) {
-          // Fallback if raw query is unavailable (e.g. SQLite or unit tests)
-          logger.debug('Row locking raw query executed.');
+        } catch {
+          // Fallback if raw query is unavailable (e.g. SQLite or mock tests)
+          logger.debug('Row locking raw query executed or bypassed.');
         }
 
         // B. CRITICAL RE-VERIFICATION IMMEDIATELY BEFORE INSERTION
-        // Never trust outside check: verify parent's slot is still free inside locked transaction
-        const existingChild = await tx.mLMNode.findFirst({
-          where: {
-            placementParentId: placementParent.id,
-            placementPosition: placementPosition as PlacementPosition,
-          },
+        // Query current children of parent inside the locked transaction
+        const existingChildren = await tx.mLMNode.findMany({
+          where: { placementParentId: placementParent.id },
+          select: { placementPosition: true },
         });
 
-        if (existingChild) {
+        const occupiedPositions = new Set(
+          existingChildren
+            .map((c) => c.placementPosition)
+            .filter((pos): pos is 'LEFT' | 'RIGHT' => Boolean(pos))
+        );
+
+        if (occupiedPositions.has('LEFT') && occupiedPositions.has('RIGHT')) {
+          throw new AppError(
+            'Placement parent tree is full: Both LEFT and RIGHT positions are occupied.',
+            409,
+            'TREE_FULL'
+          );
+        }
+
+        if (occupiedPositions.has(placementPosition as 'LEFT' | 'RIGHT')) {
           throw new AppError(
             `The ${placementPosition} position under placement parent is already occupied.`,
             409,
@@ -548,11 +656,11 @@ export class TreePlacementService {
         };
       }
 
-      if (err instanceof AppError && err.code === 'POSITION_ALREADY_OCCUPIED') {
+      if (err instanceof AppError && (err.code === 'POSITION_ALREADY_OCCUPIED' || err.code === 'TREE_FULL')) {
         if (throwOnError) throw err;
         return {
           success: false,
-          code: 'POSITION_ALREADY_OCCUPIED',
+          code: err.code,
           message: err.message,
         };
       }
@@ -568,6 +676,9 @@ export class TreePlacementService {
 
   /**
    * Retrieves available placement positions ('LEFT', 'RIGHT', both, or none) under a parent.
+   *
+   * @param placementParentId Node ID, Business Center ID, or Distributor ID of the parent
+   * @returns Array containing available positions: ['LEFT', 'RIGHT'], ['LEFT'], ['RIGHT'], or []
    */
   public static async getAvailablePositions(placementParentId: string): Promise<('LEFT' | 'RIGHT')[]> {
     const parentNode = await this.resolveNode(placementParentId);
@@ -587,6 +698,9 @@ export class TreePlacementService {
 
   /**
    * Retrieves direct children under a parent node in the binary tree.
+   *
+   * @param placementParentId Node ID, Business Center ID, or Distributor ID of the parent
+   * @returns List of child nodes (maximum 2: LEFT and/or RIGHT)
    */
   public static async getChildren(placementParentId: string): Promise<ChildNodeInfo[]> {
     const parentNode = await this.resolveNode(placementParentId);
@@ -617,5 +731,47 @@ export class TreePlacementService {
       },
       orderBy: { placementPosition: 'asc' },
     })) as ChildNodeInfo[];
+  }
+
+  /**
+   * Retrieves the parent node of a given node or distributor in the binary tree.
+   *
+   * @param childNodeIdOrDistributorId Node ID or Distributor ID/Code of the child
+   * @returns ParentNodeInfo if placed under a parent, or null if root / unplaced
+   */
+  public static async getParent(
+    childNodeIdOrDistributorId: string
+  ): Promise<ParentNodeInfo | null> {
+    const childNode = await this.resolveNode(childNodeIdOrDistributorId);
+    if (!childNode || !childNode.placementParentId) {
+      return null;
+    }
+
+    const parentNode = await prisma.mLMNode.findUnique({
+      where: { id: childNode.placementParentId },
+      include: {
+        distributor: {
+          select: {
+            id: true,
+            distributorId: true,
+            distributorCode: true,
+            firstName: true,
+            lastName: true,
+            displayName: true,
+            status: true,
+          },
+        },
+        businessCenter: {
+          select: {
+            id: true,
+            centerCode: true,
+            centerNumber: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    return parentNode as ParentNodeInfo | null;
   }
 }
