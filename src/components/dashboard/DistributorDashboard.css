@@ -347,6 +347,12 @@ body:has(.kashvimlm-portal-root) .footer,
   background-color: #f4f6f9;
 }
 
+.kashvimlm-main-canvas.canvas-network-tree-mode {
+  padding: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 /* --------------------------------------------------------------------------
    Welcome & Hide Commission Toggle
    -------------------------------------------------------------------------- */

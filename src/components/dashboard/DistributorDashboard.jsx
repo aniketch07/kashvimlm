@@ -454,7 +454,7 @@ function DistributorDashboard({ user, onSignOut, defaultNav }) {
         </aside>
 
         {/* Main Center Dashboard Area */}
-        <main className="kashvimlm-main-canvas">
+        <main className={`kashvimlm-main-canvas ${activeNavIcon === 'network_tree' ? 'canvas-network-tree-mode' : ''}`}>
           {activeNavIcon === 'dashboard' && (
             <>
               {/* Welcome Header & Hide Commission Toggle */}

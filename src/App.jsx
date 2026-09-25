@@ -61,7 +61,10 @@ function AppContent() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/dashboard" element={<Profile />} />
-          <Route path="/network-tree" element={<NetworkTreePage />} />
+          <Route
+            path="/network-tree"
+            element={isLoggedIn ? <Profile defaultNav="network_tree" /> : <NetworkTreePage />}
+          />
           <Route path="/admin/network-tree" element={<AdminNetworkTreePage />} />
           <Route path="/join" element={<Join />} />
           <Route path="*" element={<Home />} />
