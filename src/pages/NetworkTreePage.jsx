@@ -668,6 +668,7 @@ function NetworkTreePage({ embedded = false }) {
             onZoomChange={handleZoomChange}
             onResetZoom={handleResetZoom}
             onResetToRoot={handleResetToRoot}
+            onCenterTree={() => handleCenterTree()}
             panPosition={panPosition}
             onPanChange={setPanPosition}
             onNodeClick={handleNodeClick}

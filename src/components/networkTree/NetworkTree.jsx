@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { Plus, Minus, Focus, RotateCcw } from 'lucide-react';
 import TreeNode from './TreeNode';
 
 /**
@@ -18,6 +19,7 @@ function NetworkTree({
   onZoomChange,
   onResetZoom,
   onResetToRoot,
+  onCenterTree,
   onNodeClick,
   onNodeHover,
   onNodeLeave,
@@ -118,7 +120,7 @@ function NetworkTree({
       e.preventDefault();
       const zoomStep = e.deltaY < 0 ? 0.08 : -0.08;
       onZoomChange((prevZoom) => {
-        const cur = typeof prevZoom === 'function' ? prevZoom(zoomLevel) : zoomLevel;
+        const cur = typeof prevZoom === 'number' ? prevZoom : zoomLevel;
         return Math.max(0.4, Math.min(2.0, Number((cur + zoomStep).toFixed(2))));
       });
     };
@@ -281,6 +283,63 @@ function NetworkTree({
           <div className="tree-empty-notice">
             <p>No binary genealogy network loaded.</p>
           </div>
+        )}
+      </div>
+
+      {/* Floating Canvas Quick Controls (Prompt 12) */}
+      <div className="canvas-floating-controls" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="canvas-floating-btn"
+          onClick={() => onZoomChange && onZoomChange(Math.min(2.0, Number((zoomLevel + 0.1).toFixed(2))))}
+          title="Zoom In (+)"
+          aria-label="Zoom In"
+        >
+          <Plus size={15} />
+          <span>Zoom In</span>
+        </button>
+        <button
+          type="button"
+          className="canvas-floating-btn zoom-level-badge"
+          onClick={onResetZoom}
+          title="Reset Zoom (100%)"
+          aria-label="Reset Zoom"
+        >
+          {Math.round(zoomLevel * 100)}%
+        </button>
+        <button
+          type="button"
+          className="canvas-floating-btn"
+          onClick={() => onZoomChange && onZoomChange(Math.max(0.4, Number((zoomLevel - 0.1).toFixed(2))))}
+          title="Zoom Out (-)"
+          aria-label="Zoom Out"
+        >
+          <Minus size={15} />
+          <span>Zoom Out</span>
+        </button>
+        {onCenterTree && (
+          <button
+            type="button"
+            className="canvas-floating-btn"
+            onClick={onCenterTree}
+            title="Center selected node in viewport"
+            aria-label="Center Node"
+          >
+            <Focus size={15} />
+            <span>Center</span>
+          </button>
+        )}
+        {onResetToRoot && (
+          <button
+            type="button"
+            className="canvas-floating-btn"
+            onClick={onResetToRoot}
+            title="Reset to logged-in user's tree"
+            aria-label="Reset Tree"
+          >
+            <RotateCcw size={15} />
+            <span>Reset</span>
+          </button>
         )}
       </div>
     </div>

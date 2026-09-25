@@ -52,38 +52,40 @@ function TreeControls({
     <div className="tree-controls-wrapper">
       {/* Top Controls Bar */}
       <div className="tree-controls-bar">
-        {/* Zoom Controls: Zoom Out (-), Indicator, Zoom In (+) */}
-        <div className="control-group zoom-group" title="Zoom Controls">
-          <button
-            type="button"
-            className="control-btn zoom-btn zoom-out-btn"
-            onClick={handleZoomOut}
-            title="Zoom Out (-)"
-            aria-label="Zoom Out"
-          >
-            <ZoomOut size={16} />
-          </button>
+        {/* Zoom In (+) Button */}
+        <button
+          type="button"
+          className="control-action-btn zoom-btn zoom-in-action-btn"
+          onClick={handleZoomIn}
+          title="Zoom In (+)"
+          aria-label="Zoom In"
+        >
+          <Plus size={15} />
+          <span>Zoom In</span>
+        </button>
 
-          <button
-            type="button"
-            className="control-btn zoom-indicator"
-            onClick={onResetZoom}
-            title="Click to reset zoom to 100%"
-            aria-label="Reset zoom to 100%"
-          >
-            {Math.round(zoomLevel * 100)}%
-          </button>
+        {/* Zoom Out (-) Button */}
+        <button
+          type="button"
+          className="control-action-btn zoom-btn zoom-out-action-btn"
+          onClick={handleZoomOut}
+          title="Zoom Out (-)"
+          aria-label="Zoom Out"
+        >
+          <Minus size={15} />
+          <span>Zoom Out</span>
+        </button>
 
-          <button
-            type="button"
-            className="control-btn zoom-btn zoom-in-btn"
-            onClick={handleZoomIn}
-            title="Zoom In (+)"
-            aria-label="Zoom In"
-          >
-            <ZoomIn size={16} />
-          </button>
-        </div>
+        {/* Zoom Indicator */}
+        <button
+          type="button"
+          className="control-action-btn zoom-indicator-btn"
+          onClick={onResetZoom}
+          title="Click to reset zoom to 100%"
+          aria-label="Reset zoom to 100%"
+        >
+          <span>{Math.round(zoomLevel * 100)}%</span>
+        </button>
 
         {/* Center Button */}
         <button
@@ -97,7 +99,7 @@ function TreeControls({
           }
         >
           <Focus size={15} />
-          <span>Center Tree</span>
+          <span>Center</span>
         </button>
 
         {/* Reset Button (Reset to logged-in user's tree) */}
@@ -108,7 +110,7 @@ function TreeControls({
           title="Reset to logged-in user's tree (My Network)"
         >
           <RotateCcw size={15} />
-          <span>Reset / My Network</span>
+          <span>Reset</span>
         </button>
 
         {/* Expand Button */}

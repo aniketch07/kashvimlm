@@ -520,6 +520,17 @@
   border-color: #7c3aed;
 }
 
+.control-action-btn.zoom-indicator-btn {
+  font-weight: 700;
+  color: #0284c7;
+  background-color: #f0f9ff;
+  border-color: #bae6fd;
+}
+
+.control-action-btn.zoom-indicator-btn:hover {
+  background-color: #e0f2fe;
+}
+
 .control-action-btn.center-btn {
   color: #005086;
   border-color: #bae6fd;
@@ -1984,22 +1995,22 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  /* Preserve binary horizontal tree topology inside scrollable/pannable zoom plane */
   .binary-legs-row {
-    flex-direction: column;
-    align-items: center;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
   }
 
   .binary-leg-col {
-    width: 100%;
+    min-width: 220px;
+    padding: 0 10px;
+    padding-top: 42px;
   }
 
   .tree-node-card {
-    width: 100%;
-    max-width: 280px;
-  }
-
-  .branch-svg-connector {
-    display: none;
+    width: 210px;
   }
 }
 
