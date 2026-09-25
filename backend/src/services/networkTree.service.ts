@@ -21,6 +21,7 @@ export interface NetworkTreeNode {
   hasDeeperMembers?: boolean;
   hasChildren?: boolean;
   isExpanded?: boolean;
+  children?: NetworkTreeNode[];
   left: NetworkTreeNode | null;
   right: NetworkTreeNode | null;
 }
@@ -242,6 +243,7 @@ export class NetworkTreeService {
             hasDeeperMembers: hasChildrenInDB,
             hasChildren: hasChildrenInDB,
             isExpanded: false,
+            children: [],
             left: null,
             right: null,
           };
@@ -259,6 +261,7 @@ export class NetworkTreeService {
         const rightTeamCount = countSubtree(rightNode);
         const totalTeamCount = leftTeamCount + rightTeamCount;
         const directMembers = (leftNode ? 1 : 0) + (rightNode ? 1 : 0);
+        const children = [leftNode, rightNode].filter(Boolean) as NetworkTreeNode[];
 
         return {
           id: nodeId,
@@ -279,6 +282,7 @@ export class NetworkTreeService {
           hasDeeperMembers: Boolean(leftNode?.hasDeeperMembers || rightNode?.hasDeeperMembers || totalTeamCount > 0),
           hasChildren: Boolean(leftNode || rightNode || childrenMap.has(nodeId)),
           isExpanded: Boolean(leftNode || rightNode),
+          children,
           left: leftNode,
           right: rightNode,
         };
@@ -875,6 +879,12 @@ export class NetworkTreeService {
     }
     if (sanitized.right) {
       sanitized.right = this.sanitizeTreeNode(sanitized.right);
+    }
+
+    if (sanitized.children && Array.isArray(sanitized.children) && sanitized.children.length > 0) {
+      sanitized.children = sanitized.children.map((c: any) => this.sanitizeTreeNode(c)).filter(Boolean);
+    } else {
+      sanitized.children = [sanitized.left, sanitized.right].filter(Boolean);
     }
 
     return sanitized as NetworkTreeNode;

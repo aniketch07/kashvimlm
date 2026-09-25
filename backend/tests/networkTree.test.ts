@@ -133,6 +133,70 @@ describe('BINARY MLM NETWORK TREE API & SECURITY TESTS (PROMPT 15)', () => {
       expect(root).not.toHaveProperty('bankAccount');
     });
 
+    it('should return tree hierarchy with Level 0 (root), Level 1 (LEFT + RIGHT), Level 2, and Level 3 with children and required fields (Prompt 7)', async () => {
+      const res = await request(app)
+        .get('/api/v1/network-tree?depth=3')
+        .set('Authorization', `Bearer ${rahulToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      const root = res.body.data.root;
+      expect(root).toBeDefined();
+
+      // Required fields on root
+      expect(root).toHaveProperty('distributorId');
+      expect(root).toHaveProperty('name');
+      expect(root).toHaveProperty('status');
+      expect(root).toHaveProperty('rank');
+      expect(root).toHaveProperty('joinedDate');
+      expect(root).toHaveProperty('position');
+      expect(root).toHaveProperty('children');
+
+      // Level 1: LEFT + RIGHT
+      expect(Array.isArray(root.children)).toBe(true);
+      expect(root.children.length).toBe(2);
+
+      const [leftNode, rightNode] = root.children;
+      expect(leftNode.position).toBe('LEFT');
+      expect(rightNode.position).toBe('RIGHT');
+
+      for (const node of [leftNode, rightNode]) {
+        expect(node).toHaveProperty('distributorId');
+        expect(node).toHaveProperty('name');
+        expect(node).toHaveProperty('status');
+        expect(node).toHaveProperty('rank');
+        expect(node).toHaveProperty('joinedDate');
+        expect(node).toHaveProperty('children');
+        expect(Array.isArray(node.children)).toBe(true);
+      }
+
+      // Level 2: Children of LEFT + RIGHT
+      expect(leftNode.children.length).toBeGreaterThanOrEqual(1);
+      expect(rightNode.children.length).toBeGreaterThanOrEqual(1);
+
+      // Level 3: Next level
+      const level2Node = leftNode.children[0];
+      expect(level2Node).toHaveProperty('children');
+
+      // Verify no sensitive fields anywhere
+      const verifyNoSensitiveFields = (node: any) => {
+        if (!node) return;
+        expect(node.password).toBeUndefined();
+        expect(node.pan).toBeUndefined();
+        expect(node.panNumber).toBeUndefined();
+        expect(node.aadhaar).toBeUndefined();
+        expect(node.aadhaarNumber).toBeUndefined();
+        expect(node.bankAccount).toBeUndefined();
+        expect(node.otp).toBeUndefined();
+        expect(node.securityPin).toBeUndefined();
+        expect(node.kycDocuments).toBeUndefined();
+        if (node.children) {
+          node.children.forEach(verifyNoSensitiveFields);
+        }
+      };
+      verifyNoSensitiveFields(root);
+    });
+
     it('should support default depth = 3 when depth query param is omitted', async () => {
       const res = await request(app)
         .get('/api/v1/network-tree')
