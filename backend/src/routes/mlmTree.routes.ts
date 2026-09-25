@@ -22,5 +22,19 @@ router.get('/next-slot/:nodeId', validate({ query: nextSlotQuerySchema }), MlmTr
 // Seed exact requested model tree: A -> LEFT (B -> C) & RIGHT (D -> E) (Admin only)
 router.post('/seed-model', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), MlmTreeController.seedModelTree);
 
+// MLM Tree Audit Logging & Administrative Placement (Prompt 16)
+import { TreeAuditController } from '../controllers/treeAudit.controller';
+import { adminChangePlacementSchema, adminRemoveMemberSchema, getTreeAuditLogsQuerySchema } from '../validators/treeAudit.validators';
+
+router.get('/audit-logs', authenticate, validate({ query: getTreeAuditLogsQuerySchema }), TreeAuditController.getAuditLogs);
+router.post('/change-placement', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), validate({ body: adminChangePlacementSchema }), TreeAuditController.changePlacement);
+router.post('/remove-member', authenticate, authorizeRoles('SUPER_ADMIN', 'ADMIN'), validate({ body: adminRemoveMemberSchema }), TreeAuditController.removeMember);
+
+// Prompt 16 Requirement: "Audit records should not be editable by normal users."
+router.put('/audit-logs/:id', authenticate, TreeAuditController.blockAuditMutation);
+router.patch('/audit-logs/:id', authenticate, TreeAuditController.blockAuditMutation);
+router.delete('/audit-logs/:id', authenticate, TreeAuditController.blockAuditMutation);
+router.delete('/audit-logs', authenticate, TreeAuditController.blockAuditMutation);
+
 export const mlmTreeRouter = router;
 

@@ -919,6 +919,39 @@ export class EnrollmentService {
         }
         fallback.status = 'COMPLETED';
         fallback.submittedAt = new Date();
+
+        // Prompt 16: Audit logging for DISTRIBUTOR_CREATED, SPONSOR_ASSIGNED, TREE_MEMBER_PLACED
+        try {
+          const { TreeAuditService } = await import('./treeAudit.service');
+          const distCode = 'KV-NEW-9001';
+          const sponsorCode = fallback.sponsorId || 'KV-1001';
+          const parentCode = fallback.placementParentId || sponsorCode;
+          const pos = fallback.placementPosition || 'LEFT';
+
+          await TreeAuditService.logDistributorCreated({
+            actorId: sponsorCode,
+            memberId: distCode,
+            sponsorId: sponsorCode,
+            details: { name: fallback.legalName || 'New Distributor', status: 'ACTIVE' },
+          });
+
+          await TreeAuditService.logSponsorAssigned({
+            actorId: sponsorCode,
+            memberId: distCode,
+            sponsorId: sponsorCode,
+          });
+
+          await TreeAuditService.logTreeMemberPlaced({
+            actorId: sponsorCode,
+            memberId: distCode,
+            sponsorId: sponsorCode,
+            placementParentId: parentCode,
+            position: pos,
+          });
+        } catch {
+          // Safe fallback
+        }
+
         return {
           success: true,
           distributorCode: 'KV-NEW-9001',
@@ -1409,6 +1442,39 @@ export class EnrollmentService {
       },
       'Enrollment submitted and executed successfully'
     );
+
+    if (result.distributor) {
+      try {
+        const { TreeAuditService } = await import('./treeAudit.service');
+        const distCode = result.distributor.distributorCode;
+        const sponsorCode = result.enrollment?.sponsor?.distributorCode || enrollment.sponsorId;
+        await TreeAuditService.logDistributorCreated({
+          actorId: result.user.id,
+          memberId: distCode,
+          sponsorId: sponsorCode,
+        });
+        if (sponsorCode) {
+          await TreeAuditService.logSponsorAssigned({
+            actorId: result.user.id,
+            memberId: distCode,
+            sponsorId: sponsorCode,
+          });
+        }
+        if (result.binaryNode) {
+          await TreeAuditService.logTreeMemberPlaced({
+            actorId: result.user.id,
+            memberId: distCode,
+            sponsorId: sponsorCode,
+            placementParentId: enrollment.placementParentId || sponsorCode,
+            position: result.binaryNode.position,
+            depth: result.binaryNode.depth,
+            path: result.binaryNode.binaryPath,
+          });
+        }
+      } catch {
+        // Safe fallback
+      }
+    }
 
     return {
       ...result,

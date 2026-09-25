@@ -76,4 +76,17 @@ router.delete('/audit-logs/:id', AdminController.blockAuditDeletion);
 // 21. Global Network Tree Inspection (Prompt 17: Test 15 & 16)
 router.get('/network-tree', AdminController.getNetworkTree);
 
+// 22. Tree Audit & Placement Endpoints (Prompt 16)
+import { TreeAuditController } from '../controllers/treeAudit.controller';
+import { adminChangePlacementSchema, adminRemoveMemberSchema, getTreeAuditLogsQuerySchema } from '../validators/treeAudit.validators';
+import { validate } from '../middleware/validate';
+
+router.get('/tree/audit-logs', validate({ query: getTreeAuditLogsQuerySchema }), TreeAuditController.getAuditLogs);
+router.post('/tree/change-placement', validate({ body: adminChangePlacementSchema }), TreeAuditController.changePlacement);
+router.post('/tree/remove-member', validate({ body: adminRemoveMemberSchema }), TreeAuditController.removeMember);
+router.put('/tree/audit-logs/:id', TreeAuditController.blockAuditMutation);
+router.patch('/tree/audit-logs/:id', TreeAuditController.blockAuditMutation);
+router.delete('/tree/audit-logs/:id', TreeAuditController.blockAuditMutation);
+router.delete('/tree/audit-logs', TreeAuditController.blockAuditMutation);
+
 export const adminRouter = router;

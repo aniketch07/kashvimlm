@@ -14,6 +14,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import NetworkTreePage from './NetworkTreePage';
+import TreeAuditModal from '../components/networkTree/TreeAuditModal';
+import AdminPlacementChangeModal from '../components/networkTree/AdminPlacementChangeModal';
 import { api } from '../services/api';
 import '../components/networkTree/NetworkTree.css';
 
@@ -46,6 +48,11 @@ export default function AdminNetworkTreePage() {
 
   // Search input for admin to inspect any member in the company
   const [searchQuery, setSearchQuery] = useState(searchParams.get('member') || 'KV-1001');
+
+  // Audit trail modal & Placement Change modal state (Prompt 16)
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [selectedMemberForMove, setSelectedMemberForMove] = useState(null);
 
   // Listen for storage changes
   useEffect(() => {
@@ -190,7 +197,44 @@ export default function AdminNetworkTreePage() {
           </span>
         </div>
 
-        <div className="admin-tree-banner-right">
+        <div className="admin-tree-banner-right" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Prompt 16: Audit Trail button */}
+          <button
+            type="button"
+            className="btn-role-toggle-test"
+            onClick={() => setShowAuditModal(true)}
+            title="View MLM tree audit trail (Prompt 16)"
+            style={{
+              background: '#0f172a',
+              color: '#34d399',
+              border: '1px solid #10b981',
+              fontWeight: 600,
+            }}
+          >
+            <ShieldCheck size={14} />
+            <span>Tree Audit Trail</span>
+          </button>
+
+          {/* Prompt 16: Admin placement change button */}
+          <button
+            type="button"
+            className="btn-role-toggle-test"
+            onClick={() => {
+              setSelectedMemberForMove({ distributorId: 'KV-1006', name: 'Neha' });
+              setShowMoveModal(true);
+            }}
+            title="Admin move distributor / change placement (Prompt 16)"
+            style={{
+              background: '#d97706',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 600,
+            }}
+          >
+            <ArrowRight size={14} />
+            <span>Change Placement</span>
+          </button>
+
           {/* Role test switcher */}
           <button
             type="button"
@@ -206,6 +250,28 @@ export default function AdminNetworkTreePage() {
 
       {/* Render Full Network Tree with Admin Privileges */}
       <NetworkTreePage embedded={true} />
+
+      {/* MLM Tree Audit Trail Modal (Prompt 16) */}
+      <TreeAuditModal
+        isOpen={showAuditModal}
+        onClose={() => setShowAuditModal(false)}
+      />
+
+      {/* Admin Placement Change Modal (Prompt 16) */}
+      <AdminPlacementChangeModal
+        isOpen={showMoveModal}
+        onClose={() => {
+          setShowMoveModal(false);
+          setSelectedMemberForMove(null);
+        }}
+        member={selectedMemberForMove}
+        onSuccess={() => {
+          setShowMoveModal(false);
+          setSelectedMemberForMove(null);
+          // Auto open audit modal to show the new record
+          setShowAuditModal(true);
+        }}
+      />
     </div>
   );
 }

@@ -655,6 +655,30 @@ export class TreePlacementService {
         return newNode;
       });
 
+      // Prompt 16: Audit Logging for Tree Placement & Sponsor Assignment
+      try {
+        const { TreeAuditService } = await import('./treeAudit.service');
+        await TreeAuditService.logTreeMemberPlaced({
+          actorId: (distributor as any)?.userId || distributorId,
+          memberId: (distributor as any)?.distributorCode || (distributor as any)?.distributorId || distributorId,
+          sponsorId: sponsor ? ((sponsor as any).distributorCode || (sponsor as any).distributorId || sponsor.id) : null,
+          placementParentId: (placementParent as any)?.distributorCode || (placementParent as any)?.distributorId || placementParentId,
+          position: placementPosition as 'LEFT' | 'RIGHT',
+          depth: placedNode?.depth,
+          path: placedNode?.binaryPath || undefined,
+        });
+
+        if (sponsor) {
+          await TreeAuditService.logSponsorAssigned({
+            actorId: (distributor as any)?.userId || distributorId,
+            memberId: (distributor as any)?.distributorCode || (distributor as any)?.distributorId || distributorId,
+            sponsorId: (sponsor as any).distributorCode || (sponsor as any).distributorId || sponsor.id,
+          });
+        }
+      } catch {
+        // Logging fallback
+      }
+
       return {
         success: true,
         data: placedNode,

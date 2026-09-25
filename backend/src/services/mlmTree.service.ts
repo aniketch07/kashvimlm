@@ -430,6 +430,32 @@ export class MlmTreeService {
     };
 
     this.dynamicEnrolledMembers.push(newMember);
+
+    // Prompt 16: Audit Logging for DISTRIBUTOR_CREATED, SPONSOR_ASSIGNED, TREE_MEMBER_PLACED
+    try {
+      const { TreeAuditService } = await import('./treeAudit.service');
+      await TreeAuditService.logDistributorCreated({
+        actorId: sponsor,
+        memberId: code,
+        sponsorId: sponsor,
+        details: { name: newMember.displayName, status: 'ACTIVE' },
+      });
+      await TreeAuditService.logSponsorAssigned({
+        actorId: sponsor,
+        memberId: code,
+        sponsorId: sponsor,
+      });
+      await TreeAuditService.logTreeMemberPlaced({
+        actorId: sponsor,
+        memberId: code,
+        sponsorId: sponsor,
+        placementParentId: sponsor,
+        position: pos,
+      });
+    } catch {
+      // Safe fallback
+    }
+
     return newMember;
   }
 

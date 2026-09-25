@@ -37,6 +37,11 @@ apiRouter.use('/tree', mlmTreeRouter);
 import { networkTreeRouter } from './networkTree.routes';
 apiRouter.use('/network-tree', networkTreeRouter);
 
+// MLM Tree Audit Logging (Prompt 16): /api/v1/tree/audit & /api/v1/admin/tree
+import { treeAuditRouter, adminTreeAuditRouter } from './treeAudit.routes';
+apiRouter.use('/tree/audit', treeAuditRouter);
+apiRouter.use('/admin/tree', adminTreeAuditRouter);
+
 // Distributor & Customer Enrollment Pipeline: /api/v1/enrollments
 apiRouter.use('/enrollments', enrollmentRouter);
 

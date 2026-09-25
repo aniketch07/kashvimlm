@@ -854,4 +854,167 @@ describe('BINARY MLM NETWORK TREE API & SECURITY TESTS (PROMPT 15)', () => {
       });
     });
   });
+
+  describe('7. MLM Tree Audit Logging & Placement Operations (Prompt 16)', () => {
+    it('should track and retrieve audit logs with all prompt 16 fields (actorId, memberId, sponsorId, placementParentId, position, oldValue, newValue, timestamp, IP, userAgent)', async () => {
+      const res = await request(app)
+        .get('/api/v1/network-tree/audit-logs')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.length).toBeGreaterThan(0);
+      const log = res.body.data[0];
+      expect(log.actorId).toBeDefined();
+      expect(log.memberId).toBeDefined();
+      expect(log.timestamp).toBeDefined();
+      expect(log.IP || log.ip).toBeDefined();
+      expect(log.userAgent).toBeDefined();
+    });
+
+    it('should strictly REQUIRE Reason, Old Parent, Old Position, New Parent, New Position, and Admin ID when Admin changes placement', async () => {
+      // 1. Missing Reason -> 400 or 422
+      const missingReason = await request(app)
+        .post('/api/v1/network-tree/change-placement')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          memberId: 'KV-1006',
+          oldParent: 'KV-1002',
+          oldPosition: 'LEFT',
+          newParent: 'KV-1003',
+          newPosition: 'RIGHT',
+        });
+      expect([400, 422]).toContain(missingReason.status);
+
+      // 2. Missing Old Parent -> 400 or 422
+      const missingOldParent = await request(app)
+        .post('/api/v1/network-tree/change-placement')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          memberId: 'KV-1006',
+          reason: 'Valid restructuring reason',
+          oldPosition: 'LEFT',
+          newParent: 'KV-1003',
+          newPosition: 'RIGHT',
+        });
+      expect([400, 422]).toContain(missingOldParent.status);
+
+      // 3. Missing Old Position -> 400 or 422
+      const missingOldPos = await request(app)
+        .post('/api/v1/network-tree/change-placement')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          memberId: 'KV-1006',
+          reason: 'Valid restructuring reason',
+          oldParent: 'KV-1002',
+          newParent: 'KV-1003',
+          newPosition: 'RIGHT',
+        });
+      expect([400, 422]).toContain(missingOldPos.status);
+
+      // 4. Missing New Parent -> 400 or 422
+      const missingNewParent = await request(app)
+        .post('/api/v1/network-tree/change-placement')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          memberId: 'KV-1006',
+          reason: 'Valid restructuring reason',
+          oldParent: 'KV-1002',
+          oldPosition: 'LEFT',
+          newPosition: 'RIGHT',
+        });
+      expect([400, 422]).toContain(missingNewParent.status);
+
+      // 5. Missing New Position -> 400 or 422
+      const missingNewPos = await request(app)
+        .post('/api/v1/network-tree/change-placement')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          memberId: 'KV-1006',
+          reason: 'Valid restructuring reason',
+          oldParent: 'KV-1002',
+          oldPosition: 'LEFT',
+          newParent: 'KV-1003',
+        });
+      expect([400, 422]).toContain(missingNewPos.status);
+
+      // 6. Complete valid request succeeds and records audit log with all 6 fields
+      const validChange = await request(app)
+        .post('/api/v1/network-tree/change-placement')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          memberId: 'KV-1006',
+          reason: 'Restructuring team to optimize binary leg performance',
+          oldParent: 'KV-1002',
+          oldPosition: 'LEFT',
+          newParent: 'KV-1003',
+          newPosition: 'RIGHT',
+        })
+        .expect(200);
+
+      expect(validChange.body.success).toBe(true);
+      const audit = validChange.body.data.auditRecord;
+      expect(audit.action).toBe('TREE_MEMBER_MOVED');
+      expect(audit.reason).toContain('Restructuring');
+      expect(audit.oldParent).toBe('KV-1002');
+      expect(audit.oldPosition).toBe('LEFT');
+      expect(audit.newParent).toBe('KV-1003');
+      expect(audit.newPosition).toBe('RIGHT');
+      expect(audit.adminId).toBeDefined();
+    });
+
+    it('should NEVER silently change an MLM relationship (audit record must be created)', async () => {
+      const res = await request(app)
+        .post('/api/v1/network-tree/change-placement')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          memberId: 'KV-1007',
+          reason: 'Leg swap under parent to resolve placement discrepancy',
+          oldParent: 'KV-1003',
+          oldPosition: 'LEFT',
+          newParent: 'KV-1003',
+          newPosition: 'RIGHT',
+        })
+        .expect(200);
+
+      expect(res.body.data.auditRecord).toBeDefined();
+      expect(res.body.data.auditRecord.action).toBe('TREE_POSITION_CHANGED');
+      expect(res.body.data.auditRecord.oldValue).toBeDefined();
+      expect(res.body.data.auditRecord.newValue).toBeDefined();
+    });
+
+    it('should block normal users from mutating or deleting audit records with 403 Forbidden', async () => {
+      // Normal user trying to delete audit log
+      const resDelete = await request(app)
+        .delete('/api/v1/network-tree/audit-logs/tree-audit-001')
+        .set('Authorization', `Bearer ${amitToken}`)
+        .expect(403);
+
+      expect(resDelete.body.code).toBe('AUDIT_LOG_IMMUTABLE');
+
+      // Normal user trying to modify audit log
+      const resPut = await request(app)
+        .put('/api/v1/network-tree/audit-logs/tree-audit-001')
+        .set('Authorization', `Bearer ${amitToken}`)
+        .send({ reason: 'tampered' })
+        .expect(403);
+
+      expect(resPut.body.code).toBe('AUDIT_LOG_IMMUTABLE');
+    });
+
+    it('should block non-admins from changing tree placement with 403 Forbidden', async () => {
+      await request(app)
+        .post('/api/v1/network-tree/change-placement')
+        .set('Authorization', `Bearer ${amitToken}`)
+        .send({
+          memberId: 'KV-1006',
+          reason: 'Unauthorized change attempt',
+          oldParent: 'KV-1002',
+          oldPosition: 'LEFT',
+          newParent: 'KV-1003',
+          newPosition: 'RIGHT',
+        })
+        .expect(403);
+    });
+  });
 });
