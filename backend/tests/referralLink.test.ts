@@ -113,6 +113,65 @@ describe('DISTRIBUTOR REFERRAL LINK API TESTS (PROMPT 6)', () => {
       });
     });
 
+    it('should generate valid referralUrl containing /join?ref=KV-1001 when baseUrl is omitted', async () => {
+      vi.spyOn(prisma.distributorProfile, 'findFirst').mockResolvedValue({
+        id: 'dist-uuid-1',
+        userId: userId,
+        distributorId: 'KV-1001',
+        distributorCode: 'KV-1001',
+        status: 'ACTIVE',
+      } as any);
+
+      const res = await request(app)
+        .get('/api/v1/distributors/me/referral-link')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.distributorId).toBe('KV-1001');
+      expect(res.body.data.referralUrl).toMatch(/\/join\?ref=KV-1001$/);
+    });
+
+    it('should reject inactive distributor with DISTRIBUTOR_INACTIVE', async () => {
+      vi.spyOn(prisma.distributorProfile, 'findFirst').mockResolvedValue({
+        id: 'dist-uuid-inactive',
+        userId: userId,
+        distributorId: 'KV-INACTIVE',
+        distributorCode: 'KV-INACTIVE',
+        status: 'INACTIVE',
+      } as any);
+
+      const res = await request(app)
+        .get('/api/v1/distributors/me/referral-link')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.code).toBe('DISTRIBUTOR_INACTIVE');
+    });
+
+    it('should never expose sensitive distributor information in response', async () => {
+      vi.spyOn(prisma.distributorProfile, 'findFirst').mockResolvedValue({
+        id: 'dist-uuid-1',
+        userId: userId,
+        distributorId: 'KV-1001',
+        distributorCode: 'KV-1001',
+        status: 'ACTIVE',
+      } as any);
+
+      const res = await request(app)
+        .get('/api/v1/distributors/me/referral-link')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      const keys = Object.keys(res.body.data);
+      expect(keys).toEqual(['distributorId', 'referralUrl']);
+      expect(res.body.data.password).toBeUndefined();
+      expect(res.body.data.email).toBeUndefined();
+      expect(res.body.data.phone).toBeUndefined();
+      expect(res.body.data.bankAccount).toBeUndefined();
+    });
     it('should return 404 if distributor is not found', async () => {
       vi.spyOn(prisma.distributorProfile, 'findFirst').mockResolvedValue(null);
 

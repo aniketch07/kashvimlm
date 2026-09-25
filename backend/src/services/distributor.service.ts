@@ -221,6 +221,10 @@ export class DistributorService {
       throw AppError.notFound('Distributor profile not found.', 'DISTRIBUTOR_NOT_FOUND');
     }
 
+    if (profile.status && profile.status !== 'ACTIVE') {
+      throw AppError.badRequest('Distributor account is not active.', 'DISTRIBUTOR_INACTIVE');
+    }
+
     const distributorId = profile.distributorId || profile.distributorCode;
     const rawBase =
       customBaseUrl ||
