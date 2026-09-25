@@ -944,6 +944,7 @@ export const api = {
       console.warn('[API] Search network tree failed or offline:', err.message);
     }
     // Client fallback: search modeled network directory
+    const lowerQ = q.toLowerCase();
     const fallbackList = [
       { id: 'dist-rahul-uuid', distributorId: 'KV-1001', name: 'Rahul Kaushal', rank: 'Business Center', status: 'ACTIVE' },
       { id: 'dist-amit-uuid', distributorId: 'KV-1002', name: 'Amit', rank: 'Executive Director', status: 'ACTIVE' },

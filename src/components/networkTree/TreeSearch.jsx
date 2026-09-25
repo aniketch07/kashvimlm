@@ -103,14 +103,14 @@ function TreeSearch({ onSelectMember }) {
         <Search size={16} className="search-icon" />
         <input
           type="text"
-          placeholder="Search by name or Distributor ID"
+          placeholder="Search by Name or Distributor ID"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onFocus={() => {
             if (searchQuery.trim().length > 0) setIsOpen(true);
           }}
           className="tree-search-input-field"
-          aria-label="Search by name or Distributor ID"
+          aria-label="Search by Name or Distributor ID"
         />
         {loading ? (
           <Loader2 size={16} className="tree-search-spinner" />
