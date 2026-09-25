@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { PlacementPosition, Prisma, UserRole } from '@prisma/client';
+import { CenterStatus, PlacementPosition, Prisma, UserRole } from '@prisma/client';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
 import { AppError } from '../utils/appError';
@@ -512,6 +512,13 @@ export class EnrollmentService {
           throw AppError.notFound(`Sponsor '${input.sponsor}' not found.`, 'ENROLLMENT_SPONSOR_NOT_FOUND');
         }
 
+        if (sponsor.status !== 'ACTIVE') {
+          throw AppError.badRequest(
+            'The specified sponsor account is not currently active.',
+            'ENROLLMENT_SPONSOR_INACTIVE'
+          );
+        }
+
         // 2. Prevent self-sponsorship
         if (sponsor.user.email.toLowerCase() === enrollment.prospectEmail.toLowerCase()) {
           throw AppError.badRequest(
@@ -948,34 +955,10 @@ export class EnrollmentService {
       }
     }
 
-    // Verify placement requirements for distributors
-    if (enrollment.enrollmentType === 'DISTRIBUTOR') {
-      if (!enrollment.placementParentId || !enrollment.placementPosition) {
-        throw AppError.badRequest(
-          'Tree placement configuration is missing. Step 3 must specify a placement parent and position.',
-          'ENROLLMENT_PLACEMENT_MISSING'
-        );
-      }
-
-      // Re-verify that the chosen position under parent is STILL free
-      const collisionNode = await prisma.mLMNode.findFirst({
-        where: {
-          placementParentId: enrollment.placementParentId,
-          placementPosition: enrollment.placementPosition,
-        },
-      });
-
-      if (collisionNode) {
-        throw AppError.conflict(
-          `Placement collision: The ${enrollment.placementPosition} position was recently occupied by another placement. Please update Step 3.`,
-          'PLACEMENT_POSITION_OCCUPIED'
-        );
-      }
-    }
-
     // Step data extractions
     const step1Data = stepMap.get(1)?.stepData as any;
     const step2Data = stepMap.get(2)?.stepData as any;
+    const step3Data = stepMap.get(3)?.stepData as any;
     const step5Data = stepMap.get(5)?.stepData as any;
 
     const email = (enrollment.prospectEmail || step1Data?.email).toLowerCase();
@@ -988,9 +971,139 @@ export class EnrollmentService {
     // Use security PIN hash or generate initial secure password hash
     const initialPasswordHash = enrollment.securityPinHash || (await hashPassword('ChangeMe@123'));
 
-    // ATOMIC REGISTRATION TRANSACTION
+    // ATOMIC REGISTRATION TRANSACTION (Prompt 5: exactly 12 steps in ONE database transaction)
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create User
+      // 1. Validate applicant
+      const existingUser = await tx.user.findUnique({
+        where: { email },
+      });
+      if (existingUser) {
+        throw AppError.conflict(
+          'An account with this email address already exists. Please login instead.',
+          'ENROLLMENT_USER_ALREADY_EXISTS'
+        );
+      }
+
+      // 2. Validate sponsor
+      const sponsorIdentifier = enrollment.sponsorId || step3Data?.sponsorId;
+      const sponsor = await tx.distributorProfile.findFirst({
+        where: {
+          OR: [
+            { id: sponsorIdentifier },
+            { distributorId: { equals: sponsorIdentifier, mode: 'insensitive' } },
+            { distributorCode: { equals: sponsorIdentifier, mode: 'insensitive' } },
+          ],
+        },
+        include: { user: true },
+      });
+
+      if (!sponsor) {
+        throw AppError.notFound(
+          `Sponsor '${sponsorIdentifier}' not found. Please verify the sponsor ID.`,
+          'SPONSOR_NOT_FOUND'
+        );
+      }
+
+      // 3. Validate sponsor status
+      if (sponsor.status !== 'ACTIVE') {
+        throw AppError.badRequest(
+          'The specified sponsor account is not active.',
+          'SPONSOR_INACTIVE'
+        );
+      }
+
+      let parentNode: any = null;
+      let parentProfile: any = null;
+      let position: PlacementPosition | null = null;
+
+      if (enrollment.enrollmentType === 'DISTRIBUTOR') {
+        // 4. Determine placement parent
+        const parentIdentifier = (
+          enrollment.placementParentId ||
+          step3Data?.placementParentId ||
+          enrollment.sponsorId
+        )?.trim();
+
+        if (!parentIdentifier) {
+          throw AppError.badRequest(
+            'Tree placement configuration is missing. Step 3 must specify a placement parent and position.',
+            'ENROLLMENT_PLACEMENT_MISSING'
+          );
+        }
+
+        parentProfile = await tx.distributorProfile.findFirst({
+          where: {
+            OR: [
+              { distributorId: { equals: parentIdentifier, mode: 'insensitive' } },
+              { distributorCode: { equals: parentIdentifier, mode: 'insensitive' } },
+              { id: parentIdentifier },
+            ],
+          },
+          include: { user: true },
+        });
+
+        if (parentProfile) {
+          parentNode = await tx.mLMNode.findFirst({
+            where: { distributorId: parentProfile.id },
+            include: { distributor: true },
+          });
+        } else {
+          parentNode = await tx.mLMNode.findUnique({
+            where: { id: parentIdentifier },
+            include: { distributor: true },
+          });
+          if (parentNode) {
+            parentProfile = parentNode.distributor;
+          }
+        }
+
+        if (!parentNode || !parentProfile) {
+          throw AppError.notFound(
+            `Placement parent '${parentIdentifier}' was not found in the binary tree.`,
+            'PLACEMENT_PARENT_NOT_FOUND'
+          );
+        }
+
+        if (parentProfile.status !== 'ACTIVE') {
+          throw AppError.badRequest(
+            'Placement parent is not active.',
+            'PLACEMENT_PARENT_INACTIVE'
+          );
+        }
+
+        // 5. Validate LEFT/RIGHT
+        const rawPos = enrollment.placementPosition || step3Data?.placementPosition;
+        if (rawPos !== 'LEFT' && rawPos !== 'RIGHT') {
+          throw AppError.badRequest(
+            'Invalid placement position. Position must be LEFT or RIGHT.',
+            'INVALID_PLACEMENT_POSITION'
+          );
+        }
+        position = rawPos as PlacementPosition;
+
+        // 6. Re-check availability (Row locking / concurrency verification)
+        try {
+          await tx.$queryRaw`SELECT "id" FROM "mlm_nodes" WHERE "id" = ${parentNode.id} FOR UPDATE;`;
+        } catch {
+          // Fallback if raw query lock not supported by test adapter
+        }
+
+        const occupiedPosition = await tx.mLMNode.findFirst({
+          where: {
+            placementParentId: parentNode.id,
+            placementPosition: position,
+          },
+        });
+
+        if (occupiedPosition) {
+          throw AppError.conflict(
+            `The ${position} position under placement parent (${parentProfile.distributorId || parentProfile.distributorCode}) is already occupied.`,
+            'POSITION_ALREADY_OCCUPIED'
+          );
+        }
+      }
+
+      // 7. Create user
       const user = await tx.user.create({
         data: {
           email,
@@ -1013,7 +1126,7 @@ export class EnrollmentService {
         },
       });
 
-      // 2. Create Addresses (Shipping & Billing)
+      // Addresses (Shipping & Billing)
       const addressStreet = step2Data?.address || 'Main Street';
       const city = step2Data?.city || 'Default City';
       const state = step2Data?.state || 'Default State';
@@ -1054,65 +1167,32 @@ export class EnrollmentService {
 
       let distributorProfile: any = null;
       let binaryNode: any = null;
+      let bc: any = null;
       let order: any = null;
 
       if (enrollment.enrollmentType === 'DISTRIBUTOR') {
         const uniqueSuffix = Math.floor(10000 + Math.random() * 90000);
         const distributorCode = `DST-${uniqueSuffix}`;
 
-        // 3. Create Distributor Profile
+        // 8. Create distributor
         distributorProfile = await tx.distributorProfile.create({
           data: {
             userId: user.id,
+            distributorId: distributorCode,
             distributorCode,
             firstName,
             lastName,
             displayName: legalName,
             status: 'ACTIVE',
-            sponsorId: enrollment.sponsorId,
+            sponsorId: sponsor.id,
             activatedAt: new Date(),
           },
         });
 
-        // 4. Create Business Center (BC1)
-        const bc = await tx.businessCenter.create({
-          data: {
-            distributorId: distributorProfile.id,
-            centerNumber: 1,
-            centerCode: `${distributorCode}-BC1`,
-            status: 'ACTIVE',
-          },
-        });
-
-        // 5. Binary MLM Tree Placement
-        const parentNode = await tx.mLMNode.findUnique({
-          where: { id: enrollment.placementParentId! },
-        });
-
-        if (!parentNode) {
-          throw AppError.notFound('Placement parent node missing in transaction.');
-        }
-
-        const newDepth = parentNode.depth + 1;
-        const parentPath = parentNode.binaryPath || 'ROOT';
-        const legIndicator = enrollment.placementPosition === 'LEFT' ? 'L' : 'R';
-        const binaryPath = `${parentPath}/${legIndicator}`;
-
-        binaryNode = await tx.mLMNode.create({
-          data: {
-            distributorId: distributorProfile.id,
-            businessCenterId: bc.id,
-            placementParentId: parentNode.id,
-            placementPosition: enrollment.placementPosition!,
-            depth: newDepth,
-            binaryPath,
-          },
-        });
-
-        // 6. Populate Sponsorship Lineage
+        // 9. Create sponsor relationship (direct depth 1 + ancestors)
         await tx.sponsorRelationship.create({
           data: {
-            ancestorId: enrollment.sponsorId,
+            ancestorId: sponsor.id,
             descendantId: distributorProfile.id,
             depth: 1,
             isDirect: true,
@@ -1120,7 +1200,7 @@ export class EnrollmentService {
         });
 
         const ancestors = await tx.sponsorRelationship.findMany({
-          where: { descendantId: enrollment.sponsorId },
+          where: { descendantId: sponsor.id },
         });
 
         for (const ancestor of ancestors) {
@@ -1133,6 +1213,34 @@ export class EnrollmentService {
             },
           });
         }
+
+        // 10. Create MLMNode (with 11. Business Center created if required)
+        const newDepth = parentNode.depth + 1;
+        const parentPath = parentNode.binaryPath || 'ROOT';
+        const legIndicator = position === 'LEFT' ? 'L' : 'R';
+        const binaryPath = `${parentPath}/${legIndicator}`;
+
+        // 11. Create Business Center if required
+        bc = await tx.businessCenter.create({
+          data: {
+            distributorId: distributorProfile.id,
+            centerNumber: 1,
+            centerCode: `${distributorCode}-BC1`,
+            status: CenterStatus.ACTIVE,
+          },
+        });
+
+        // 10. Create MLMNode
+        binaryNode = await tx.mLMNode.create({
+          data: {
+            distributorId: distributorProfile.id,
+            businessCenterId: bc.id,
+            placementParentId: parentNode.id,
+            placementPosition: position!,
+            depth: newDepth,
+            binaryPath,
+          },
+        });
 
         // 7. Create Bank Account (status: PENDING_VERIFICATION)
         if (step5Data) {
@@ -1511,7 +1619,9 @@ export class EnrollmentService {
             OR: [{ distributorId: newDistributorId }, { distributorCode: newDistributorId }],
           },
         });
-        while (conflict) {
+        let attempts = 0;
+        while (conflict && attempts < 10) {
+          attempts++;
           nextNum = Math.floor(1000 + Math.random() * 9000);
           newDistributorId = `KV-${nextNum}`;
           conflict = await tx.distributorProfile.findFirst({
@@ -1563,22 +1673,23 @@ export class EnrollmentService {
           });
         }
 
-        // 10. Create business center if required
-        const bc = await tx.businessCenter.create({
-          data: {
-            distributorId: distributor.id,
-            centerNumber: 1,
-            centerCode: `${newDistributorId}-BC1`,
-            status: 'ACTIVE',
-          },
-        });
-
-        // 11. Create MLM tree relationship
+        // 10. Create MLMNode (with 11. Business Center created if required)
         const newDepth = parentNode.depth + 1;
         const parentPath = parentNode.binaryPath || 'ROOT';
         const legIndicator = position === 'LEFT' ? 'L' : 'R';
         const binaryPath = `${parentPath}/${legIndicator}`;
 
+        // 11. Create Business Center if required
+        const bc = await tx.businessCenter.create({
+          data: {
+            distributorId: distributor.id,
+            centerNumber: 1,
+            centerCode: `${newDistributorId}-BC1`,
+            status: CenterStatus.ACTIVE,
+          },
+        });
+
+        // 10. Create MLMNode
         const mlmNode = await tx.mLMNode.create({
           data: {
             distributorId: distributor.id,

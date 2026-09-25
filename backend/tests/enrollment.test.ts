@@ -22,8 +22,14 @@ import {
   step5BankSecuritySchema,
 } from '../src/validators/enrollment.validators';
 import { EnrollmentService } from '../src/services/enrollment.service';
+import { prisma } from '../src/config/database';
 import { maskAccountNumber, maskEmail, maskIfsc, sanitizeEnrollmentResponse } from '../src/utils/masking';
 import { AppError } from '../src/utils/appError';
+
+vi.mock('../src/utils/password', () => ({
+  hashPassword: vi.fn().mockResolvedValue('$argon2id$mock_hash_for_testing'),
+  verifyPassword: vi.fn().mockResolvedValue(true),
+}));
 
 describe('ENROLLMENT MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
   beforeEach(() => {
@@ -440,6 +446,252 @@ describe('ENROLLMENT MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
 
       expect(res.body.success).toBe(false);
       expect(res.body.code).toBe('SPONSOR_INACTIVE');
+    });
+  });
+
+  describe('7. 12-Step Database Transaction & Tree Placement Integrity (Prompt 5)', () => {
+    const inputPayload = {
+      fullName: 'Sunil Gavaskar',
+      email: 'sunil.gavaskar@example.com',
+      phone: '+91 98200 11223',
+      dob: '1985-07-10',
+      address: '12 Marine Drive',
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      pincode: '400020',
+      country: 'India',
+      sponsorId: 'KV-1001',
+      placementParentId: 'KV-1001',
+      placementPosition: 'LEFT' as const,
+      enrollmentType: 'DISTRIBUTOR' as const,
+      price: 249.99,
+      bv: 100,
+      bankName: 'State Bank of India',
+      accountNumber: '112233445566',
+      ifscCode: 'SBIN0000123',
+      password: 'SecurePassword123!',
+    };
+
+    let mockTx: any;
+
+    beforeEach(() => {
+      mockTx = {
+        $queryRaw: vi.fn().mockResolvedValue([]),
+        user: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: 'usr-new-1', email: inputPayload.email, roleName: 'DISTRIBUTOR', status: 'ACTIVE' }),
+        },
+        distributorProfile: {
+          findFirst: vi.fn().mockImplementation(async (query: any) => {
+            const hasSponsor = query?.where?.OR?.some(
+              (o: any) =>
+                o.id === 'KV-1001' ||
+                o.distributorId?.equals === 'KV-1001' ||
+                o.distributorCode?.equals === 'KV-1001'
+            );
+            if (hasSponsor) {
+              return {
+                id: 'sponsor-profile-1',
+                distributorId: 'KV-1001',
+                distributorCode: 'KV-1001',
+                firstName: 'Rahul',
+                lastName: 'Kaushal',
+                displayName: 'Rahul Kaushal',
+                status: 'ACTIVE',
+                user: { email: 'rahul.kaushal@kashvimlm.com' },
+              };
+            }
+            return null;
+          }),
+          count: vi.fn().mockResolvedValue(5),
+          create: vi.fn().mockResolvedValue({
+            id: 'dist-new-1',
+            distributorId: 'KV-1009',
+            distributorCode: 'KV-1009',
+            displayName: 'Sunil Gavaskar',
+            status: 'ACTIVE',
+            sponsorId: 'sponsor-profile-1',
+          }),
+        },
+        mLMNode: {
+          findFirst: vi.fn().mockResolvedValueOnce({
+            id: 'node-parent-1',
+            distributorId: 'sponsor-profile-1',
+            depth: 0,
+            binaryPath: 'ROOT',
+            distributor: { id: 'sponsor-profile-1', distributorId: 'KV-1001', distributorCode: 'KV-1001', status: 'ACTIVE' },
+          }).mockResolvedValueOnce(null),
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({
+            id: 'node-new-1',
+            distributorId: 'dist-new-1',
+            placementParentId: 'node-parent-1',
+            placementPosition: 'LEFT',
+            depth: 1,
+            binaryPath: 'ROOT/L',
+            businessCenter: { id: 'bc-new-1', centerCode: 'KV-1009-BC1', centerNumber: 1, status: 'ACTIVE' },
+          }),
+        },
+        sponsorRelationship: {
+          create: vi.fn().mockResolvedValue({ id: 'rel-1' }),
+          findMany: vi.fn().mockResolvedValue([]),
+        },
+        businessCenter: {
+          create: vi.fn().mockResolvedValue({ id: 'bc-new-1', centerCode: 'KV-1009-BC1', centerNumber: 1 }),
+        },
+        address: {
+          create: vi.fn().mockResolvedValue({ id: 'addr-1' }),
+        },
+        bankAccount: {
+          create: vi.fn().mockResolvedValue({ id: 'bank-1' }),
+        },
+      };
+
+      vi.spyOn(prisma, '$transaction').mockImplementation(async (callback: any) => {
+        return callback(mockTx);
+      });
+    });
+
+    it('Step 1 validation: should throw and abort transaction if applicant email is already registered', async () => {
+      mockTx.user.findUnique.mockResolvedValueOnce({ id: 'existing-usr', email: inputPayload.email });
+
+      await expect(EnrollmentService.completeDirectEnrollment(inputPayload)).rejects.toThrow(
+        'An account with this email address already exists. Please login instead.'
+      );
+
+      // Verify distributor and tree node were never created
+      expect(mockTx.distributorProfile.create).not.toHaveBeenCalled();
+      expect(mockTx.mLMNode.create).not.toHaveBeenCalled();
+    });
+
+    it('Step 2 validation: should throw and abort transaction if sponsor does not exist', async () => {
+      mockTx.distributorProfile.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        EnrollmentService.completeDirectEnrollment({ ...inputPayload, sponsorId: 'KV-NONEXISTENT' })
+      ).rejects.toThrow('Sponsor');
+
+      expect(mockTx.user.create).not.toHaveBeenCalled();
+      expect(mockTx.distributorProfile.create).not.toHaveBeenCalled();
+    });
+
+    it('Step 3 validation: should throw and abort transaction if sponsor is inactive', async () => {
+      mockTx.distributorProfile.findFirst.mockResolvedValueOnce({
+        id: 'inactive-spon',
+        distributorId: 'KV-1001',
+        distributorCode: 'KV-1001',
+        status: 'SUSPENDED',
+        user: { email: 'sponsor@example.com' },
+      });
+
+      await expect(EnrollmentService.completeDirectEnrollment(inputPayload)).rejects.toThrow(
+        'The specified sponsor account is not active.'
+      );
+
+      expect(mockTx.user.create).not.toHaveBeenCalled();
+      expect(mockTx.distributorProfile.create).not.toHaveBeenCalled();
+    });
+
+    it('Step 3b self-sponsorship: should throw and abort transaction if applicant email equals sponsor email', async () => {
+      mockTx.distributorProfile.findFirst.mockResolvedValueOnce({
+        id: 'spon-id',
+        status: 'ACTIVE',
+        user: { email: inputPayload.email },
+      });
+
+      await expect(EnrollmentService.completeDirectEnrollment(inputPayload)).rejects.toThrow(
+        'Self-sponsorship forbidden'
+      );
+
+      expect(mockTx.user.create).not.toHaveBeenCalled();
+      expect(mockTx.distributorProfile.create).not.toHaveBeenCalled();
+    });
+
+    it('Step 4 validation: should throw and abort transaction if placement parent does not exist', async () => {
+      mockTx.distributorProfile.findFirst
+        .mockResolvedValueOnce({ id: 'sponsor-1', status: 'ACTIVE', user: { email: 'spon@example.com' } })
+        .mockResolvedValueOnce(null);
+      mockTx.mLMNode.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        EnrollmentService.completeDirectEnrollment({ ...inputPayload, placementParentId: 'KV-UNKNOWN' })
+      ).rejects.toThrow('Placement parent');
+
+      expect(mockTx.distributorProfile.create).not.toHaveBeenCalled();
+    });
+
+    it('Step 4b validation: should throw and abort transaction if placement parent is inactive', async () => {
+      mockTx.distributorProfile.findFirst
+        .mockResolvedValueOnce({ id: 'sponsor-1', status: 'ACTIVE', user: { email: 'spon@example.com' } })
+        .mockResolvedValueOnce({ id: 'parent-1', status: 'INACTIVE', user: { email: 'parent@example.com' } });
+      mockTx.mLMNode.findFirst.mockResolvedValueOnce({
+        id: 'node-parent-1',
+        distributorId: 'parent-1',
+        distributor: { status: 'INACTIVE' },
+      });
+
+      await expect(EnrollmentService.completeDirectEnrollment(inputPayload)).rejects.toThrow(
+        'Placement parent is not active.'
+      );
+
+      expect(mockTx.distributorProfile.create).not.toHaveBeenCalled();
+    });
+
+    it('Step 5 validation: should reject invalid placement positions', async () => {
+      await expect(
+        EnrollmentService.completeDirectEnrollment({ ...inputPayload, placementPosition: 'CENTER' as any })
+      ).rejects.toThrow('Invalid placement position');
+
+      expect(mockTx.user.create).not.toHaveBeenCalled();
+    });
+
+    it('Step 6 re-check availability: should throw and abort transaction if position is already occupied', async () => {
+      mockTx.mLMNode.findFirst
+        .mockReset()
+        .mockResolvedValueOnce({
+          id: 'node-parent-1',
+          distributorId: 'sponsor-profile-1',
+          depth: 0,
+          binaryPath: 'ROOT',
+          distributor: { id: 'sponsor-profile-1', distributorId: 'KV-1001', status: 'ACTIVE' },
+        })
+        .mockResolvedValueOnce({
+          id: 'existing-left-child',
+          placementParentId: 'node-parent-1',
+          placementPosition: 'LEFT',
+        });
+
+      await expect(EnrollmentService.completeDirectEnrollment(inputPayload)).rejects.toThrow(
+        'is already occupied'
+      );
+
+      expect(mockTx.$queryRaw).toHaveBeenCalled();
+      expect(mockTx.distributorProfile.create).not.toHaveBeenCalled();
+    });
+
+    it('Steps 1-12 complete flow: should atomically create user, distributor, lineage, and MLM tree relationship', async () => {
+      const result = await EnrollmentService.completeDirectEnrollment(inputPayload);
+
+      expect(result).toBeDefined();
+      expect(result.user.email).toBe(inputPayload.email);
+      expect(result.distributor.status).toBe('ACTIVE');
+      expect(result.placement.position).toBe('LEFT');
+      expect(result.placement.depth).toBe(1);
+      expect(result.placement.binaryPath).toBe('ROOT/L');
+
+      // Verify all operations occurred within the atomic transaction
+      expect(mockTx.user.create).toHaveBeenCalled();
+      expect(mockTx.distributorProfile.create).toHaveBeenCalled();
+      expect(mockTx.sponsorRelationship.create).toHaveBeenCalled();
+      expect(mockTx.mLMNode.create).toHaveBeenCalled();
+    });
+
+    it('Rollback on placement failure: if MLMNode creation fails, transaction throws and nothing is committed', async () => {
+      mockTx.mLMNode.create.mockRejectedValueOnce(new Error('Database unique constraint violation'));
+
+      await expect(EnrollmentService.completeDirectEnrollment(inputPayload)).rejects.toThrow(
+        'Database unique constraint violation'
+      );
     });
   });
 });

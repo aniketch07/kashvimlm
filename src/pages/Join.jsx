@@ -107,19 +107,25 @@ function Join() {
 
         // Pre-select first available placement position (LEFT or RIGHT)
         const avail = res.data.availablePositions || [];
-        if (avail.length > 0) {
+        if (avail.length === 1) {
+          setSelectedPosition(avail[0]);
+        } else if (avail.includes(selectedPosition)) {
+          // Keep current selection
+        } else if (avail.length > 0) {
           setSelectedPosition(avail[0]);
         } else {
-          setSelectedPosition('LEFT');
+          setSelectedPosition('');
         }
       } else {
         setValidationState('INVALID');
         setSponsorData(null);
+        setSelectedPosition('');
         setErrorMessage('Invalid or inactive sponsor.');
       }
     } catch {
       setValidationState('INVALID');
       setSponsorData(null);
+      setSelectedPosition('');
       setErrorMessage('Invalid or inactive sponsor.');
     }
   };
@@ -734,50 +740,55 @@ function Join() {
                 {/* Placement Position Selection */}
                 <div className="form-group">
                   <label className="form-label">Select Binary Placement Leg *</label>
-                  <div className="leg-selector-row">
-                    <button
-                      type="button"
-                      className={`leg-choice-btn ${selectedPosition === 'LEFT' ? 'selected' : ''} ${
-                        sponsorData.availablePositions && !sponsorData.availablePositions.includes('LEFT')
-                          ? 'disabled-leg'
-                          : ''
-                      }`}
-                      onClick={() => setSelectedPosition('LEFT')}
-                      disabled={
-                        sponsorData.availablePositions &&
-                        sponsorData.availablePositions.length > 0 &&
-                        !sponsorData.availablePositions.includes('LEFT')
-                      }
+                  {sponsorData.availablePositions && sponsorData.availablePositions.length === 0 ? (
+                    <div
+                      className="no-positions-alert"
+                      style={{
+                        padding: '14px',
+                        background: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: '8px',
+                        color: '#b91c1c',
+                      }}
                     >
-                      <span className="leg-label">LEFT LEG</span>
-                      <span className="leg-status">
-                        {sponsorData.availablePositions?.includes('LEFT') ? 'Available' : 'Occupied'}
+                      <strong style={{ display: 'block', marginBottom: '4px' }}>
+                        No direct position available under this sponsor.
+                      </strong>
+                      <span style={{ fontSize: '0.85rem' }}>
+                        Both LEFT and RIGHT positions under {sponsorData.sponsor.name} (
+                        {sponsorData.sponsor.distributorId}) are already occupied in the binary tree.
                       </span>
-                    </button>
+                    </div>
+                  ) : (
+                    <div className="leg-selector-row">
+                      {sponsorData.availablePositions?.includes('LEFT') && (
+                        <button
+                          type="button"
+                          className={`leg-choice-btn ${selectedPosition === 'LEFT' ? 'selected' : ''}`}
+                          onClick={() => setSelectedPosition('LEFT')}
+                        >
+                          <span className="leg-label">LEFT LEG</span>
+                          <span className="leg-status">Available</span>
+                        </button>
+                      )}
 
-                    <button
-                      type="button"
-                      className={`leg-choice-btn ${selectedPosition === 'RIGHT' ? 'selected' : ''} ${
-                        sponsorData.availablePositions && !sponsorData.availablePositions.includes('RIGHT')
-                          ? 'disabled-leg'
-                          : ''
-                      }`}
-                      onClick={() => setSelectedPosition('RIGHT')}
-                      disabled={
-                        sponsorData.availablePositions &&
-                        sponsorData.availablePositions.length > 0 &&
-                        !sponsorData.availablePositions.includes('RIGHT')
-                      }
-                    >
-                      <span className="leg-label">RIGHT LEG</span>
-                      <span className="leg-status">
-                        {sponsorData.availablePositions?.includes('RIGHT') ? 'Available' : 'Occupied'}
-                      </span>
-                    </button>
-                  </div>
-                  <span className="field-hint">
-                    Selected Leg: <strong>{selectedPosition}</strong> under Business Center 001.
-                  </span>
+                      {sponsorData.availablePositions?.includes('RIGHT') && (
+                        <button
+                          type="button"
+                          className={`leg-choice-btn ${selectedPosition === 'RIGHT' ? 'selected' : ''}`}
+                          onClick={() => setSelectedPosition('RIGHT')}
+                        >
+                          <span className="leg-label">RIGHT LEG</span>
+                          <span className="leg-status">Available</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {selectedPosition && (
+                    <span className="field-hint">
+                      Selected Leg: <strong>{selectedPosition}</strong> under Business Center 001.
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -916,7 +927,12 @@ function Join() {
               <button
                 type="submit"
                 className="btn-submit-enrollment"
-                disabled={isSubmitting || !formData.agreeTerms}
+                disabled={
+                  isSubmitting ||
+                  !formData.agreeTerms ||
+                  !selectedPosition ||
+                  (sponsorData?.availablePositions && sponsorData.availablePositions.length === 0)
+                }
               >
                 {isSubmitting ? (
                   <>

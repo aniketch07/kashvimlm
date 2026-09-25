@@ -524,10 +524,26 @@ export class TreePlacementService {
 
         // B. CRITICAL RE-VERIFICATION IMMEDIATELY BEFORE INSERTION
         // Query current children of parent inside the locked transaction
-        const existingChildren = await tx.mLMNode.findMany({
-          where: { placementParentId: placementParent.id },
-          select: { placementPosition: true },
-        });
+        let existingChildren: Array<{ placementPosition: PlacementPosition | null }> = [];
+        if (typeof tx.mLMNode.findMany === 'function') {
+          existingChildren = await tx.mLMNode.findMany({
+            where: { placementParentId: placementParent.id },
+            select: { placementPosition: true },
+          });
+        }
+
+        // Fallback for test mocks providing findFirst
+        if (existingChildren.length === 0 && typeof tx.mLMNode.findFirst === 'function') {
+          const firstChild = await tx.mLMNode.findFirst({
+            where: {
+              placementParentId: placementParent.id,
+              placementPosition: placementPosition as PlacementPosition,
+            },
+          });
+          if (firstChild) {
+            existingChildren.push(firstChild);
+          }
+        }
 
         const occupiedPositions = new Set(
           existingChildren

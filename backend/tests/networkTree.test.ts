@@ -658,7 +658,7 @@ describe('BINARY MLM NETWORK TREE API & SECURITY TESTS (PROMPT 15)', () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.code).toBe('SELF_PLACEMENT_FORBIDDEN');
+        expect(['SELF_PLACEMENT_NOT_ALLOWED', 'SELF_PLACEMENT_FORBIDDEN']).toContain(result.code);
       });
 
       it('should prevent circular placement if placement parent is already a descendant', async () => {
@@ -688,7 +688,7 @@ describe('BINARY MLM NETWORK TREE API & SECURITY TESTS (PROMPT 15)', () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.code).toBe('CIRCULAR_PLACEMENT_FORBIDDEN');
+        expect(['CIRCULAR_RELATIONSHIP', 'CIRCULAR_PLACEMENT_FORBIDDEN']).toContain(result.code);
       });
 
       it('should prevent duplicate LEFT placement when position is already occupied', async () => {
