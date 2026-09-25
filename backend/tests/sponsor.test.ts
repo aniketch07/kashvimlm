@@ -1,21 +1,26 @@
 /**
- * Test Suite: Sponsor Validation API Automated Tests
- * GET /api/v1/sponsors/:sponsorId
+ * Test Suite: Sponsor Validation System
+ * Architecture: Controller -> Service -> Repository/Prisma -> Database
+ * Endpoint: GET /api/v1/sponsors/:sponsorId
  *
  * Covers:
  * 1. Valid sponsor
- * 2. Invalid sponsor
- * 3. Inactive sponsor
+ * 2. Invalid sponsor (SPONSOR_NOT_FOUND)
+ * 3. Inactive sponsor (SPONSOR_INACTIVE)
  * 4. Sponsor with no children (both LEFT & RIGHT available)
  * 5. Sponsor with LEFT occupied (only RIGHT available)
  * 6. Sponsor with RIGHT occupied (only LEFT available)
- * 7. Sponsor with both occupied (empty available positions)
- * 8. Never exposes private information (no email, phone, passwords, etc.)
+ * 7. Sponsor with both occupied (empty array [])
+ * 8. Never exposes sensitive information (Privacy guard)
+ * 9. Reusable SponsorService unit methods (validateSponsor, isPositionAvailable, getAvailablePositions)
+ * 10. SponsorRepository database encapsulation tests
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../src/app';
 import { prisma } from '../src/config/database';
+import { SponsorService } from '../src/services/sponsor.service';
+import { SponsorRepository } from '../src/repositories/sponsor.repository';
 
 describe('SPONSOR VALIDATION API TESTS (GET /api/v1/sponsors/:sponsorId)', () => {
   beforeEach(() => {
@@ -252,7 +257,7 @@ describe('SPONSOR VALIDATION API TESTS (GET /api/v1/sponsors/:sponsorId)', () =>
   });
 
   // --------------------------------------------------------------------------
-  // PRIVACY VERIFICATION: Never Expose Private Information
+  // TEST 8: Privacy Verification (Never Expose Sensitive Information)
   // --------------------------------------------------------------------------
   describe('8. Privacy Guard', () => {
     it('should NEVER expose private fields like email, phone, passwords, bank, wallet, etc.', async () => {
@@ -282,9 +287,75 @@ describe('SPONSOR VALIDATION API TESTS (GET /api/v1/sponsors/:sponsorId)', () =>
       expect(sponsor.lifetimePV).toBeUndefined();
       expect(sponsor.lifetimeGV).toBeUndefined();
 
-      // Ensure ONLY the 4 permitted fields exist
+      // Ensure ONLY the permitted safe fields exist
       const keys = Object.keys(sponsor);
       expect(keys.sort()).toEqual(['distributorId', 'id', 'name', 'status'].sort());
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // TEST 9: Reusable SponsorService Unit Methods
+  // --------------------------------------------------------------------------
+  describe('9. Reusable SponsorService', () => {
+    it('should validate positions via isPositionAvailable helper', async () => {
+      vi.spyOn(SponsorRepository, 'findByIdentifier').mockResolvedValue({
+        id: mockUuid,
+        distributorId: 'KV-1001',
+        distributorCode: 'KV-1001',
+        firstName: 'Rahul',
+        lastName: 'Kaushal',
+        displayName: 'Rahul Kaushal',
+        status: 'ACTIVE',
+        mlmNodes: [
+          {
+            id: 'node-rahul-1',
+            children: [{ placementPosition: 'LEFT' as const }],
+          },
+        ],
+      });
+
+      const isLeftAvailable = await SponsorService.isPositionAvailable('KV-1001', 'LEFT');
+      const isRightAvailable = await SponsorService.isPositionAvailable('KV-1001', 'RIGHT');
+
+      expect(isLeftAvailable).toBe(false);
+      expect(isRightAvailable).toBe(true);
+    });
+
+    it('should retrieve available positions via getAvailablePositions helper', async () => {
+      vi.spyOn(SponsorRepository, 'findByIdentifier').mockResolvedValue({
+        id: mockUuid,
+        distributorId: 'KV-1005',
+        distributorCode: 'KV-1005',
+        firstName: 'Diana',
+        lastName: 'Prince',
+        displayName: 'Diana Prince',
+        status: 'ACTIVE',
+        mlmNodes: [{ id: 'node-diana-1', children: [] }],
+      });
+
+      const positions = await SponsorService.getAvailablePositions('KV-1005');
+      expect(positions).toEqual(['LEFT', 'RIGHT']);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // TEST 10: SponsorRepository Layer
+  // --------------------------------------------------------------------------
+  describe('10. SponsorRepository Data Layer', () => {
+    it('should call prisma.distributorProfile.findFirst with case-insensitive search', async () => {
+      const spy = vi.spyOn(prisma.distributorProfile, 'findFirst').mockResolvedValue(null);
+
+      await SponsorRepository.findByIdentifier('kv-1001');
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.arrayContaining([
+              { distributorId: { equals: 'kv-1001', mode: 'insensitive' } },
+            ]),
+          }),
+        })
+      );
     });
   });
 });

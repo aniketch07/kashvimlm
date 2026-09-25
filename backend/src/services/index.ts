@@ -15,3 +15,4 @@ export * from './news.service';
 export * from './website.service';
 export * from './audit.service';
 export * from './treePlacement.service';
+export * from './sponsor.service';

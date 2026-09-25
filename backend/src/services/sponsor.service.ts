@@ -1,69 +1,46 @@
-import { prisma } from '../config/database';
+import { SponsorRepository, SponsorRecord } from '../repositories/sponsor.repository';
 import { AppError } from '../utils/appError';
 
+export interface SafeSponsorInfo {
+  id: string;
+  distributorId: string;
+  name: string;
+  status: string;
+}
+
 export interface SponsorValidationData {
-  sponsor: {
-    id: string;
-    distributorId: string;
-    name: string;
-    status: string;
-  };
+  sponsor: SafeSponsorInfo;
   availablePositions: ('LEFT' | 'RIGHT')[];
 }
 
+/**
+ * SponsorService
+ * Reusable business logic for sponsor validation and binary tree availability.
+ * Follows the pattern: Controller -> Service -> Repository/Prisma -> Database.
+ */
 export class SponsorService {
   /**
    * Validates a sponsor by Distributor ID, Code, or UUID.
    *
-   * 1. Finds sponsor by distributorId, distributorCode, or id.
-   * 2. Verifies sponsor existence (throws SPONSOR_NOT_FOUND if missing).
-   * 3. Checks sponsor status (throws SPONSOR_INACTIVE if not ACTIVE).
-   * 4. Retrieves safe basic information (no private credentials or personal data).
-   * 5. Checks available binary tree positions (LEFT, RIGHT, or both/none).
+   * 1. Finds distributor by distributorId via SponsorRepository.
+   * 2. Verifies that the distributor exists (throws 404 SPONSOR_NOT_FOUND if missing).
+   * 3. Verifies distributor status (throws 400 SPONSOR_INACTIVE if not ACTIVE).
+   * 4. Returns safe sponsor information (never exposes sensitive information).
+   * 5. Determines available LEFT/RIGHT positions under primary node.
    */
   public static async validateSponsor(sponsorIdentifier: string): Promise<SponsorValidationData> {
-    const identifier = sponsorIdentifier.trim();
+    const identifier = sponsorIdentifier?.trim();
 
     if (!identifier) {
       throw AppError.badRequest('Sponsor ID is required', 'SPONSOR_ID_REQUIRED');
     }
 
-    // 1. Find sponsor by distributorId, distributorCode, or id
-    let sponsor: any = null;
+    // 1. Find distributor via repository layer
+    let sponsor: SponsorRecord | null = null;
     try {
-      sponsor = await prisma.distributorProfile.findFirst({
-        where: {
-          OR: [
-            { distributorId: { equals: identifier, mode: 'insensitive' } },
-            { distributorCode: { equals: identifier, mode: 'insensitive' } },
-            { id: identifier },
-          ],
-        },
-        select: {
-          id: true,
-          distributorId: true,
-          distributorCode: true,
-          firstName: true,
-          lastName: true,
-          displayName: true,
-          status: true,
-          mlmNodes: {
-            select: {
-              id: true,
-              children: {
-                select: {
-                  placementPosition: true,
-                },
-              },
-            },
-            orderBy: {
-              createdAt: 'asc',
-            },
-          },
-        },
-      });
+      sponsor = await SponsorRepository.findByIdentifier(identifier);
     } catch {
-      // Offline / in-memory test fallback
+      // Offline / in-memory fallback for local mock testing
       const upper = identifier.toUpperCase();
       if (upper === 'KV-1001' || upper === '88767139') {
         sponsor = {
@@ -90,39 +67,20 @@ export class SponsorService {
       }
     }
 
-    // 2. Check if sponsor exists
+    // 2. Verify that the distributor exists
     if (!sponsor) {
       throw new AppError('Sponsor not found', 404, 'SPONSOR_NOT_FOUND');
     }
 
-    // 3. Check sponsor status
+    // 3. Verify distributor status
     if (sponsor.status !== 'ACTIVE') {
       throw new AppError('Sponsor is inactive', 400, 'SPONSOR_INACTIVE');
     }
 
-    // 4. Calculate available LEFT / RIGHT binary placement positions under primary node
-    const primaryNode = sponsor.mlmNodes[0];
-    const availablePositions: ('LEFT' | 'RIGHT')[] = [];
+    // 4. Determine available LEFT / RIGHT binary placement positions under primary node
+    const availablePositions = this.calculateAvailablePositions(sponsor);
 
-    if (primaryNode && primaryNode.children) {
-      const occupiedPositions = new Set(
-        primaryNode.children
-          .map((c: any) => c.placementPosition)
-          .filter((pos: any): pos is 'LEFT' | 'RIGHT' => Boolean(pos))
-      );
-
-      if (!occupiedPositions.has('LEFT')) {
-        availablePositions.push('LEFT');
-      }
-      if (!occupiedPositions.has('RIGHT')) {
-        availablePositions.push('RIGHT');
-      }
-    } else {
-      // If sponsor has no tree node yet, both positions are available by default
-      availablePositions.push('LEFT', 'RIGHT');
-    }
-
-    // 5. Build clean, non-sensitive public sponsor object
+    // 5. Build clean, non-sensitive public sponsor information
     const displayName =
       sponsor.displayName?.trim() ||
       `${sponsor.firstName} ${sponsor.lastName}`.trim() ||
@@ -139,5 +97,54 @@ export class SponsorService {
       },
       availablePositions,
     };
+  }
+
+  /**
+   * Helper: Calculates available binary positions ('LEFT', 'RIGHT', both, or empty).
+   */
+  public static calculateAvailablePositions(sponsor: SponsorRecord): ('LEFT' | 'RIGHT')[] {
+    const primaryNode = sponsor.mlmNodes?.[0];
+    const availablePositions: ('LEFT' | 'RIGHT')[] = [];
+
+    if (primaryNode && primaryNode.children) {
+      const occupiedPositions = new Set(
+        primaryNode.children
+          .map((c) => c.placementPosition)
+          .filter((pos): pos is 'LEFT' | 'RIGHT' => Boolean(pos))
+      );
+
+      if (!occupiedPositions.has('LEFT')) {
+        availablePositions.push('LEFT');
+      }
+      if (!occupiedPositions.has('RIGHT')) {
+        availablePositions.push('RIGHT');
+      }
+    } else {
+      // If sponsor has no tree node or children yet, both positions are available by default
+      availablePositions.push('LEFT', 'RIGHT');
+    }
+
+    return availablePositions;
+  }
+
+  /**
+   * Helper: Checks if a specific position (LEFT or RIGHT) is available under a sponsor.
+   */
+  public static async isPositionAvailable(
+    sponsorIdentifier: string,
+    position: 'LEFT' | 'RIGHT'
+  ): Promise<boolean> {
+    const validation = await this.validateSponsor(sponsorIdentifier);
+    return validation.availablePositions.includes(position);
+  }
+
+  /**
+   * Helper: Retrieves available positions for a given sponsor.
+   */
+  public static async getAvailablePositions(
+    sponsorIdentifier: string
+  ): Promise<('LEFT' | 'RIGHT')[]> {
+    const validation = await this.validateSponsor(sponsorIdentifier);
+    return validation.availablePositions;
   }
 }

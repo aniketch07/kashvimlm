@@ -1,6 +1,6 @@
 /**
  * Repositories Layer
  * Encapsulates direct database queries and Prisma ORM data interactions.
- * Business queries to be implemented here.
+ * Architecture: Controller -> Service -> Repository/Prisma -> Database
  */
-export {};
+export * from './sponsor.repository';
