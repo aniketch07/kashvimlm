@@ -496,11 +496,7 @@ function NetworkTreePage({ embedded = false }) {
   }, [searchParams, initialDistributorId, currentRootId]);
 
   // 8. Interaction Handlers (Prompt 10: Desktop Hover; Prompt 11: Click opens Member Details)
-  const handleNodeClick = (node, forceDetails = false) => {
-    if (isMobile && !forceDetails) {
-      setHoverNode(node);
-      return;
-    }
+  const handleNodeClick = (node) => {
     setSelectedMember(node);
     setHoverNode(null);
   };

@@ -62,11 +62,23 @@ function MemberDetailsPanel({
   const isActive = rawStatus === 'ACTIVE';
   const status = isActive ? 'Active' : 'Inactive';
 
-  const joinedDate =
+  const rawJoinedDate =
     member.joinedDate ||
     member.distributor?.createdAtFormatted ||
     member.distributor?.joinedDate ||
-    '15 Sep 2026';
+    '15 September 2026';
+
+  let joinedDate = rawJoinedDate;
+  if (rawJoinedDate && typeof rawJoinedDate === 'string') {
+    const parsedDate = new Date(rawJoinedDate);
+    if (!isNaN(parsedDate.getTime())) {
+      joinedDate = parsedDate.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+  }
   const sponsor =
     member.sponsor ||
     member.sponsorId ||
@@ -209,15 +221,15 @@ function MemberDetailsPanel({
               <span className="panel-info-value font-bold">{directMembers}</span>
             </div>
             <div className="panel-info-row">
-              <span className="panel-info-label">Left Team Count:</span>
+              <span className="panel-info-label">Left Team:</span>
               <span className="panel-info-value text-blue font-bold">{leftTeamCount}</span>
             </div>
             <div className="panel-info-row">
-              <span className="panel-info-label">Right Team Count:</span>
+              <span className="panel-info-label">Right Team:</span>
               <span className="panel-info-value text-purple font-bold">{rightTeamCount}</span>
             </div>
             <div className="panel-info-row highlight-total-row">
-              <span className="panel-info-label">Total Team Count:</span>
+              <span className="panel-info-label">Total Team:</span>
               <span className="panel-info-value text-dark font-bold">{totalTeamCount}</span>
             </div>
           </div>

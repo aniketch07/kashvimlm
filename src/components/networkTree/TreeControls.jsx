@@ -97,7 +97,7 @@ function TreeControls({
           }
         >
           <Focus size={15} />
-          <span>Center</span>
+          <span>Center Tree</span>
         </button>
 
         {/* Reset Button (Reset to logged-in user's tree) */}
@@ -105,10 +105,10 @@ function TreeControls({
           type="button"
           className="control-action-btn reset-btn"
           onClick={onResetToRoot}
-          title="Reset to logged-in user's tree and default view"
+          title="Reset to logged-in user's tree (My Network)"
         >
           <RotateCcw size={15} />
-          <span>Reset</span>
+          <span>Reset / My Network</span>
         </button>
 
         {/* Expand Button */}
