@@ -52,11 +52,23 @@ function MemberHoverCard({
   const status = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase();
   const isActive = status.toLowerCase() === 'active';
 
-  const joinedDate =
+  const rawJoinedDate =
     node.joinedDate ||
     node.distributor?.createdAtFormatted ||
     node.distributor?.joinedDate ||
-    '15 Sep 2026';
+    '15 September 2026';
+
+  let joinedDate = rawJoinedDate;
+  if (rawJoinedDate && typeof rawJoinedDate === 'string') {
+    const parsedDate = new Date(rawJoinedDate);
+    if (!isNaN(parsedDate.getTime())) {
+      joinedDate = parsedDate.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+  }
   const sponsor =
     node.sponsor ||
     node.sponsorId ||

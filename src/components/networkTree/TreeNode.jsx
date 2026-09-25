@@ -142,7 +142,7 @@ function TreeNode({
             className="node-action-btn view-details-btn"
             onClick={(e) => {
               e.stopPropagation();
-              onNodeClick && onNodeClick(node);
+              onNodeClick && onNodeClick(node, true);
             }}
             title="View member breakdown"
           >
