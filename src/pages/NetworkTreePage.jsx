@@ -442,18 +442,18 @@ function NetworkTreePage({ embedded = false }) {
     try {
       const res = await api.getMemberNetworkTree(nodeId, 2);
       const fetchedRoot = res?.root || res;
-      if (fetchedRoot) {
+        const hasAnyChildren = Boolean(fetchedRoot.left || fetchedRoot.right);
         setTreeData((prev) =>
           updateNodeInTree(prev, nodeId, (curr) => ({
             ...curr,
             left: fetchedRoot.left || null,
             right: fetchedRoot.right || null,
-            hasDeeperMembers: fetchedRoot.hasDeeperMembers ?? curr.hasDeeperMembers,
+            hasDeeperMembers: hasAnyChildren ? (fetchedRoot.hasDeeperMembers ?? curr.hasDeeperMembers) : false,
+            hasChildren: hasAnyChildren,
             isExpanded: true,
             isCollapsed: false,
           }))
         );
-      }
     } catch (err) {
       console.error(`Failed to expand node ${nodeId}:`, err);
     } finally {
