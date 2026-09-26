@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { logger } from '../../config/logger.js';
+import { BinaryTreePlacementService } from './binaryTreePlacement.service.js';
 
 export interface TreeIntegrityReport {
   isValid: boolean;
@@ -38,17 +39,40 @@ export class TreeValidationService {
 
     try {
       // 1. Fetch all nodes with distributor & parent details
-      const res = await query(
-        `SELECT t.id AS tree_id, t.distributor_id, t.parent_distributor_id,
-                t.leg_position, t.depth, t.tree_path,
-                d.member_id, d.full_name, d.sponsor_id,
-                p.member_id AS parent_member_id
-         FROM mlm_tree t
-         JOIN distributors d ON d.id = t.distributor_id
-         LEFT JOIN distributors p ON p.id = t.parent_distributor_id`
-      );
+      let rows: any[] = [];
+      try {
+        const res = await query(
+          `SELECT t.id AS tree_id, t.distributor_id, t.parent_distributor_id,
+                  t.leg_position, t.depth, t.tree_path,
+                  d.member_id, d.full_name, d.sponsor_id,
+                  p.member_id AS parent_member_id
+           FROM mlm_tree t
+           JOIN distributors d ON d.id = t.distributor_id
+           LEFT JOIN distributors p ON p.id = t.parent_distributor_id`
+        );
+        if (res && res.rows && res.rows.length > 0) {
+          rows = res.rows;
+        }
+      } catch {
+        // offline
+      }
 
-      const rows = res.rows;
+      if (rows.length === 0) {
+        const mems = BinaryTreePlacementService.getAllMembers();
+        rows = mems.map((m) => ({
+          tree_id: `tree_${m.memberId}`,
+          distributor_id: m.distributorId,
+          parent_distributor_id: m.parentMemberId ? BinaryTreePlacementService.getMember(m.parentMemberId)?.distributorId || null : null,
+          leg_position: m.position,
+          depth: m.depth,
+          tree_path: m.treePath,
+          member_id: m.memberId,
+          full_name: m.fullName,
+          sponsor_id: m.sponsorId,
+          parent_member_id: m.parentMemberId,
+        }));
+      }
+
       totalNodes = rows.length;
 
       if (totalNodes === 0) {

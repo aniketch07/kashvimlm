@@ -362,4 +362,82 @@ describe('PROMPT 3 — DISTRIBUTOR REGISTRATION AND BINARY MLM TREE PLACEMENT (T
     assert.strictEqual(body.data.distributorId, 'KV-1001');
     console.log('[PASS] REST API: GET /api/distributors/KV-1001 returned distributor details');
   });
+
+  it('REST API: POST /api/distributors/register successfully registers new distributor with automatic placement', async () => {
+    const timestamp = Date.now();
+    const res = await fetch(`${baseUrl}/api/distributors/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Kavita Verma',
+        email: `kavita_${timestamp}@example.com`,
+        phone: `+91987${Math.floor(1000000 + Math.random() * 9000000)}`,
+        sponsorId: 'KV-1001',
+      }),
+    });
+
+    assert.strictEqual(res.status, 201);
+    const body: any = await res.json();
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.message, 'Distributor registered successfully');
+    assert.ok(body.distributor, 'Response must contain distributor object per Section 13');
+    assert.ok(body.distributor.id, 'Must contain distributor ID');
+    assert.strictEqual(body.distributor.name, 'Kavita Verma');
+    assert.strictEqual(body.distributor.sponsorId, 'KV-1001');
+    assert.ok(body.distributor.parentId, 'Must contain parentId');
+    assert.ok(body.distributor.position === 'LEFT' || body.distributor.position === 'RIGHT', 'Position must be LEFT or RIGHT');
+    assert.ok(body.distributor.level >= 1, 'Level must be >= 1');
+    console.log(`[PASS] REST API: Successfully registered Kavita Verma (${body.distributor.id}) under parent ${body.distributor.parentId} (${body.distributor.position}, Level ${body.distributor.level})`);
+  });
+
+  it('REST API: POST /api/distributors/register rejects duplicate email with 400', async () => {
+    const res = await fetch(`${baseUrl}/api/distributors/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Duplicate Email User',
+        email: 'rahul.kaushal@kashvimlm.com', // Existing email
+        phone: '+919876549999',
+        sponsorId: 'KV-1001',
+      }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body: any = await res.json();
+    assert.strictEqual(body.success, false);
+    assert.ok(body.message.includes('Email already registered') || body.message.includes('already registered'));
+    console.log('[PASS] REST API: Duplicate email rejected with 400');
+  });
+
+  it('REST API: POST /api/distributors/register rejects duplicate phone with 400', async () => {
+    const res = await fetch(`${baseUrl}/api/distributors/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Duplicate Phone User',
+        email: `unique_${Date.now()}@example.com`,
+        phone: '+91 98765 43210', // Existing phone
+        sponsorId: 'KV-1001',
+      }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body: any = await res.json();
+    assert.strictEqual(body.success, false);
+    assert.ok(body.message.includes('Phone') || body.message.includes('already registered'));
+    console.log('[PASS] REST API: Duplicate phone rejected with 400');
+  });
+
+  it('REST API: GET /api/tree/:distributorId returns binary tree structure with children', async () => {
+    const res = await fetch(`${baseUrl}/api/tree/KV-1001`);
+    assert.strictEqual(res.status, 200);
+    const body: any = await res.json();
+    assert.strictEqual(body.success, true);
+    assert.ok(body.data?.root || body.root, 'Tree response must contain binary root node');
+    const rootNode = body.data?.root || body.root;
+    assert.strictEqual(rootNode.distributorId, 'KV-1001');
+    assert.ok(rootNode.left, 'Must contain left child');
+    assert.ok(rootNode.right, 'Must contain right child');
+    console.log('[PASS] REST API: GET /api/tree/KV-1001 returned complete binary network tree');
+  });
 });

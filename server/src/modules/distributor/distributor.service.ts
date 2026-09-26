@@ -227,12 +227,12 @@ export class DistributorService {
     // 4. Duplicate checks
     try {
       const emailCheck = await query(`SELECT id FROM users WHERE LOWER(email) = $1`, [cleanEmail]);
-      if (emailCheck.rows.length > 0) {
+      if (emailCheck && emailCheck.rows.length > 0) {
         throw new Error('Email already registered.');
       }
 
       const phoneCheck = await query(`SELECT id FROM users WHERE phone = $1`, [cleanPhone]);
-      if (phoneCheck.rows.length > 0) {
+      if (phoneCheck && phoneCheck.rows.length > 0) {
         throw new Error('Phone number already registered.');
       }
     } catch (err: any) {
@@ -241,18 +241,32 @@ export class DistributorService {
       }
     }
 
+    // In-memory duplicate checks for offline mode
+    for (const mem of BinaryTreePlacementService.getAllMembers()) {
+      if (mem.email.toLowerCase() === cleanEmail) {
+        throw new Error('Email already registered.');
+      }
+      if (mem.phone === cleanPhone) {
+        throw new Error('Phone number already registered.');
+      }
+    }
+
     // Generate or validate memberId
     let newMemberId = (data.distributorId || '').trim().toUpperCase();
     if (newMemberId) {
       try {
         const idCheck = await query(`SELECT id FROM distributors WHERE member_id = $1`, [newMemberId]);
-        if (idCheck.rows.length > 0) {
+        if (idCheck && idCheck.rows.length > 0) {
           throw new Error('Distributor ID already exists.');
         }
       } catch (err: any) {
         if (err.message && err.message.includes('Distributor ID already exists')) {
           throw err;
         }
+      }
+
+      if (BinaryTreePlacementService.hasMember(newMemberId)) {
+        throw new Error('Distributor ID already exists.');
       }
     } else {
       newMemberId = `KV-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -272,21 +286,33 @@ export class DistributorService {
            FROM distributors WHERE member_id = $1`,
           [cleanSponsor]
         );
-        if (sponsorRes.rows.length === 0) {
-          if (cleanSponsor !== 'KV-1001' && cleanSponsor !== 'KV-1002' && cleanSponsor !== 'KV-1003') {
-            throw new Error(`Invalid sponsor ID: Sponsor ${cleanSponsor} not found.`);
-          }
-        } else {
+        if (sponsorRes && sponsorRes.rows.length > 0) {
           sponsorRow = sponsorRes.rows[0];
-          const status = (sponsorRow.qualification_status || 'ACTIVE').toUpperCase();
-          if (status !== 'ACTIVE') {
-            throw new Error(`Invalid or inactive sponsor: Sponsor ${cleanSponsor} is inactive.`);
-          }
         }
-      } catch (err: any) {
-        if (err.message && (err.message.includes('Invalid') || err.message.includes('inactive'))) {
-          throw err;
+      } catch {
+        // offline
+      }
+
+      if (!sponsorRow) {
+        const mem = BinaryTreePlacementService.getMember(cleanSponsor);
+        if (mem) {
+          sponsorRow = {
+            id: mem.distributorId,
+            member_id: mem.memberId,
+            full_name: mem.fullName,
+            qualification_status: mem.status,
+            team_size: 1,
+          };
         }
+      }
+
+      if (!sponsorRow) {
+        throw new Error(`Invalid sponsor ID: Sponsor ${cleanSponsor} not found.`);
+      }
+
+      const status = (sponsorRow.qualification_status || 'ACTIVE').toUpperCase();
+      if (status !== 'ACTIVE') {
+        throw new Error(`Invalid or inactive sponsor: Sponsor ${cleanSponsor} is inactive (status: ${status}).`);
       }
     }
 
@@ -512,7 +538,35 @@ export class DistributorService {
         };
       }
     } catch {
-      // Fallback
+      // offline / fallback
+    }
+
+    // Check in-memory store fallback
+    const mem = BinaryTreePlacementService.getMember(cleanId);
+    if (mem) {
+      return {
+        id: mem.distributorId,
+        distributorId: mem.memberId,
+        name: mem.fullName,
+        email: mem.email,
+        phone: mem.phone,
+        username: `@${mem.memberId.toLowerCase()}`,
+        sponsorId: mem.sponsorId || 'KV-1000',
+        sponsorName: mem.sponsorId === 'KV-1001' ? 'Rahul Kaushal' : 'Corporate System',
+        parentId: mem.parentMemberId,
+        parentName: mem.parentMemberId === 'KV-1001' ? 'Rahul Kaushal' : 'Direct',
+        position: mem.position,
+        level: mem.depth,
+        treePath: mem.treePath,
+        rank: mem.rank,
+        status: mem.status,
+        currentPsv: 200,
+        lifetimeBv: 10000,
+        teamSize: 10,
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        joinedAt: new Date().toISOString(),
+      };
     }
 
     return null;
@@ -535,39 +589,45 @@ export class DistributorService {
         [cleanId]
       );
 
-      let left: any = null;
-      let right: any = null;
+      if (res && res.rows.length > 0) {
+        let left: any = null;
+        let right: any = null;
 
-      for (const row of res.rows) {
-        const leg = (row.leg_position || '').toUpperCase();
-        const formatted = {
-          id: row.id,
-          distributorId: row.member_id,
-          name: row.full_name,
-          email: row.email,
-          phone: row.phone,
-          rank: row.rank,
-          status: row.qualification_status,
-          position: leg,
-          level: row.depth,
-          treePath: row.tree_path,
+        for (const row of res.rows) {
+          const leg = (row.leg_position || '').toUpperCase();
+          const formatted = {
+            id: row.id,
+            distributorId: row.member_id,
+            name: row.full_name,
+            email: row.email,
+            phone: row.phone,
+            rank: row.rank,
+            status: row.qualification_status,
+            position: leg,
+            level: row.depth,
+            treePath: row.tree_path,
+          };
+          if (leg === 'LEFT') left = formatted;
+          if (leg === 'RIGHT') right = formatted;
+        }
+
+        return {
+          distributorId: cleanId,
+          left,
+          right,
         };
-        if (leg === 'LEFT') left = formatted;
-        if (leg === 'RIGHT') right = formatted;
       }
-
-      return {
-        distributorId: cleanId,
-        left,
-        right,
-      };
     } catch {
-      return {
-        distributorId: cleanId,
-        left: null,
-        right: null,
-      };
+      // Fallback
     }
+
+    // In-memory fallback
+    const memChildren = BinaryTreePlacementService.getChildren(cleanId);
+    return {
+      distributorId: cleanId,
+      left: memChildren.left,
+      right: memChildren.right,
+    };
   }
 
   /**

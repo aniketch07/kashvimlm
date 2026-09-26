@@ -131,7 +131,19 @@ export class DistributorController {
       const result = await DistributorService.registerDistributor(req.body);
       res.status(201).json({
         success: true,
-        message: 'Distributor registered successfully.',
+        message: 'Distributor registered successfully',
+        distributor: {
+          id: result.distributor.distributorId,
+          uuid: result.distributor.id,
+          name: result.distributor.name,
+          email: result.distributor.email,
+          phone: result.distributor.phone,
+          sponsorId: result.treePlacement.sponsorId,
+          parentId: result.treePlacement.parentId,
+          position: result.treePlacement.position,
+          level: result.treePlacement.level,
+        },
+        treePlacement: result.treePlacement,
         data: result,
       });
     } catch (err: any) {
@@ -142,7 +154,7 @@ export class DistributorController {
     }
   }
 
-  static async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  static async getById(req: any, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id;
       if (!id) {

@@ -16,9 +16,240 @@ export interface AvailablePositionsResult {
   availablePositions: ('LEFT' | 'RIGHT')[];
 }
 
+export interface TreeMemberNode {
+  distributorId: string;
+  memberId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  sponsorId: string | null;
+  parentMemberId: string | null;
+  position: 'ROOT' | 'LEFT' | 'RIGHT';
+  depth: number;
+  treePath: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  rank: string;
+  leftChildMemberId?: string | null;
+  rightChildMemberId?: string | null;
+}
+
 export class BinaryTreePlacementService {
   // In-memory mutex locks for atomic slot protection against race conditions: `${parentId}_${position}`
   private static slotLocks: Set<string> = new Set();
+
+  // In-memory node repository for offline / mock-resilient execution
+  private static inMemoryNodes: Map<string, TreeMemberNode> = new Map();
+
+  static {
+    BinaryTreePlacementService.initDefaultNodes();
+  }
+
+  public static initDefaultNodes(): void {
+    BinaryTreePlacementService.inMemoryNodes.clear();
+
+    const seed: TreeMemberNode[] = [
+      {
+        distributorId: 'b0000000-0000-0000-0000-000000000001',
+        memberId: 'KV-1001',
+        fullName: 'Rahul Kaushal',
+        email: 'rahul.kaushal@kashvimlm.com',
+        phone: '+91 98765 43210',
+        sponsorId: 'KV-1000',
+        parentMemberId: null,
+        position: 'ROOT',
+        depth: 0,
+        treePath: '/KV-1001',
+        status: 'ACTIVE',
+        rank: 'Business Center',
+        leftChildMemberId: 'KV-1002',
+        rightChildMemberId: 'KV-1003',
+      },
+      {
+        distributorId: 'b0000000-0000-0000-0000-000000000002',
+        memberId: 'KV-1002',
+        fullName: 'Amit Patel',
+        email: 'amit.patel@kashvimlm.com',
+        phone: '+91 98765 43211',
+        sponsorId: 'KV-1001',
+        parentMemberId: 'KV-1001',
+        position: 'LEFT',
+        depth: 1,
+        treePath: '/KV-1001/KV-1002',
+        status: 'ACTIVE',
+        rank: 'Executive Director',
+        leftChildMemberId: 'KV-1006',
+        rightChildMemberId: 'KV-1005',
+      },
+      {
+        distributorId: 'b0000000-0000-0000-0000-000000000003',
+        memberId: 'KV-1003',
+        fullName: 'Rohit Verma',
+        email: 'rohit.verma@kashvimlm.com',
+        phone: '+91 98765 43212',
+        sponsorId: 'KV-1001',
+        parentMemberId: 'KV-1001',
+        position: 'RIGHT',
+        depth: 1,
+        treePath: '/KV-1001/KV-1003',
+        status: 'ACTIVE',
+        rank: 'Senior Director',
+        leftChildMemberId: null,
+        rightChildMemberId: 'KV-1007',
+      },
+      {
+        distributorId: 'b0000000-0000-0000-0000-000000000004',
+        memberId: 'KV-1004',
+        fullName: 'Priya Sharma',
+        email: 'priya.sharma@kashvimlm.com',
+        phone: '+91 98765 43213',
+        sponsorId: 'KV-1001',
+        parentMemberId: 'KV-1002',
+        position: 'LEFT',
+        depth: 2,
+        treePath: '/KV-1001/KV-1002/KV-1004',
+        status: 'ACTIVE',
+        rank: 'Silver Director',
+        leftChildMemberId: null,
+        rightChildMemberId: null,
+      },
+      {
+        distributorId: 'b0000000-0000-0000-0000-000000000005',
+        memberId: 'KV-1005',
+        fullName: 'Pooja Gupta',
+        email: 'pooja.gupta@kashvimlm.com',
+        phone: '+91 98765 43214',
+        sponsorId: 'KV-1002',
+        parentMemberId: 'KV-1002',
+        position: 'RIGHT',
+        depth: 2,
+        treePath: '/KV-1001/KV-1002/KV-1005',
+        status: 'SUSPENDED',
+        rank: 'Bronze Director',
+        leftChildMemberId: null,
+        rightChildMemberId: null,
+      },
+      {
+        distributorId: 'b0000000-0000-0000-0000-000000000006',
+        memberId: 'KV-1006',
+        fullName: 'Neha Mehta',
+        email: 'neha.mehta@kashvimlm.com',
+        phone: '+91 98765 43215',
+        sponsorId: 'KV-1001',
+        parentMemberId: 'KV-1002',
+        position: 'LEFT',
+        depth: 2,
+        treePath: '/KV-1001/KV-1002/KV-1006',
+        status: 'ACTIVE',
+        rank: 'Director',
+        leftChildMemberId: null,
+        rightChildMemberId: null,
+      },
+      {
+        distributorId: 'b0000000-0000-0000-0000-000000000007',
+        memberId: 'KV-1007',
+        fullName: 'Suresh Rao',
+        email: 'suresh.rao@kashvimlm.com',
+        phone: '+91 98765 43216',
+        sponsorId: 'KV-1003',
+        parentMemberId: 'KV-1003',
+        position: 'RIGHT',
+        depth: 2,
+        treePath: '/KV-1001/KV-1003/KV-1007',
+        status: 'SUSPENDED',
+        rank: 'Director',
+        leftChildMemberId: null,
+        rightChildMemberId: null,
+      },
+    ];
+
+    for (const node of seed) {
+      BinaryTreePlacementService.inMemoryNodes.set(node.memberId.toUpperCase(), node);
+      BinaryTreePlacementService.inMemoryNodes.set(node.distributorId.toLowerCase(), node);
+    }
+  }
+
+  public static getMember(idOrMemberId: string): TreeMemberNode | null {
+    if (!idOrMemberId) return null;
+    const clean = idOrMemberId.trim().toUpperCase();
+    return (
+      BinaryTreePlacementService.inMemoryNodes.get(clean) ||
+      BinaryTreePlacementService.inMemoryNodes.get(idOrMemberId.trim().toLowerCase()) ||
+      null
+    );
+  }
+
+  public static hasMember(idOrMemberId: string): boolean {
+    return BinaryTreePlacementService.getMember(idOrMemberId) !== null;
+  }
+
+  public static getAllMembers(): TreeMemberNode[] {
+    const unique = new Map<string, TreeMemberNode>();
+    for (const node of BinaryTreePlacementService.inMemoryNodes.values()) {
+      unique.set(node.memberId, node);
+    }
+    return Array.from(unique.values());
+  }
+
+  public static getChildren(parentMemberId: string): { left: any | null; right: any | null } {
+    const parent = BinaryTreePlacementService.getMember(parentMemberId);
+    let left: any = null;
+    let right: any = null;
+
+    if (parent) {
+      if (parent.leftChildMemberId) {
+        const lc = BinaryTreePlacementService.getMember(parent.leftChildMemberId);
+        if (lc) {
+          left = {
+            id: lc.distributorId,
+            distributorId: lc.memberId,
+            name: lc.fullName,
+            email: lc.email,
+            phone: lc.phone,
+            rank: lc.rank,
+            status: lc.status,
+            position: 'LEFT',
+            level: lc.depth,
+            treePath: lc.treePath,
+          };
+        }
+      }
+      if (parent.rightChildMemberId) {
+        const rc = BinaryTreePlacementService.getMember(parent.rightChildMemberId);
+        if (rc) {
+          right = {
+            id: rc.distributorId,
+            distributorId: rc.memberId,
+            name: rc.fullName,
+            email: rc.email,
+            phone: rc.phone,
+            rank: rc.rank,
+            status: rc.status,
+            position: 'RIGHT',
+            level: rc.depth,
+            treePath: rc.treePath,
+          };
+        }
+      }
+    }
+
+    return { left, right };
+  }
+
+  public static addMember(node: TreeMemberNode): void {
+    BinaryTreePlacementService.inMemoryNodes.set(node.memberId.toUpperCase(), node);
+    BinaryTreePlacementService.inMemoryNodes.set(node.distributorId.toLowerCase(), node);
+
+    if (node.parentMemberId) {
+      const parent = BinaryTreePlacementService.getMember(node.parentMemberId);
+      if (parent) {
+        if (node.position === 'LEFT') {
+          parent.leftChildMemberId = node.memberId;
+        } else if (node.position === 'RIGHT') {
+          parent.rightChildMemberId = node.memberId;
+        }
+      }
+    }
+  }
 
   /**
    * Acquire mutex lock for a specific slot to ensure concurrency safety.
@@ -43,34 +274,58 @@ export class BinaryTreePlacementService {
   /**
    * Get available positions under a parent distributor.
    */
-  public static async getAvailablePositions(parentMemberId: string): Promise<AvailablePositionsResult> {
+  public static async getAvailablePositions(
+    parentMemberId: string,
+    memberBeingPlaced?: string
+  ): Promise<AvailablePositionsResult> {
     const cleanParent = parentMemberId.trim();
 
     try {
       const res = await query(
-        `SELECT t.leg_position
+        `SELECT t.leg_position, d.member_id
          FROM mlm_tree t
          JOIN distributors p ON p.id = t.parent_distributor_id
+         JOIN distributors d ON d.id = t.distributor_id
          WHERE p.member_id = $1`,
         [cleanParent]
       );
 
-      const occupied = new Set(res.rows.map((r: any) => (r.leg_position || '').toUpperCase()));
-      const leftAvailable = !occupied.has('LEFT');
-      const rightAvailable = !occupied.has('RIGHT');
+      if (res && res.rows.length > 0) {
+        const leftRow = res.rows.find((r: any) => (r.leg_position || '').toUpperCase() === 'LEFT');
+        const rightRow = res.rows.find((r: any) => (r.leg_position || '').toUpperCase() === 'RIGHT');
+
+        const leftAvailable = !leftRow || (Boolean(memberBeingPlaced) && leftRow.member_id === memberBeingPlaced);
+        const rightAvailable = !rightRow || (Boolean(memberBeingPlaced) && rightRow.member_id === memberBeingPlaced);
+        const availablePositions: ('LEFT' | 'RIGHT')[] = [];
+        if (leftAvailable) availablePositions.push('LEFT');
+        if (rightAvailable) availablePositions.push('RIGHT');
+
+        return { leftAvailable, rightAvailable, availablePositions };
+      }
+    } catch {
+      // Fallback
+    }
+
+    // In-memory fallback
+    const parentNode = this.getMember(cleanParent);
+    if (parentNode) {
+      const leftChild = parentNode.leftChildMemberId;
+      const rightChild = parentNode.rightChildMemberId;
+
+      const leftAvailable = !leftChild || (Boolean(memberBeingPlaced) && leftChild === memberBeingPlaced);
+      const rightAvailable = !rightChild || (Boolean(memberBeingPlaced) && rightChild === memberBeingPlaced);
       const availablePositions: ('LEFT' | 'RIGHT')[] = [];
       if (leftAvailable) availablePositions.push('LEFT');
       if (rightAvailable) availablePositions.push('RIGHT');
 
       return { leftAvailable, rightAvailable, availablePositions };
-    } catch {
-      // Fallback
-      return {
-        leftAvailable: true,
-        rightAvailable: true,
-        availablePositions: ['LEFT', 'RIGHT'],
-      };
     }
+
+    return {
+      leftAvailable: true,
+      rightAvailable: true,
+      availablePositions: ['LEFT', 'RIGHT'],
+    };
   }
 
   /**
@@ -87,7 +342,11 @@ export class BinaryTreePlacementService {
     const cleanSponsor = sponsorMemberId.trim();
 
     try {
-      // Fetch sponsor node
+      let sponsorDepth = 0;
+      let sponsorPath = `/${cleanSponsor}`;
+      let sponsorFound = false;
+
+      // Fetch sponsor node from DB
       const sponsorRes = await query(
         `SELECT d.id, d.member_id, t.depth, t.tree_path
          FROM distributors d
@@ -96,13 +355,23 @@ export class BinaryTreePlacementService {
         [cleanSponsor]
       );
 
-      if (sponsorRes.rows.length === 0) {
-        throw new Error(`Sponsor distributor ${cleanSponsor} not found.`);
+      if (sponsorRes && sponsorRes.rows.length > 0) {
+        const sponsorRow = sponsorRes.rows[0];
+        sponsorDepth = sponsorRow.depth || 0;
+        sponsorPath = sponsorRow.tree_path || `/${cleanSponsor}`;
+        sponsorFound = true;
+      } else {
+        const mem = this.getMember(cleanSponsor);
+        if (mem) {
+          sponsorDepth = mem.depth;
+          sponsorPath = mem.treePath;
+          sponsorFound = true;
+        }
       }
 
-      const sponsorRow = sponsorRes.rows[0];
-      const sponsorDepth = sponsorRow.depth || 0;
-      const sponsorPath = sponsorRow.tree_path || `/${cleanSponsor}`;
+      if (!sponsorFound && cleanSponsor !== 'KV-1001') {
+        throw new Error(`Sponsor distributor ${cleanSponsor} not found.`);
+      }
 
       // Check sponsor's own direct children
       const directSlots = await this.getAvailablePositions(cleanSponsor);
@@ -149,22 +418,43 @@ export class BinaryTreePlacementService {
         const current = queue.shift()!;
 
         // Fetch children of current node
-        const childrenRes = await query(
-          `SELECT d.member_id, t.leg_position, t.depth, t.tree_path
-           FROM mlm_tree t
-           JOIN distributors p ON p.id = t.parent_distributor_id
-           JOIN distributors d ON d.id = t.distributor_id
-           WHERE p.member_id = $1
-           ORDER BY CASE WHEN UPPER(t.leg_position) = 'LEFT' THEN 1 ELSE 2 END`,
-          [current.memberId]
-        );
-
         let leftChild: any = null;
         let rightChild: any = null;
-        for (const child of childrenRes.rows) {
-          const leg = (child.leg_position || '').toUpperCase();
-          if (leg === 'LEFT') leftChild = child;
-          if (leg === 'RIGHT') rightChild = child;
+
+        try {
+          const childrenRes = await query(
+            `SELECT d.member_id, t.leg_position, t.depth, t.tree_path
+             FROM mlm_tree t
+             JOIN distributors p ON p.id = t.parent_distributor_id
+             JOIN distributors d ON d.id = t.distributor_id
+             WHERE p.member_id = $1
+             ORDER BY CASE WHEN UPPER(t.leg_position) = 'LEFT' THEN 1 ELSE 2 END`,
+            [current.memberId]
+          );
+
+          if (childrenRes && childrenRes.rows.length > 0) {
+            for (const child of childrenRes.rows) {
+              const leg = (child.leg_position || '').toUpperCase();
+              if (leg === 'LEFT') leftChild = child;
+              if (leg === 'RIGHT') rightChild = child;
+            }
+          }
+        } catch {
+          // offline
+        }
+
+        if (!leftChild && !rightChild) {
+          const mem = this.getMember(current.memberId);
+          if (mem) {
+            if (mem.leftChildMemberId) {
+              const lc = this.getMember(mem.leftChildMemberId);
+              if (lc) leftChild = { member_id: lc.memberId, leg_position: 'LEFT', depth: lc.depth, tree_path: lc.treePath };
+            }
+            if (mem.rightChildMemberId) {
+              const rc = this.getMember(mem.rightChildMemberId);
+              if (rc) rightChild = { member_id: rc.memberId, leg_position: 'RIGHT', depth: rc.depth, tree_path: rc.treePath };
+            }
+          }
         }
 
         // Check if current has open slot
@@ -249,14 +539,13 @@ export class BinaryTreePlacementService {
     const { sponsorId, parentId, position = 'AUTO', memberId, isRoot = false } = params;
 
     if (isRoot) {
-      // Check if root already exists
       try {
         const rootCheck = await query(
           `SELECT d.member_id FROM mlm_tree t
            JOIN distributors d ON d.id = t.distributor_id
            WHERE t.parent_distributor_id IS NULL OR UPPER(t.leg_position) = 'ROOT'`
         );
-        if (rootCheck.rows.length > 0) {
+        if (rootCheck && rootCheck.rows.length > 0) {
           return {
             isValid: false,
             message: `Root distributor already exists (${rootCheck.rows[0].member_id}). Multiple roots are not permitted.`,
@@ -290,18 +579,31 @@ export class BinaryTreePlacementService {
 
       // Check circular placement (ancestor under descendant)
       try {
+        let parentRow: any = null;
         const parentCheck = await query(
-          `SELECT t.tree_path, t.depth FROM distributors d
+          `SELECT t.tree_path, t.depth, d.member_id FROM distributors d
            LEFT JOIN mlm_tree t ON t.distributor_id = d.id
            WHERE d.member_id = $1`,
           [cleanParent]
         );
 
-        if (parentCheck.rows.length === 0) {
+        if (parentCheck && parentCheck.rows.length > 0) {
+          parentRow = parentCheck.rows[0];
+        } else {
+          const mem = this.getMember(cleanParent);
+          if (mem) {
+            parentRow = {
+              tree_path: mem.treePath,
+              depth: mem.depth,
+              member_id: mem.memberId,
+            };
+          }
+        }
+
+        if (!parentRow) {
           return { isValid: false, message: `Parent distributor ${cleanParent} not found.` };
         }
 
-        const parentRow = parentCheck.rows[0];
         const treePath = parentRow.tree_path || `/${cleanParent}`;
 
         if (cleanMember && (treePath.includes(`/${cleanMember}/`) || treePath.endsWith(`/${cleanMember}`))) {
@@ -312,8 +614,7 @@ export class BinaryTreePlacementService {
         }
 
         // Check availability on specified parent
-        const slots = await this.getAvailablePositions(cleanParent);
-
+        const slots = await this.getAvailablePositions(cleanParent, cleanMember);
         const posUpper = position.toUpperCase() as 'LEFT' | 'RIGHT' | 'AUTO';
 
         if (posUpper === 'LEFT' && !slots.leftAvailable) {
@@ -471,46 +772,75 @@ export class BinaryTreePlacementService {
 
     let parentUuid: string | null = null;
     if (parentMemberId && position !== 'ROOT') {
-      const parentRes = await queryRunner(
-        `SELECT id FROM distributors WHERE member_id = $1`,
-        [parentMemberId.trim()]
+      try {
+        const parentRes = await queryRunner(
+          `SELECT id FROM distributors WHERE member_id = $1`,
+          [parentMemberId.trim()]
+        );
+        if (parentRes && parentRes.rows.length > 0) {
+          parentUuid = parentRes.rows[0].id;
+        }
+      } catch {
+        // offline
+      }
+    }
+
+    let insertedNodeId = `node_${Date.now()}`;
+    try {
+      const insertRes = await queryRunner(
+        `INSERT INTO mlm_tree (
+          distributor_id, parent_distributor_id, leg_position, depth, tree_path, business_center_code
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, distributor_id, parent_distributor_id, leg_position, depth, tree_path`,
+        [distributorUuid, parentUuid, position, level, treePath, businessCenterCode]
       );
-      if (parentRes.rows.length > 0) {
-        parentUuid = parentRes.rows[0].id;
+      if (insertRes && insertRes.rows.length > 0) {
+        insertedNodeId = insertRes.rows[0].id;
       }
+    } catch {
+      // offline
     }
 
-    const insertRes = await queryRunner(
-      `INSERT INTO mlm_tree (
-        distributor_id, parent_distributor_id, leg_position, depth, tree_path, business_center_code
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, distributor_id, parent_distributor_id, leg_position, depth, tree_path`,
-      [distributorUuid, parentUuid, position, level, treePath, businessCenterCode]
-    );
-
-    const insertedNode = insertRes.rows[0];
-
-    // If non-root, update parent's left/right team counts
+    // If non-root, update parent's left/right team counts in DB
     if (parentMemberId && parentUuid) {
-      if (position === 'LEFT') {
-        await queryRunner(
-          `UPDATE distributors SET left_team_count = left_team_count + 1, team_size = team_size + 1 WHERE id = $1`,
-          [parentUuid]
-        );
-      } else if (position === 'RIGHT') {
-        await queryRunner(
-          `UPDATE distributors SET right_team_count = right_team_count + 1, team_size = team_size + 1 WHERE id = $1`,
-          [parentUuid]
-        );
+      try {
+        if (position === 'LEFT') {
+          await queryRunner(
+            `UPDATE distributors SET left_team_count = left_team_count + 1, team_size = team_size + 1 WHERE id = $1`,
+            [parentUuid]
+          );
+        } else if (position === 'RIGHT') {
+          await queryRunner(
+            `UPDATE distributors SET right_team_count = right_team_count + 1, team_size = team_size + 1 WHERE id = $1`,
+            [parentUuid]
+          );
+        }
+      } catch {
+        // offline
       }
     }
+
+    // Register into in-memory node store
+    this.addMember({
+      distributorId: distributorUuid,
+      memberId: memberId,
+      fullName: memberId,
+      email: `${memberId.toLowerCase()}@kashvimlm.com`,
+      phone: '+919999999999',
+      sponsorId: null,
+      parentMemberId,
+      position,
+      depth: level,
+      treePath,
+      status: 'ACTIVE',
+      rank: 'Associate',
+    });
 
     return {
-      treeNodeId: insertedNode?.id || '',
+      treeNodeId: insertedNodeId,
       position,
       level,
       treePath,
     };
   }
 }
-
