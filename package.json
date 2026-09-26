@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "npm test --prefix server",
+    "test:tree": "npm run test:tree --prefix server",
+    "test:api": "npm run test:api --prefix server",
+    "db:init": "npm run db:init --prefix server"
   },
   "dependencies": {
     "lucide-react": "^1.43.0",

@@ -33,19 +33,41 @@ function TreeNode({
   isExpanded = false,
   onExpandNode,
   onCollapseNode,
+  adminViewOnly = false,
+  isFilterMatched = false,
+  isFilterActive = false,
 }) {
-  // 1. EMPTY SLOT / "+ Available" Card
+  // 1. EMPTY SLOT Card
   if (!node) {
+    if (adminViewOnly) {
+      return (
+        <div className="tree-node-wrapper empty-slot-wrapper admin-empty-slot">
+          <div
+            className="tree-node-card empty-card admin-readonly-empty"
+            title={`Empty ${position} Position. Member movements & enrollment are locked in viewing mode.`}
+          >
+            <div className="empty-position-pill">
+              {position ? `${position} POSITION` : 'AVAILABLE'}
+            </div>
+            <div className="empty-title-text" style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600 }}>
+              Empty Slot
+            </div>
+            <p className="empty-instruction-note" style={{ color: '#cbd5e1' }}>🔒 Viewing Mode Only</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="tree-node-wrapper empty-slot-wrapper">
         <div
           className="tree-node-card empty-card"
-          onClick={() => onAvailableClick(parentNode, position)}
+          onClick={() => onAvailableClick && onAvailableClick(parentNode, position)}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-              onAvailableClick(parentNode, position);
+              onAvailableClick && onAvailableClick(parentNode, position);
             }
           }}
           title={`Available ${position} Position. Click to enroll through official enrollment process.`}
@@ -75,6 +97,12 @@ function TreeNode({
   const totalBV = leftBV + rightBV;
   const leftPct = totalBV > 0 ? Math.round((leftBV / totalBV) * 100) : 50;
 
+  const sponsor = node.sponsor ? node.sponsor.split(' ')[0] : 'KV-1001';
+  const placementParent = node.placementParent
+    ? node.placementParent.split(' ')[0]
+    : (isRoot ? 'ROOT' : (parentNode?.distributorId || 'KV-1001'));
+  const businessCenter = node.businessCenter || 'BC-001';
+
   // Prompt 14: Check if node has deeper children
   const totalDownlines =
     (node.totalTeamCount ?? 0) +
@@ -89,17 +117,30 @@ function TreeNode({
     hasChildrenInMemory
   );
 
+  const filterClass = isFilterActive
+    ? isFilterMatched
+      ? 'filter-matched-node'
+      : 'filter-dimmed-node'
+    : '';
+
   return (
-    <div className={`tree-node-wrapper ${isRoot ? 'is-root-node' : ''}`}>
+    <div className={`tree-node-wrapper ${isRoot ? 'is-root-node' : ''} ${filterClass}`}>
       <div
         className={`tree-node-card member-card ${isActive ? 'status-active' : 'status-inactive'} ${
           isHighlighted ? 'search-highlighted' : ''
-        }`}
+        } ${filterClass}`}
         data-distributor-id={distributorId}
         onClick={() => onNodeClick && onNodeClick(node)}
         onMouseEnter={(e) => onNodeHover && onNodeHover(node, e)}
         onMouseLeave={() => onNodeLeave && onNodeLeave()}
       >
+        {/* Filter Match Badge */}
+        {isFilterActive && isFilterMatched && (
+          <div className="filter-match-chip">
+            <span>★ Filter Match</span>
+          </div>
+        )}
+
         {/* Node Header Tag: Position & Level */}
         <div className="node-header-row">
           <span className={`position-tag ${isRoot ? 'root-tag' : position.toLowerCase() + '-tag'}`}>
@@ -107,7 +148,7 @@ function TreeNode({
           </span>
           <div className="status-indicator-pill">
             <span className={`status-dot ${isActive ? 'dot-active' : 'dot-inactive'}`} />
-            <span className="status-text">{isActive ? 'Active' : 'Inactive'}</span>
+            <span className="status-text">{status}</span>
           </div>
         </div>
 
@@ -120,6 +161,19 @@ function TreeNode({
           <div className="node-rank-row">
             <Award size={13} className="rank-icon" />
             <span className="rank-name">{rank}</span>
+          </div>
+
+          {/* Micro Metadata Lineage Tags */}
+          <div className="node-micro-meta-row">
+            <span className="meta-tag-pill" title={`Sponsor: ${node.sponsor || 'KV-1001'}`}>
+              Sp: {sponsor}
+            </span>
+            <span className="meta-tag-pill" title={`Placement Parent: ${placementParent}`}>
+              Par: {placementParent}
+            </span>
+            <span className="meta-tag-pill bc-pill" title={`Business Center: ${businessCenter}`}>
+              {businessCenter}
+            </span>
           </div>
         </div>
 

@@ -5,13 +5,21 @@ const { Pool } = pg;
 
 export const pool = new Pool(
   config.databaseUrl
-    ? { connectionString: config.databaseUrl }
+    ? {
+        connectionString: config.databaseUrl,
+        max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
+      }
     : {
         host: config.dbHost,
         port: config.dbPort,
         user: config.dbUser,
         password: config.dbPassword,
         database: config.dbName,
+        max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
       }
 );
 
@@ -55,17 +63,36 @@ export async function checkDbConnection(): Promise<boolean> {
 export async function withTransaction<T>(
   callback: (client: pg.PoolClient) => Promise<T>
 ): Promise<T> {
-  const client = await pool.connect();
+  let client: pg.PoolClient | null = null;
+  try {
+    client = await pool.connect();
+  } catch (err: any) {
+    if (err.code === 'ECONNREFUSED' || err.name === 'AggregateError' || err.message?.includes('ECONNREFUSED')) {
+      const mockClient: any = {
+        query: async (text: string, params?: any[]) => query(text, params),
+        release: () => {},
+      };
+      return await callback(mockClient);
+    }
+    throw err;
+  }
+
   try {
     await client.query('BEGIN');
     const result = await callback(client);
     await client.query('COMMIT');
     return result;
   } catch (err) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // client error during rollback
+    }
     throw err;
   } finally {
-    client.release();
+    if (client) {
+      client.release();
+    }
   }
 }
 

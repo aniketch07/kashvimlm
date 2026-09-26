@@ -408,7 +408,14 @@ export class AdminController {
 
       res.status(200).json(result);
     } catch (err: any) {
-      if (err.message && err.message.includes('required')) {
+      if (
+        err.message &&
+        (err.message.includes('required') ||
+          err.message.includes('Circular') ||
+          err.message.includes('cannot be placed') ||
+          err.message.includes('occupied') ||
+          err.message.includes('violation'))
+      ) {
         res.status(400).json({ success: false, message: err.message });
         return;
       }
@@ -454,7 +461,7 @@ export class AdminController {
     try {
       const rootId = (req.query.memberId || req.query.rootId || 'KV-1001') as string;
       const depth = parseInt(req.query.depth as string, 10) || 3;
-      const tree = MlmTreeService.getNetworkTree(rootId, depth);
+      const tree = await MlmTreeService.getNetworkTree(rootId, depth);
       res.status(200).json({
         success: true,
         message: 'Admin global network tree retrieved successfully.',

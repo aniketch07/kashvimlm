@@ -145,18 +145,24 @@ CREATE INDEX idx_orders_number ON orders(order_number);
 CREATE TABLE mlm_tree (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     distributor_id UUID NOT NULL REFERENCES distributors(id) ON DELETE CASCADE,
-    business_center_code VARCHAR(20) NOT NULL DEFAULT 'BC 001', -- 'BC 001', 'BC 002', 'BC 003'
+    business_center_code VARCHAR(20) NOT NULL DEFAULT 'BC-001', -- 'BC-001', 'BC-002', 'BC-003'
     parent_distributor_id UUID REFERENCES distributors(id),
     left_child_id UUID REFERENCES distributors(id),
     right_child_id UUID REFERENCES distributors(id),
-    leg_position VARCHAR(10), -- 'left', 'right' under parent
+    leg_position VARCHAR(10), -- 'left', 'right', 'ROOT' under parent
     depth INT NOT NULL DEFAULT 0,
-    tree_path TEXT, -- Materialized path for high-speed sub-tree queries, e.g. "/88767139/1861001/..."
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    tree_path TEXT, -- Materialized path for high-speed sub-tree queries, e.g. "/KV-1001/KV-1002/..."
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_mlm_tree_distributor UNIQUE (distributor_id),
+    CONSTRAINT uq_mlm_tree_parent_leg UNIQUE (parent_distributor_id, leg_position),
+    CONSTRAINT chk_mlm_tree_leg CHECK (leg_position IN ('left', 'right', 'ROOT') OR leg_position IS NULL),
+    CONSTRAINT chk_mlm_tree_no_self_parent CHECK (parent_distributor_id IS NULL OR parent_distributor_id <> distributor_id)
 );
 
 CREATE INDEX idx_mlm_tree_distributor ON mlm_tree(distributor_id);
 CREATE INDEX idx_mlm_tree_parent ON mlm_tree(parent_distributor_id);
+CREATE INDEX idx_mlm_tree_leg ON mlm_tree(leg_position);
+CREATE INDEX idx_mlm_tree_path ON mlm_tree(tree_path);
 
 -- -----------------------------------------------------------------------------
 -- 6. BV LEDGER TABLE (Volume Accumulation, Left vs Right Legs, Carryover)

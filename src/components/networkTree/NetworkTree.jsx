@@ -32,6 +32,8 @@ function NetworkTree({
   expandingNodeIds = {},
   onExpandNode,
   onCollapseNode,
+  filterCriteria = null,
+  adminViewOnly = false,
 }) {
   const containerRef = useRef(null);
   const [isPanning, setIsPanning] = useState(false);
@@ -168,7 +170,37 @@ function NetworkTree({
   }, [selectedMemberId, highlightedId, currentPan, updatePan]);
 
   // 5. Recursive Binary Branch Renderer
-  const renderBinaryBranch = (node, isRoot = false, position = 'ROOT', currentLevel = 1) => {
+  const isFilterActive = Boolean(
+    filterCriteria &&
+      ((filterCriteria.status && filterCriteria.status !== 'ALL') ||
+        (filterCriteria.rank && filterCriteria.rank !== 'ALL') ||
+        (filterCriteria.businessCenter && filterCriteria.businessCenter !== 'ALL'))
+  );
+
+  const checkFilterMatch = (n) => {
+    if (!n || !isFilterActive) return false;
+    if (filterCriteria.status && filterCriteria.status !== 'ALL') {
+      const s = (n.status || '').toUpperCase();
+      if (s !== filterCriteria.status.toUpperCase()) return false;
+    }
+    if (filterCriteria.rank && filterCriteria.rank !== 'ALL') {
+      const r = (n.rank || '').toLowerCase();
+      if (r !== filterCriteria.rank.toLowerCase()) return false;
+    }
+    if (filterCriteria.businessCenter && filterCriteria.businessCenter !== 'ALL') {
+      const bc = (n.businessCenter || '').toUpperCase();
+      if (!bc.includes(filterCriteria.businessCenter.toUpperCase())) return false;
+    }
+    return true;
+  };
+
+  const renderBinaryBranch = (
+    node,
+    isRoot = false,
+    position = 'ROOT',
+    currentLevel = 1,
+    parentNode = null
+  ) => {
     if (!node) return null;
 
     const leftChild = node.left || node.leftChild || null;
@@ -189,6 +221,7 @@ function NetworkTree({
         node.distributor?.distributorCode === highlightedId);
 
     const isExpanding = Boolean(expandingNodeIds && expandingNodeIds[nodeId]);
+    const isMatchedByFilter = checkFilterMatch(node);
 
     return (
       <div className={`binary-branch-unit ${isRoot ? 'root-branch' : ''}`}>
@@ -198,7 +231,7 @@ function NetworkTree({
             node={node}
             isRoot={isRoot}
             position={position}
-            parentNode={null}
+            parentNode={parentNode}
             onNodeClick={onNodeClick}
             onNodeHover={onNodeHover}
             onNodeLeave={onNodeLeave}
@@ -209,6 +242,9 @@ function NetworkTree({
             isExpanded={isBranchExpanded}
             onExpandNode={onExpandNode}
             onCollapseNode={onCollapseNode}
+            adminViewOnly={adminViewOnly}
+            isFilterActive={isFilterActive}
+            isFilterMatched={isMatchedByFilter}
           />
         </div>
 
@@ -224,13 +260,14 @@ function NetworkTree({
               <div className="binary-leg-col left-leg-col">
                 <div className="leg-label-pill left-leg-pill">◀ LEFT LEG</div>
                 {leftChild ? (
-                  renderBinaryBranch(leftChild, false, 'LEFT', currentLevel + 1)
+                  renderBinaryBranch(leftChild, false, 'LEFT', currentLevel + 1, node)
                 ) : (
                   <TreeNode
                     node={null}
                     position="LEFT"
                     parentNode={node}
                     onAvailableClick={onAvailableClick}
+                    adminViewOnly={adminViewOnly}
                   />
                 )}
               </div>
@@ -239,13 +276,14 @@ function NetworkTree({
               <div className="binary-leg-col right-leg-col">
                 <div className="leg-label-pill right-leg-pill">RIGHT LEG ▶</div>
                 {rightChild ? (
-                  renderBinaryBranch(rightChild, false, 'RIGHT', currentLevel + 1)
+                  renderBinaryBranch(rightChild, false, 'RIGHT', currentLevel + 1, node)
                 ) : (
                   <TreeNode
                     node={null}
                     position="RIGHT"
                     parentNode={node}
                     onAvailableClick={onAvailableClick}
+                    adminViewOnly={adminViewOnly}
                   />
                 )}
               </div>

@@ -43,6 +43,7 @@ function MemberDetailsPanel({
   onEnrollDownline,
   onMoveDistributor,
   onViewAuditLogs,
+  adminMode = false,
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -60,7 +61,7 @@ function MemberDetailsPanel({
   const rank = member.rank || member.distributor?.rankName || 'Business Center';
   const rawStatus = (member.status || member.distributor?.status || 'Active').toUpperCase();
   const isActive = rawStatus === 'ACTIVE';
-  const status = isActive ? 'Active' : 'Inactive';
+  const status = rawStatus;
 
   const rawJoinedDate =
     member.joinedDate ||
@@ -80,15 +81,28 @@ function MemberDetailsPanel({
     }
   }
   const sponsor =
-    member.sponsor ||
-    member.sponsorId ||
-    member.distributor?.sponsorCode ||
-    (distributorId === 'KV-1001' ? 'KV-1000' : 'KV-1001');
+    member.sponsorName
+      ? `${member.sponsor} (${member.sponsorName})`
+      : member.sponsor ||
+        member.sponsorId ||
+        member.distributor?.sponsorCode ||
+        (distributorId === 'KV-1001' ? 'KV-1000 (Corporate System)' : 'KV-1001 (Rahul Kaushal)');
+
+  const placementParent =
+    member.placementParentName
+      ? `${member.placementParent} (${member.placementParentName})`
+      : member.placementParent ||
+        member.placementParentId ||
+        (distributorId === 'KV-1001' ? 'ROOT (None)' : (member.parentId || member.sponsor || 'KV-1001'));
+
+  const position = (member.position || (distributorId === 'KV-1001' ? 'ROOT' : 'LEFT')).toUpperCase();
+
   const businessCenter =
-    member.businessCenter ||
-    member.businessCenterName ||
-    member.businessCenter?.centerCode ||
-    'BC-001';
+    member.businessCenterName
+      ? `${member.businessCenter || 'BC-001'} - ${member.businessCenterName}`
+      : member.businessCenter ||
+        member.businessCenter?.centerCode ||
+        'BC-001 (Corporate Headquarters)';
 
   // Recursive fallback for team counts
   const countSubtree = (child) => {
@@ -115,6 +129,10 @@ function MemberDetailsPanel({
 
   const leftBV = member.leftBV ?? member.businessCenter?.leftVolume ?? leftTeamCount * 1000;
   const rightBV = member.rightBV ?? member.businessCenter?.rightVolume ?? rightTeamCount * 800;
+  const personalBV = member.personalBV ?? member.pbv ?? 250;
+  const totalBV = member.totalBV ?? (leftBV + rightBV + personalBV);
+  const totalLegBV = leftBV + rightBV;
+  const leftPct = totalLegBV > 0 ? Math.round((leftBV / totalLegBV) * 100) : 50;
 
   const referralUrl = `${window.location.origin}/join?ref=${distributorId}`;
 
@@ -162,15 +180,18 @@ function MemberDetailsPanel({
           </span>
           <span className="panel-leg-badge">
             <Building2 size={13} />
-            <span>{businessCenter}</span>
+            <span>{member.businessCenter || 'BC-001'}</span>
+          </span>
+          <span className={`panel-position-badge pos-${position.toLowerCase()}`}>
+            <span>Position: {position}</span>
           </span>
         </div>
 
-        {/* 11 Required Fields Grid (Prompt 11 Specification) */}
+        {/* 10 Required Fields Grid (Prompt 17 Specification) */}
         <div className="panel-card member-info-card">
           <h4 className="panel-card-title">
             <Users size={16} />
-            <span>Distributor Information</span>
+            <span>Distributor Organizational Details</span>
           </h4>
           <div className="panel-info-list">
             <div className="panel-info-row">
@@ -190,16 +211,9 @@ function MemberDetailsPanel({
             </div>
             <div className="panel-info-row">
               <span className="panel-info-label">Status:</span>
-              <span className="panel-info-value">
+              <span className="panel-info-value font-semibold">
                 <span className={`status-dot ${isActive ? 'dot-active' : 'dot-inactive'}`} />
                 {status}
-              </span>
-            </div>
-            <div className="panel-info-row">
-              <span className="panel-info-label">Joined Date:</span>
-              <span className="panel-info-value">
-                <Calendar size={13} className="inline-icon text-slate" />
-                {joinedDate}
               </span>
             </div>
             <div className="panel-info-row">
@@ -207,10 +221,27 @@ function MemberDetailsPanel({
               <span className="panel-info-value text-accent font-semibold">{sponsor}</span>
             </div>
             <div className="panel-info-row">
+              <span className="panel-info-label">Placement Parent:</span>
+              <span className="panel-info-value text-purple font-semibold">{placementParent}</span>
+            </div>
+            <div className="panel-info-row">
+              <span className="panel-info-label">Position:</span>
+              <span className="panel-info-value font-bold">
+                <span className={`position-tag-pill ${position.toLowerCase()}-pill`}>{position}</span>
+              </span>
+            </div>
+            <div className="panel-info-row">
               <span className="panel-info-label">Business Center:</span>
               <span className="panel-info-value">
                 <Building2 size={13} className="inline-icon text-slate" />
                 {businessCenter}
+              </span>
+            </div>
+            <div className="panel-info-row">
+              <span className="panel-info-label">Joined Date:</span>
+              <span className="panel-info-value">
+                <Calendar size={13} className="inline-icon text-slate" />
+                {joinedDate}
               </span>
             </div>
 
@@ -221,64 +252,102 @@ function MemberDetailsPanel({
               <span className="panel-info-value font-bold">{directMembers}</span>
             </div>
             <div className="panel-info-row">
-              <span className="panel-info-label">Left Team:</span>
+              <span className="panel-info-label">Left Team Count:</span>
               <span className="panel-info-value text-blue font-bold">{leftTeamCount}</span>
             </div>
             <div className="panel-info-row">
-              <span className="panel-info-label">Right Team:</span>
+              <span className="panel-info-label">Right Team Count:</span>
               <span className="panel-info-value text-purple font-bold">{rightTeamCount}</span>
             </div>
             <div className="panel-info-row highlight-total-row">
-              <span className="panel-info-label">Total Team:</span>
+              <span className="panel-info-label">Total Team Count:</span>
               <span className="panel-info-value text-dark font-bold">{totalTeamCount}</span>
             </div>
           </div>
         </div>
 
-        {/* Dual-Leg Volume Breakdown Card */}
+        {/* BV Summary & Volume Breakdown Card (Prompt 17 Requirement 9) */}
         <div className="panel-card volume-card">
           <h4 className="panel-card-title">
             <TrendingUp size={16} />
-            <span>Dual-Leg Volume Breakdown</span>
+            <span>Business Volume (BV) Summary</span>
           </h4>
-          <div className="panel-metric-grid">
+          <div className="panel-metric-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
             <div className="panel-metric-item">
-              <span className="metric-label">Left Leg Volume</span>
-              <span className="metric-val text-blue">{leftBV.toLocaleString()} BV</span>
+              <span className="metric-label">Personal BV (PBV)</span>
+              <span className="metric-val text-emerald-600 font-bold">{personalBV.toLocaleString()} BV</span>
             </div>
             <div className="panel-metric-item">
-              <span className="metric-label">Right Leg Volume</span>
-              <span className="metric-val text-purple">{rightBV.toLocaleString()} BV</span>
+              <span className="metric-label">Total Group BV (GBV)</span>
+              <span className="metric-val text-dark font-bold">{totalBV.toLocaleString()} BV</span>
+            </div>
+            <div className="panel-metric-item">
+              <span className="metric-label">Left Leg BV</span>
+              <span className="metric-val text-blue font-bold">{leftBV.toLocaleString()} BV</span>
+            </div>
+            <div className="panel-metric-item">
+              <span className="metric-label">Right Leg BV</span>
+              <span className="metric-val text-purple font-bold">{rightBV.toLocaleString()} BV</span>
+            </div>
+          </div>
+          {/* Dual Leg Balance Ratio Track */}
+          <div style={{ marginTop: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>
+              <span>Left Leg: {leftPct}%</span>
+              <span>Right Leg: {100 - leftPct}%</span>
+            </div>
+            <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
+              <div style={{ width: `${leftPct}%`, background: '#3b82f6', height: '100%' }} />
+              <div style={{ width: `${100 - leftPct}%`, background: '#8b5cf6', height: '100%' }} />
             </div>
           </div>
         </div>
 
-        {/* Distributor Referral Link Card */}
-        <div className="panel-card referral-card">
-          <h4 className="panel-card-title">
-            <Share2 size={16} />
-            <span>Referral Link</span>
-          </h4>
-          <div className="referral-input-row">
-            <input
-              type="text"
-              readOnly
-              value={referralUrl}
-              className="referral-readonly-input"
-            />
-            <button
-              type="button"
-              className="referral-copy-btn"
-              onClick={handleCopyLink}
-              title="Copy Referral Link"
-            >
-              {copied ? <Check size={15} /> : <Copy size={15} />}
-              <span>{copied ? 'Copied!' : 'Copy'}</span>
-            </button>
+        {/* Distributor Referral Link Card (Hidden in Admin Mode) */}
+        {!adminMode && (
+          <div className="panel-card referral-card">
+            <h4 className="panel-card-title">
+              <Share2 size={16} />
+              <span>Referral Link</span>
+            </h4>
+            <div className="referral-input-row">
+              <input
+                type="text"
+                readOnly
+                value={referralUrl}
+                className="referral-readonly-input"
+              />
+              <button
+                type="button"
+                className="referral-copy-btn"
+                onClick={handleCopyLink}
+                title="Copy Referral Link"
+              >
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+                <span>{copied ? 'Copied!' : 'Copy'}</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Panel Action Buttons (Prompt 11 Requirements: View Network, Close) */}
+        {/* Admin Viewing Notice */}
+        {adminMode && (
+          <div
+            style={{
+              background: '#f8fafc',
+              border: '1px dashed #cbd5e1',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              fontSize: '12px',
+              color: '#475569',
+              lineHeight: '1.5',
+            }}
+          >
+            <strong>🔒 Viewing &amp; Searching Only:</strong> Member movements and placement modifications are locked from this interface in accordance with Prompt 17 governance rules.
+          </div>
+        )}
+
+        {/* Panel Action Buttons */}
         <div className="panel-actions-col">
           <button
             type="button"
@@ -290,15 +359,15 @@ function MemberDetailsPanel({
             title="Make this distributor the root of the tree"
           >
             <Network size={16} />
-            <span>View Network</span>
+            <span>{adminMode ? 'Inspect Subtree' : 'View Network'}</span>
           </button>
 
-          {onMoveDistributor && (
+          {!adminMode && onMoveDistributor && (
             <button
               type="button"
               className="panel-action-btn admin-move-btn"
               onClick={() => onMoveDistributor(member)}
-              title="Admin Move Distributor (Prompt 16: Requires reason, old/new parents & positions, generates immutable audit log)"
+              title="Admin Move Distributor (Prompt 16)"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -320,7 +389,7 @@ function MemberDetailsPanel({
             </button>
           )}
 
-          {onViewAuditLogs && (
+          {!adminMode && onViewAuditLogs && (
             <button
               type="button"
               className="panel-action-btn audit-trail-btn"

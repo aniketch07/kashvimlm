@@ -1,40 +1,97 @@
 -- =============================================================================
 -- KASHVIMLM DATABASE SEED SCRIPT
--- Seeds default verified ID Owner (Rahul kaushal - 88767139), downline binary tree,
--- Clothes/Hosiery & Electronics catalog, and initial wallet records.
+-- Seeds complete verified Binary MLM Tree (Rahul KV-1001 through Suresh KV-1007+),
+-- Business Centers (BC-001, BC-002, BC-003), Products, Wallets, and BV ledgers.
 -- =============================================================================
 
--- 1. Insert ID Owner User (Password: "RahulPass2026!", BCrypt Hash)
+-- 1. USERS
 INSERT INTO users (id, email, phone, username, password_hash, role, is_active)
-VALUES (
+VALUES
+(
     'a0000000-0000-0000-0000-000000000001',
     'rahul.kaushal@kashvimlm.com',
     '+91 98765 43210',
     '@rahul_kaushal',
-    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO', -- hashed password
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
     'admin',
     TRUE
-) ON CONFLICT (email) DO NOTHING;
+),
+(
+    'a0000000-0000-0000-0000-000000000002',
+    'amit.patel@kashvimlm.com',
+    '+91 98765 43211',
+    '@amit_patel',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    TRUE
+),
+(
+    'a0000000-0000-0000-0000-000000000003',
+    'rohit.verma@kashvimlm.com',
+    '+91 98765 43212',
+    '@rohit_verma',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    TRUE
+),
+(
+    'a0000000-0000-0000-0000-000000000004',
+    'priya.sharma@kashvimlm.com',
+    '+91 98765 43213',
+    '@priya_sharma',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    TRUE
+),
+(
+    'a0000000-0000-0000-0000-000000000005',
+    'pooja.gupta@kashvimlm.com',
+    '+91 98765 43214',
+    '@pooja_gupta',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    FALSE
+),
+(
+    'a0000000-0000-0000-0000-000000000006',
+    'neha.mehta@kashvimlm.com',
+    '+91 98765 43215',
+    '@neha_mehta',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    TRUE
+),
+(
+    'a0000000-0000-0000-0000-000000000007',
+    'suresh.rao@kashvimlm.com',
+    '+91 98765 43216',
+    '@suresh_rao',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    FALSE
+)
+ON CONFLICT (email) DO UPDATE SET is_active = EXCLUDED.is_active;
 
--- 2. Insert ID Owner Distributor Profile (Business Center Owner)
+-- 2. DISTRIBUTORS
 INSERT INTO distributors (
     id, user_id, member_id, full_name, sponsor_id, parent_id,
     placement_leg, rank, qualification_status, current_psv, lifetime_bv,
     team_size, bank_name, bank_account_number, bank_ifsc_code, pan_number,
     address, city, state, pincode, country
-) VALUES (
+) VALUES
+(
     'b0000000-0000-0000-0000-000000000001',
     'a0000000-0000-0000-0000-000000000001',
-    '88767139',
-    'Rahul kaushal',
-    '10000000',
+    'KV-1001',
+    'Rahul Kaushal',
+    'KV-1000',
     NULL,
     'auto',
-    'Emerald Director',
+    'Business Center',
     'Active',
-    100.00,
-    14850.00,
-    48,
+    250.00,
+    25950.00,
+    42,
     'HDFC Bank',
     '50100492819201',
     'HDFC0000123',
@@ -44,29 +101,273 @@ INSERT INTO distributors (
     'Maharashtra',
     '400053',
     'India'
-) ON CONFLICT (member_id) DO NOTHING;
+),
+(
+    'b0000000-0000-0000-0000-000000000002',
+    'a0000000-0000-0000-0000-000000000002',
+    'KV-1002',
+    'Amit Patel',
+    'KV-1001',
+    'KV-1001',
+    'left',
+    'Executive Director',
+    'Active',
+    200.00,
+    14400.00,
+    18,
+    'State Bank of India',
+    '20100492819202',
+    'SBIN0000456',
+    'BCDEF2345G',
+    'MG Road, Bandra West',
+    'Mumbai',
+    'Maharashtra',
+    '400050',
+    'India'
+),
+(
+    'b0000000-0000-0000-0000-000000000003',
+    'a0000000-0000-0000-0000-000000000003',
+    'KV-1003',
+    'Rohit Verma',
+    'KV-1001',
+    'KV-1001',
+    'right',
+    'Senior Director',
+    'Active',
+    150.00,
+    11150.00,
+    14,
+    'ICICI Bank',
+    '30100492819203',
+    'ICIC0000789',
+    'CDEFG3456H',
+    'Koregaon Park',
+    'Pune',
+    'Maharashtra',
+    '411001',
+    'India'
+),
+(
+    'b0000000-0000-0000-0000-000000000004',
+    'a0000000-0000-0000-0000-000000000004',
+    'KV-1004',
+    'Priya Sharma',
+    'KV-1001',
+    'KV-1002',
+    'left',
+    'Silver Director',
+    'Active',
+    150.00,
+    6750.00,
+    8,
+    'Axis Bank',
+    '40100492819204',
+    'UTIB0000101',
+    'DEFGH4567I',
+    'Sector 62',
+    'Noida',
+    'Uttar Pradesh',
+    '201301',
+    'India'
+),
+(
+    'b0000000-0000-0000-0000-000000000005',
+    'a0000000-0000-0000-0000-000000000005',
+    'KV-1005',
+    'Pooja Gupta',
+    'KV-1002',
+    'KV-1002',
+    'right',
+    'Bronze Director',
+    'Suspended',
+    100.00,
+    4900.00,
+    6,
+    'Punjab National Bank',
+    '50100492819205',
+    'PUNB0000202',
+    'EFGHI5678J',
+    'Civil Lines',
+    'Jaipur',
+    'Rajasthan',
+    '302006',
+    'India'
+),
+(
+    'b0000000-0000-0000-0000-000000000006',
+    'a0000000-0000-0000-0000-000000000006',
+    'KV-1006',
+    'Neha Mehta',
+    'KV-1003',
+    'KV-1003',
+    'left',
+    'Silver Director',
+    'Active',
+    120.00,
+    5420.00,
+    6,
+    'Kotak Mahindra Bank',
+    '60100492819206',
+    'KKBK0000303',
+    'FGHIJ6789K',
+    'Navrangpura',
+    'Ahmedabad',
+    'Gujarat',
+    '380009',
+    'India'
+),
+(
+    'b0000000-0000-0000-0000-000000000007',
+    'a0000000-0000-0000-0000-000000000007',
+    'KV-1007',
+    'Suresh Rao',
+    'KV-1001',
+    'KV-1003',
+    'right',
+    'Gold Partner',
+    'Inactive',
+    0.00,
+    3300.00,
+    4,
+    'Bank of Baroda',
+    '70100492819207',
+    'BARB0000404',
+    'GHIJK7890L',
+    'Alkapuri',
+    'Vadodara',
+    'Gujarat',
+    '390007',
+    'India'
+)
+ON CONFLICT (member_id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    rank = EXCLUDED.rank,
+    qualification_status = EXCLUDED.qualification_status;
 
--- 3. Insert ID Owner Wallet
+-- 3. WALLETS
 INSERT INTO wallets (id, distributor_id, available_balance, pending_balance, lifetime_earnings, lifetime_withdrawals)
-VALUES (
-    'c0000000-0000-0000-0000-000000000001',
-    'b0000000-0000-0000-0000-000000000001',
-    42500.00,
-    12400.00,
-    285000.00,
-    242500.00
-) ON CONFLICT (distributor_id) DO NOTHING;
+VALUES
+('c0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 42500.00, 12400.00, 285000.00, 242500.00),
+('c0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', 18200.00, 5600.00, 125000.00, 106800.00),
+('c0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000003', 14500.00, 4200.00, 95000.00, 80500.00),
+('c0000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000004', 9800.00, 2800.00, 62000.00, 52200.00),
+('c0000000-0000-0000-0000-000000000005', 'b0000000-0000-0000-0000-000000000005', 3200.00, 0.00, 32000.00, 28800.00),
+('c0000000-0000-0000-0000-000000000006', 'b0000000-0000-0000-0000-000000000006', 7400.00, 1900.00, 48000.00, 40600.00),
+('c0000000-0000-0000-0000-000000000007', 'b0000000-0000-0000-0000-000000000007', 1200.00, 0.00, 18000.00, 16800.00)
+ON CONFLICT (distributor_id) DO NOTHING;
 
--- 4. Insert Binary Tree Root for BC 001
-INSERT INTO mlm_tree (distributor_id, business_center_code, depth, tree_path)
-VALUES (
+-- 4. MLM TREE TOPOLOGY (Parent -> Left Child / Right Child)
+-- Clean existing tree rows to prevent conflict
+DELETE FROM mlm_tree WHERE distributor_id IN (
     'b0000000-0000-0000-0000-000000000001',
-    'BC 001',
-    0,
-    '/88767139'
+    'b0000000-0000-0000-0000-000000000002',
+    'b0000000-0000-0000-0000-000000000003',
+    'b0000000-0000-0000-0000-000000000004',
+    'b0000000-0000-0000-0000-000000000005',
+    'b0000000-0000-0000-0000-000000000006',
+    'b0000000-0000-0000-0000-000000000007'
 );
 
--- 5. Insert Clothes & Hosiery (Hozri) Products
+-- Root: Rahul (KV-1001)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000001',
+    'b0000000-0000-0000-0000-000000000001',
+    'BC-001',
+    NULL,
+    'b0000000-0000-0000-0000-000000000002', -- Amit
+    'b0000000-0000-0000-0000-000000000003', -- Rohit
+    'ROOT',
+    0,
+    '/KV-1001'
+);
+
+-- Left Child of Rahul: Amit (KV-1002)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000002',
+    'b0000000-0000-0000-0000-000000000002',
+    'BC-001',
+    'b0000000-0000-0000-0000-000000000001', -- Parent: Rahul
+    'b0000000-0000-0000-0000-000000000004', -- Left: Priya
+    'b0000000-0000-0000-0000-000000000005', -- Right: Pooja
+    'left',
+    1,
+    '/KV-1001/KV-1002'
+);
+
+-- Right Child of Rahul: Rohit (KV-1003)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000003',
+    'b0000000-0000-0000-0000-000000000003',
+    'BC-001',
+    'b0000000-0000-0000-0000-000000000001', -- Parent: Rahul
+    'b0000000-0000-0000-0000-000000000006', -- Left: Neha
+    'b0000000-0000-0000-0000-000000000007', -- Right: Suresh
+    'right',
+    1,
+    '/KV-1001/KV-1003'
+);
+
+-- Left Child of Amit: Priya (KV-1004)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000004',
+    'b0000000-0000-0000-0000-000000000004',
+    'BC-002',
+    'b0000000-0000-0000-0000-000000000002', -- Parent: Amit
+    NULL,
+    NULL,
+    'left',
+    2,
+    '/KV-1001/KV-1002/KV-1004'
+);
+
+-- Right Child of Amit: Pooja (KV-1005)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000005',
+    'b0000000-0000-0000-0000-000000000005',
+    'BC-002',
+    'b0000000-0000-0000-0000-000000000002', -- Parent: Amit
+    NULL,
+    NULL,
+    'right',
+    2,
+    '/KV-1001/KV-1002/KV-1005'
+);
+
+-- Left Child of Rohit: Neha (KV-1006)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000006',
+    'b0000000-0000-0000-0000-000000000006',
+    'BC-003',
+    'b0000000-0000-0000-0000-000000000003', -- Parent: Rohit
+    NULL,
+    NULL,
+    'left',
+    2,
+    '/KV-1001/KV-1003/KV-1006'
+);
+
+-- Right Child of Rohit: Suresh (KV-1007)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000007',
+    'b0000000-0000-0000-0000-000000000007',
+    'BC-003',
+    'b0000000-0000-0000-0000-000000000003', -- Parent: Rohit
+    NULL,
+    NULL,
+    'right',
+    2,
+    '/KV-1001/KV-1003/KV-1007'
+);
+
+-- 5. PRODUCTS (Clothes & Hosiery + Electronics)
 INSERT INTO products (sku, name, category, distributor_price, mrp, volume_bv, stock_quantity, status, size_spec, short_desc, benefits, usage_instructions)
 VALUES
 (
@@ -125,7 +426,6 @@ VALUES
     '["Thermal heat retention brushed inner lining", "Double-layered hood with adjustable drawstrings", "Ribbed elastane cuffs and waist hem"]'::jsonb,
     'Winter casual, morning walks, and outdoor travel.'
 ),
--- 6. Insert Electronics & Smart Devices Products
 (
     'KASH-ELE-001',
     'Smart Active Wireless Noise-Cancelling Headphones',
@@ -183,7 +483,7 @@ VALUES
     'Insert nano SIM card and follow initial Android setup.'
 ) ON CONFLICT (sku) DO NOTHING;
 
--- 7. Seed Initial System Notification
+-- 6. INITIAL NOTIFICATION
 INSERT INTO notifications (distributor_id, title, message, type)
 VALUES (
     'b0000000-0000-0000-0000-000000000001',

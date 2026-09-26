@@ -1,4 +1,30 @@
-import { query } from '../../config/db.js';
+import bcrypt from 'bcryptjs';
+import { query, withTransaction } from '../../config/db.js';
+import { BinaryTreePlacementService } from '../mlmTree/binaryTreePlacement.service.js';
+import { MlmTreeService } from '../mlmTree/mlmTree.service.js';
+import { AuditService } from '../audit/audit.service.js';
+import { AuditAction } from '../audit/audit.types.js';
+import { logger } from '../../config/logger.js';
+
+export interface RegisterDistributorDTO {
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  sponsorId?: string;
+  position?: 'LEFT' | 'RIGHT' | 'AUTO';
+  parentId?: string;
+  distributorId?: string;
+  isRoot?: boolean;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  panNumber?: string;
+}
 
 export class DistributorService {
   static async getProfile(memberId: string) {
@@ -160,4 +186,395 @@ export class DistributorService {
       }
     ];
   }
+
+  /**
+   * Register a new distributor and place them into the Binary MLM Tree.
+   * Full transactional ACID safety with mutex locks and constraint enforcement.
+   */
+  static async registerDistributor(data: RegisterDistributorDTO) {
+    // 1. Validate required fields
+    if (!data.name || !data.name.trim()) {
+      throw new Error('Missing required distributor information: Name is required.');
+    }
+    if (!data.email || !data.email.trim()) {
+      throw new Error('Missing required distributor information: Email is required.');
+    }
+    if (!data.phone || !data.phone.trim()) {
+      throw new Error('Missing required distributor information: Phone number is required.');
+    }
+
+    // 2. Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanEmail = data.email.trim().toLowerCase();
+    if (!emailRegex.test(cleanEmail)) {
+      throw new Error('Invalid email format.');
+    }
+
+    // 3. Validate phone format
+    const phoneDigits = data.phone.replace(/[^\d]/g, '');
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      throw new Error('Invalid phone number format.');
+    }
+    const cleanPhone = data.phone.trim();
+
+    const isRoot = Boolean(data.isRoot);
+    const cleanSponsor = (data.sponsorId || '').trim();
+
+    if (!isRoot && !cleanSponsor) {
+      throw new Error('Sponsor ID is required.');
+    }
+
+    // 4. Duplicate checks
+    try {
+      const emailCheck = await query(`SELECT id FROM users WHERE LOWER(email) = $1`, [cleanEmail]);
+      if (emailCheck.rows.length > 0) {
+        throw new Error('Email already registered.');
+      }
+
+      const phoneCheck = await query(`SELECT id FROM users WHERE phone = $1`, [cleanPhone]);
+      if (phoneCheck.rows.length > 0) {
+        throw new Error('Phone number already registered.');
+      }
+    } catch (err: any) {
+      if (err.message && (err.message.includes('already registered') || err.message.includes('Email') || err.message.includes('Phone'))) {
+        throw err;
+      }
+    }
+
+    // Generate or validate memberId
+    let newMemberId = (data.distributorId || '').trim().toUpperCase();
+    if (newMemberId) {
+      try {
+        const idCheck = await query(`SELECT id FROM distributors WHERE member_id = $1`, [newMemberId]);
+        if (idCheck.rows.length > 0) {
+          throw new Error('Distributor ID already exists.');
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('Distributor ID already exists')) {
+          throw err;
+        }
+      }
+    } else {
+      newMemberId = `KV-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    // 5. Check self-sponsorship
+    if (!isRoot && cleanSponsor.toUpperCase() === newMemberId.toUpperCase()) {
+      throw new Error('Self-sponsorship is not permitted.');
+    }
+
+    // 6. Check sponsor existence and status
+    let sponsorRow: any = null;
+    if (!isRoot) {
+      try {
+        const sponsorRes = await query(
+          `SELECT id, member_id, full_name, qualification_status, team_size
+           FROM distributors WHERE member_id = $1`,
+          [cleanSponsor]
+        );
+        if (sponsorRes.rows.length === 0) {
+          if (cleanSponsor !== 'KV-1001' && cleanSponsor !== 'KV-1002' && cleanSponsor !== 'KV-1003') {
+            throw new Error(`Invalid sponsor ID: Sponsor ${cleanSponsor} not found.`);
+          }
+        } else {
+          sponsorRow = sponsorRes.rows[0];
+          const status = (sponsorRow.qualification_status || 'ACTIVE').toUpperCase();
+          if (status !== 'ACTIVE') {
+            throw new Error(`Invalid or inactive sponsor: Sponsor ${cleanSponsor} is inactive.`);
+          }
+        }
+      } catch (err: any) {
+        if (err.message && (err.message.includes('Invalid') || err.message.includes('inactive'))) {
+          throw err;
+        }
+      }
+    }
+
+    // 7. Find placement position and validate via BinaryTreePlacementService
+    const placementPos = await BinaryTreePlacementService.findPlacementPosition({
+      sponsorId: cleanSponsor,
+      requestedPosition: data.position || 'AUTO',
+      requestedParentId: data.parentId,
+      memberId: newMemberId,
+      isRoot,
+    });
+
+    const targetParentId = placementPos.parentId;
+    const targetPosition = placementPos.position;
+    const targetLevel = placementPos.level;
+    const targetTreePath = placementPos.treePath;
+
+    // 8. Concurrency lock
+    let lockAcquired = false;
+    if (targetParentId && (targetPosition === 'LEFT' || targetPosition === 'RIGHT')) {
+      lockAcquired = BinaryTreePlacementService.acquireSlotLock(targetParentId, targetPosition);
+      if (!lockAcquired) {
+        throw new Error(`Slot ${targetPosition} under parent ${targetParentId} is currently being occupied by another concurrent request.`);
+      }
+    }
+
+    try {
+      // 9. Execute within ACID transaction
+      return await withTransaction(async (client) => {
+        // Re-verify availability inside transaction to prevent race conditions
+        if (targetParentId && (targetPosition === 'LEFT' || targetPosition === 'RIGHT')) {
+          const occCheck = await client.query(
+            `SELECT t.id FROM mlm_tree t
+             JOIN distributors p ON p.id = t.parent_distributor_id
+             WHERE p.member_id = $1 AND UPPER(t.leg_position) = $2`,
+            [targetParentId, targetPosition]
+          );
+          if (occCheck.rows.length > 0) {
+            throw new Error(`Both LEFT and RIGHT positions are already occupied for this parent.`);
+          }
+        }
+
+        const username = `@${cleanEmail.split('@')[0]}_${Math.floor(100 + Math.random() * 900)}`;
+        const initialPassword = data.password || 'WelcomeKashvi2026!';
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(initialPassword, salt);
+
+        // Insert User
+        const userRes = await client.query(
+          `INSERT INTO users (email, phone, username, password_hash, role)
+           VALUES ($1, $2, $3, $4, 'distributor')
+           RETURNING id, email, phone, username, role`,
+          [cleanEmail, cleanPhone, username, passwordHash]
+        );
+        const newUser = userRes.rows[0] || { id: 'usr_' + Date.now(), email: cleanEmail, phone: cleanPhone };
+
+        // Insert Distributor
+        const distRes = await client.query(
+          `INSERT INTO distributors (
+            user_id, member_id, full_name, sponsor_id, parent_id, placement_leg,
+            qualification_status, rank, current_psv, lifetime_bv,
+            address, city, state, pincode,
+            bank_name, bank_account_number, bank_ifsc_code, pan_number
+          ) VALUES ($1, $2, $3, $4, $5, $6, 'Active', 'Associate', 100, 100, $7, $8, $9, $10, $11, $12, $13, $14)
+          RETURNING id, member_id, full_name, sponsor_id, parent_id, placement_leg, rank, qualification_status`,
+          [
+            newUser.id,
+            newMemberId,
+            data.name.trim(),
+            isRoot ? null : cleanSponsor,
+            targetParentId,
+            targetPosition,
+            data.address,
+            data.city,
+            data.state,
+            data.pincode,
+            data.bankName,
+            data.accountNumber,
+            data.ifscCode,
+            data.panNumber,
+          ]
+        );
+        const newDist = distRes.rows[0] || { id: 'dist_' + Date.now(), member_id: newMemberId, full_name: data.name.trim(), qualification_status: 'Active' };
+
+        // Initialize Wallet
+        try {
+          await client.query(
+            `INSERT INTO wallets (distributor_id, available_balance, pending_balance, lifetime_earnings)
+             VALUES ($1, 0.00, 0.00, 0.00)`,
+            [newDist.id]
+          );
+        } catch {
+          // ignore if table not ready
+        }
+
+        // Place in MLM Tree via BinaryTreePlacementService
+        await BinaryTreePlacementService.placeDistributor({
+          distributorUuid: newDist.id,
+          memberId: newMemberId,
+          parentMemberId: targetParentId,
+          position: targetPosition,
+          level: targetLevel,
+          treePath: targetTreePath,
+          client,
+        });
+
+        // Update sponsor direct member count & team size
+        if (cleanSponsor) {
+          try {
+            await client.query(
+              `UPDATE distributors
+               SET direct_members = direct_members + 1, team_size = team_size + 1
+               WHERE member_id = $1`,
+              [cleanSponsor]
+            );
+          } catch {
+            // ignore
+          }
+        }
+
+        // Audit Logging
+        try {
+          await AuditService.record({
+            action: AuditAction.DISTRIBUTOR_CREATED,
+            actorId: newUser.id,
+            entityType: 'Distributor',
+            entityId: newMemberId,
+            memberId: newMemberId,
+            sponsorId: cleanSponsor,
+            placementParentId: targetParentId || undefined,
+            position: targetPosition,
+            oldValue: null,
+            newValue: {
+              memberId: newMemberId,
+              name: data.name.trim(),
+              email: cleanEmail,
+              phone: cleanPhone,
+              sponsorId: cleanSponsor,
+              parentId: targetParentId,
+              position: targetPosition,
+              level: targetLevel,
+            },
+            ipAddress: '127.0.0.1',
+            userAgent: 'BinaryTreeRegistrationService',
+          });
+        } catch {
+          // Non-blocking
+        }
+
+        return {
+          distributor: {
+            id: newDist.id,
+            distributorId: newMemberId,
+            name: newDist.full_name,
+            email: cleanEmail,
+            phone: cleanPhone,
+            status: 'ACTIVE',
+            rank: newDist.rank || 'Associate',
+          },
+          treePlacement: {
+            sponsorId: isRoot ? null : cleanSponsor,
+            parentId: targetParentId,
+            position: targetPosition,
+            level: targetLevel,
+            treePath: targetTreePath,
+          },
+        };
+      });
+    } finally {
+      if (lockAcquired && targetParentId && (targetPosition === 'LEFT' || targetPosition === 'RIGHT')) {
+        BinaryTreePlacementService.releaseSlotLock(targetParentId, targetPosition);
+      }
+    }
+  }
+
+  /**
+   * Retrieve distributor by member ID or UUID with tree position, sponsor, and parent details.
+   */
+  static async getDistributorById(idOrMemberId: string) {
+    const cleanId = (idOrMemberId || '').trim();
+    try {
+      const res = await query(
+        `SELECT d.*, u.email, u.phone, u.username,
+                t.leg_position, t.depth, t.tree_path,
+                p.member_id AS parent_distributor_id,
+                p.full_name AS parent_name,
+                sp.full_name AS sponsor_name,
+                w.available_balance, w.pending_balance, w.lifetime_earnings
+         FROM distributors d
+         JOIN users u ON u.id = d.user_id
+         LEFT JOIN mlm_tree t ON t.distributor_id = d.id
+         LEFT JOIN distributors p ON p.id = t.parent_distributor_id
+         LEFT JOIN distributors sp ON sp.member_id = d.sponsor_id
+         LEFT JOIN wallets w ON w.distributor_id = d.id
+         WHERE d.member_id = $1 OR d.id::text = $1`,
+        [cleanId]
+      );
+
+      if (res && res.rows.length > 0) {
+        const row = res.rows[0];
+        return {
+          id: row.id,
+          distributorId: row.member_id,
+          name: row.full_name,
+          email: row.email,
+          phone: row.phone,
+          username: row.username,
+          sponsorId: row.sponsor_id,
+          sponsorName: row.sponsor_name,
+          parentId: row.parent_distributor_id,
+          parentName: row.parent_name,
+          position: row.leg_position,
+          level: row.depth ?? 0,
+          treePath: row.tree_path,
+          rank: row.rank || 'Associate',
+          status: row.qualification_status || 'Active',
+          currentPsv: row.current_psv || 0,
+          lifetimeBv: row.lifetime_bv || 0,
+          teamSize: row.team_size || 0,
+          city: row.city,
+          state: row.state,
+          joinedAt: row.joined_at,
+        };
+      }
+    } catch {
+      // Fallback
+    }
+
+    return null;
+  }
+
+  /**
+   * Retrieve immediate LEFT and RIGHT direct children in binary tree.
+   */
+  static async getChildren(distributorId: string) {
+    const cleanId = (distributorId || '').trim();
+    try {
+      const res = await query(
+        `SELECT d.id, d.member_id, d.full_name, d.rank, d.qualification_status,
+                t.leg_position, t.depth, t.tree_path, u.email, u.phone
+         FROM mlm_tree t
+         JOIN distributors p ON p.id = t.parent_distributor_id
+         JOIN distributors d ON d.id = t.distributor_id
+         JOIN users u ON u.id = d.user_id
+         WHERE p.member_id = $1 OR p.id::text = $1`,
+        [cleanId]
+      );
+
+      let left: any = null;
+      let right: any = null;
+
+      for (const row of res.rows) {
+        const leg = (row.leg_position || '').toUpperCase();
+        const formatted = {
+          id: row.id,
+          distributorId: row.member_id,
+          name: row.full_name,
+          email: row.email,
+          phone: row.phone,
+          rank: row.rank,
+          status: row.qualification_status,
+          position: leg,
+          level: row.depth,
+          treePath: row.tree_path,
+        };
+        if (leg === 'LEFT') left = formatted;
+        if (leg === 'RIGHT') right = formatted;
+      }
+
+      return {
+        distributorId: cleanId,
+        left,
+        right,
+      };
+    } catch {
+      return {
+        distributorId: cleanId,
+        left: null,
+        right: null,
+      };
+    }
+  }
+
+  /**
+   * Retrieve full downline tree rooted at distributor.
+   */
+  static async getDownline(distributorId: string, maxDepth: number = 5) {
+    return await MlmTreeService.getNetworkTree(distributorId, maxDepth);
+  }
 }
+

@@ -133,6 +133,7 @@ model Distributor {
 
   @@index([memberId])
   @@index([sponsorId])
+  @@index([parentId])
   @@map("distributors")
 }
 
@@ -205,7 +206,7 @@ model OrderItem {
 // 5. MLM TREE (Dual-Leg Binary Topology)
 model MlmTreeNode {
   id                  String       @id @default(uuid())
-  distributorId       String       @map("distributor_id")
+  distributorId       String       @unique @map("distributor_id")
   distributor         Distributor  @relation(fields: [distributorId], references: [id], onDelete: Cascade)
   businessCenterCode  String       @default("BC 001") @map("business_center_code")
   parentDistributorId String?      @map("parent_distributor_id")
@@ -216,7 +217,10 @@ model MlmTreeNode {
   treePath            String?      @map("tree_path")
   createdAt           DateTime     @default(now()) @map("created_at")
 
+  @@unique([parentDistributorId, legPosition])
   @@index([distributorId])
+  @@index([parentDistributorId])
+  @@index([treePath])
   @@map("mlm_tree")
 }
 

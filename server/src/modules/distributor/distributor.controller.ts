@@ -125,4 +125,43 @@ export class DistributorController {
       next(err);
     }
   }
+
+  static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await DistributorService.registerDistributor(req.body);
+      res.status(201).json({
+        success: true,
+        message: 'Distributor registered successfully.',
+        data: result,
+      });
+    } catch (err: any) {
+      res.status(400).json({
+        success: false,
+        message: err.message || 'Distributor registration failed.',
+      });
+    }
+  }
+
+  static async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = req.params.id;
+      if (!id) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const distributor = await DistributorService.getDistributorById(id);
+      if (!distributor) {
+        res.status(404).json({ success: false, message: 'Distributor not found.' });
+        return;
+      }
+
+      const isOwnerOrAdmin = req.user?.memberId === distributor.distributorId || req.user?.role?.toLowerCase() === 'admin';
+      const sanitized = sanitizeProfileOutput(distributor, isOwnerOrAdmin);
+      res.status(200).json({ success: true, data: sanitized });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
+

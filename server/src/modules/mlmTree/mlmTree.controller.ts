@@ -1,31 +1,35 @@
 import { Request, Response, NextFunction } from 'express';
 import { MlmTreeService } from './mlmTree.service.js';
 import { AuthRequest } from '../../middleware/auth.js';
+import { DistributorService } from '../distributor/distributor.service.js';
+import { TreeValidationService } from './treeValidation.service.js';
 
 export class MlmTreeController {
   static async getMyNetworkTree(req: any, res: Response): Promise<void> {
     const memberId = req.user?.distributorId || req.user?.memberId || 'KV-1001';
-    const depth = parseInt(req.query.depth as string, 10) || 3;
-    const tree = MlmTreeService.getNetworkTree(memberId, depth);
+    const rawDepth = parseInt(req.query.depth as string, 10);
+    const depth = isNaN(rawDepth) ? 3 : Math.min(Math.max(1, rawDepth), 6);
+    const tree = await MlmTreeService.getNetworkTree(memberId, depth);
     res.status(200).json({ success: true, data: tree });
   }
 
   static async getMemberNetworkTree(req: Request, res: Response): Promise<void> {
     const memberId = req.params.distributorId;
-    const depth = parseInt(req.query.depth as string, 10) || 3;
-    const tree = MlmTreeService.getNetworkTree(memberId, depth);
+    const rawDepth = parseInt(req.query.depth as string, 10);
+    const depth = isNaN(rawDepth) ? 3 : Math.min(Math.max(1, rawDepth), 6);
+    const tree = await MlmTreeService.getNetworkTree(memberId, depth);
     res.status(200).json({ success: true, data: tree });
   }
 
   static async getMemberNetworkSummary(req: Request, res: Response): Promise<void> {
     const memberId = req.params.distributorId;
-    const summary = MlmTreeService.getNetworkSummary(memberId);
+    const summary = await MlmTreeService.getNetworkSummary(memberId);
     res.status(200).json({ success: true, data: summary });
   }
 
   static async searchNetworkTree(req: Request, res: Response): Promise<void> {
     const q = ((req.query.q as string) || '').trim();
-    const results = MlmTreeService.searchDistributors(q);
+    const results = await MlmTreeService.searchDistributors(q);
     res.status(200).json({ success: true, data: results });
   }
 
@@ -36,7 +40,8 @@ export class MlmTreeController {
         res.status(400).json({ success: false, message: 'Member ID required.' });
         return;
       }
-      const depth = parseInt(req.query.depth as string) || 3;
+      const rawDepth = parseInt(req.query.depth as string, 10);
+      const depth = isNaN(rawDepth) ? 3 : Math.min(Math.max(1, rawDepth), 6);
       const tree = await MlmTreeService.getTreeByDistributor(memberId, depth);
       res.status(200).json({ success: true, data: tree });
     } catch (err) {
@@ -66,6 +71,11 @@ export class MlmTreeController {
    */
   static async moveDistributor(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (req.user && req.user.role && !['admin', 'super_admin'].includes(req.user.role.toLowerCase())) {
+        res.status(403).json({ success: false, message: '403 Forbidden: Admin role required to move a distributor.' });
+        return;
+      }
+
       const memberId = req.params.memberId || req.body.memberId;
       const { oldParent, oldPosition, newParent, newPosition, reason, timestamp } = req.body;
       const adminId = req.user?.id || req.user?.memberId || req.body.adminId;
@@ -88,6 +98,11 @@ export class MlmTreeController {
       }
       if (!newPosition || !newPosition.trim()) {
         res.status(400).json({ success: false, message: 'New Position is required to move a distributor.' });
+        return;
+      }
+      const upperNewPos = (newPosition || '').trim().toUpperCase();
+      if (upperNewPos !== 'LEFT' && upperNewPos !== 'RIGHT') {
+        res.status(400).json({ success: false, message: 'New Position must be either LEFT or RIGHT.' });
         return;
       }
       if (!adminId || !adminId.trim()) {
@@ -121,7 +136,14 @@ export class MlmTreeController {
 
       res.status(200).json(result);
     } catch (err: any) {
-      if (err.message && err.message.includes('required')) {
+      if (
+        err.message &&
+        (err.message.includes('required') ||
+          err.message.includes('Circular') ||
+          err.message.includes('cannot be placed') ||
+          err.message.includes('occupied') ||
+          err.message.includes('violation'))
+      ) {
         res.status(400).json({ success: false, message: err.message });
         return;
       }
@@ -195,6 +217,11 @@ export class MlmTreeController {
    */
   static async removeMember(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (req.user && req.user.role && !['admin', 'super_admin'].includes(req.user.role.toLowerCase())) {
+        res.status(403).json({ success: false, message: '403 Forbidden: Admin role required to remove a distributor.' });
+        return;
+      }
+
       const { memberId, reason } = req.body;
       const actorId = req.user?.id || req.user?.memberId || 'admin';
       const ip =
@@ -223,6 +250,11 @@ export class MlmTreeController {
    */
   static async assignSponsor(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (req.user && req.user.role && !['admin', 'super_admin'].includes(req.user.role.toLowerCase())) {
+        res.status(403).json({ success: false, message: '403 Forbidden: Admin role required to assign sponsor.' });
+        return;
+      }
+
       const { memberId, newSponsorId, oldSponsorId, reason } = req.body;
       const actorId = req.user?.id || req.user?.memberId || 'admin';
       const ip =
@@ -278,4 +310,61 @@ export class MlmTreeController {
       next(err);
     }
   }
+
+  /**
+   * GET /api/tree/:distributorId/children
+   * Retrieve direct LEFT and RIGHT children of a distributor.
+   */
+  static async getChildren(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const children = await DistributorService.getChildren(distributorId);
+      res.status(200).json({ success: true, data: children });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/downline
+   * Retrieve full downline hierarchy of a distributor.
+   */
+  static async getDownline(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const rawDepth = parseInt(req.query.depth as string, 10);
+      const depth = isNaN(rawDepth) ? 5 : Math.min(Math.max(1, rawDepth), 10);
+      const downline = await DistributorService.getDownline(distributorId, depth);
+      res.status(200).json({ success: true, data: downline });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/tree/validate/integrity
+   * Run full audit and tree validation check across all nodes.
+   */
+  static async validateIntegrity(_req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const report = await TreeValidationService.validateTreeIntegrity();
+      res.status(200).json({
+        success: report.isValid,
+        data: report,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
+

@@ -442,6 +442,7 @@ function NetworkTreePage({ embedded = false }) {
     try {
       const res = await api.getMemberNetworkTree(nodeId, 2);
       const fetchedRoot = res?.root || res;
+      if (fetchedRoot) {
         const hasAnyChildren = Boolean(fetchedRoot.left || fetchedRoot.right);
         setTreeData((prev) =>
           updateNodeInTree(prev, nodeId, (curr) => ({
@@ -454,6 +455,7 @@ function NetworkTreePage({ embedded = false }) {
             isCollapsed: false,
           }))
         );
+      }
     } catch (err) {
       console.error(`Failed to expand node ${nodeId}:`, err);
     } finally {
