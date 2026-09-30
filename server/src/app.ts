@@ -18,6 +18,8 @@ import productRoutes from './modules/products/product.routes.js';
 import orderRoutes from './modules/orders/order.routes.js';
 import { EnrollmentController } from './modules/enrollment/enrollment.controller.js';
 import mlmTreeRoutes from './modules/mlmTree/mlmTree.routes.js';
+import businessVolumeRoutes from './modules/bvEngine/businessVolume.routes.js';
+import commissionRoutes from './modules/commissionEngine/commission.routes.js';
 import bvEngineRoutes from './modules/bvEngine/bvEngine.routes.js';
 import commissionEngineRoutes from './modules/commissionEngine/commissionEngine.routes.js';
 import walletRoutes from './modules/wallet/wallet.routes.js';
@@ -133,10 +135,14 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// 8. API Routing Tables
-// Prompt 3 REST API Endpoints
+// Prompt 3, 4, 5, 6 REST API Endpoints
+app.use('/api/auth', authRoutes);
 app.use('/api/distributors', distributorRoutes);
 app.use('/api/tree', mlmTreeRoutes);
+app.use('/api/business-volume', businessVolumeRoutes);
+app.use('/api/commission', commissionRoutes);
+app.use('/api/commissions', commissionRoutes);
+app.use('/api/admin', adminRoutes);
 
 // API v1 Routing Table (14 Modules)
 app.use('/api/v1/auth', authRoutes);
@@ -149,7 +155,9 @@ app.use('/api/v1/tree', mlmTreeRoutes);
 app.use('/api/v1/network-tree', mlmTreeRoutes);
 
 app.use('/api/v1/bv', bvEngineRoutes);
+app.use('/api/v1/business-volume', businessVolumeRoutes);
 app.use('/api/v1/commissions', commissionEngineRoutes);
+app.use('/api/v1/commission', commissionRoutes);
 app.use('/api/v1/wallet', walletRoutes);
 app.use('/api/v1/payouts', payoutRoutes);
 app.use('/api/v1/training', trainingRoutes);

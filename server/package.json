@@ -11,7 +11,10 @@
     "test:tree": "tsx --test src/modules/mlmTree/mlmTree.test.ts",
     "test:api": "tsx --test src/modules/mlmTree/mlmTree.api.test.ts",
     "test:placement": "tsx --test src/modules/mlmTree/binaryPlacement.test.ts",
-    "test": "tsx --test src/modules/mlmTree/mlmTree.test.ts src/modules/mlmTree/mlmTree.api.test.ts src/modules/mlmTree/binaryPlacement.test.ts"
+    "test:prompt4": "tsx --test src/modules/mlmTree/binaryTree.test.ts",
+    "test:prompt5": "tsx --test src/modules/commissionEngine/commission.test.ts",
+    "test:prompt6": "tsx --test src/modules/auth/auth.test.ts",
+    "test": "tsx --test src/modules/mlmTree/mlmTree.test.ts src/modules/mlmTree/mlmTree.api.test.ts src/modules/mlmTree/binaryPlacement.test.ts src/modules/mlmTree/binaryTree.test.ts src/modules/commissionEngine/commission.test.ts src/modules/auth/auth.test.ts"
   },
   "keywords": [
     "mlm",

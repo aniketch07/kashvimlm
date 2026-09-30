@@ -89,4 +89,8 @@ router.patch('/tree/audit-logs/:id', TreeAuditController.blockAuditMutation);
 router.delete('/tree/audit-logs/:id', TreeAuditController.blockAuditMutation);
 router.delete('/tree/audit-logs', TreeAuditController.blockAuditMutation);
 
+// 23. Member Level & Volume Recalculation Engine (Prompt 7)
+import { adminMemberRouter } from './adminMember.routes';
+router.use('/members', adminMemberRouter);
+
 export const adminRouter = router;

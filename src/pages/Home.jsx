@@ -12,6 +12,7 @@ import {
   Megaphone,
   GitFork,
   Crown,
+  Gem,
   Award,
   CheckCircle2,
 } from 'lucide-react';
@@ -60,70 +61,87 @@ function Home() {
     state: 'Maharashtra',
   });
 
-  // Binary Tree 4 Stages Data: Diamond (Apex) -> Platinum -> Gold -> Silver (Base)
+  // Binary Tree 5 Stages Data: Ruby (Apex) -> Diamond -> Platinum -> Gold -> Silver (Base)
   const binaryNodes = {
-    // Stage 1: Diamond (Apex)
-    root: {
+    // Stage 1: Ruby (Apex Leader)
+    ruby: {
       name: 'You (Leader)',
+      rank: 'Ruby',
+    },
+    // Stage 2: Diamond (Dual Frontline Leaders)
+    diamond1: {
+      name: 'Rahul Sharma',
       rank: 'Diamond',
     },
-    // Stage 2: Platinum (Dual Frontline)
+    diamond2: {
+      name: 'Priya Mehta',
+      rank: 'Diamond',
+    },
+    // Stage 3: Platinum (Senior Directors)
     plat1: {
-      name: 'Rahul Sharma',
+      name: 'Amit Kumar',
       rank: 'Platinum',
     },
     plat2: {
-      name: 'Priya Mehta',
+      name: 'Sneha Patel',
       rank: 'Platinum',
     },
-    // Stage 3: Gold (Team Builders)
+    plat3: {
+      name: 'Vikram D.',
+      rank: 'Platinum',
+    },
+    plat4: {
+      name: 'Ananya Roy',
+      rank: 'Platinum',
+    },
+    // Stage 4: Gold (Team Managers)
     gold1: {
-      name: 'Amit Kumar',
+      name: 'Kavita S.',
       rank: 'Gold',
     },
     gold2: {
-      name: 'Sneha Patel',
+      name: 'Rohan V.',
       rank: 'Gold',
     },
     gold3: {
-      name: 'Vikram D.',
+      name: 'Pooja J.',
       rank: 'Gold',
     },
     gold4: {
-      name: 'Ananya Roy',
+      name: 'Manish T.',
       rank: 'Gold',
     },
-    // Stage 4: Silver (Associates at foundation)
+    // Stage 5: Silver (Foundation Associates)
     silver1: {
-      name: 'Kavita S.',
-      rank: 'Silver',
-    },
-    silver2: {
-      name: 'Rohan V.',
-      rank: 'Silver',
-    },
-    silver3: {
-      name: 'Pooja J.',
-      rank: 'Silver',
-    },
-    silver4: {
-      name: 'Manish T.',
-      rank: 'Silver',
-    },
-    silver5: {
       name: 'Deepak N.',
       rank: 'Silver',
     },
-    silver6: {
+    silver2: {
       name: 'Sunita M.',
       rank: 'Silver',
     },
-    silver7: {
+    silver3: {
       name: 'Rajesh K.',
       rank: 'Silver',
     },
-    silver8: {
+    silver4: {
       name: 'Kiran B.',
+      rank: 'Silver',
+    },
+    silver5: {
+      name: 'Arjun P.',
+      rank: 'Silver',
+    },
+    silver6: {
+      name: 'Neha G.',
+      rank: 'Silver',
+    },
+    silver7: {
+      name: 'Suresh M.',
+      rank: 'Silver',
+    },
+    silver8: {
+      name: 'Divya K.',
       rank: 'Silver',
     },
   };
@@ -585,7 +603,7 @@ function Home() {
       </section>
 
       {/* =========================================================================
-          4. INTERACTIVE ANIMATED BINARY TREE SECTION (4 Stages: Diamond to Silver)
+          4. INTERACTIVE ANIMATED BINARY TREE SECTION (5 Stages: Ruby to Silver)
           ========================================================================= */}
       <section className="vadic-binary-tree-section" aria-label="Binary Network Architecture">
         <div className="binary-tree-container">
@@ -593,7 +611,7 @@ function Home() {
           <div className="binary-section-header">
             <div className="story-badge-pill">
               <GitFork size={14} />
-              <span>4-STAGE LEADERSHIP LINEAGE</span>
+              <span>5-STAGE LEADERSHIP LINEAGE</span>
             </div>
 
             <h2 className="binary-section-title">
@@ -601,27 +619,50 @@ function Home() {
             </h2>
 
             <p className="binary-section-desc">
-              Compounding across 4 leadership tiers: Beginning from <strong>Silver Associates</strong> at the foundation,
-              ascending through <strong>Gold Managers</strong>, <strong>Platinum Executives</strong>, to the apex <strong>Diamond Leader</strong>.
+              Compounding across 5 elite tiers: From foundational <strong>Silver Associates</strong>, ascending through <strong>Gold Managers</strong>, <strong>Platinum Executives</strong>, and <strong>Diamond Directors</strong>, to the apex <strong>Ruby Crown Leader</strong>.
             </p>
+
+            {/* 5-Level Visual Rank Legend */}
+            <div className="binary-rank-legend-bar">
+              <div className="rank-legend-chip chip-ruby">
+                <Crown size={13} />
+                <span>Ruby (Apex)</span>
+              </div>
+              <div className="rank-legend-chip chip-diamond">
+                <Gem size={13} />
+                <span>Diamond</span>
+              </div>
+              <div className="rank-legend-chip chip-platinum">
+                <Award size={13} />
+                <span>Platinum</span>
+              </div>
+              <div className="rank-legend-chip chip-gold">
+                <Users size={13} />
+                <span>Gold</span>
+              </div>
+              <div className="rank-legend-chip chip-silver">
+                <CheckCircle2 size={13} />
+                <span>Silver (Base)</span>
+              </div>
+            </div>
           </div>
 
-          {/* Interactive Binary Canvas Board */}
+          {/* Interactive Binary Canvas Board - NON-SCROLLABLE */}
           <div className="binary-board-wrapper">
-            <div className="binary-scroll-hint">
-              <span>↔ Swipe or scroll horizontally to inspect full lineage</span>
-            </div>
-
             <div className="binary-tree-board">
               {/* SVG Connecting Vector Lines & Animated Pulse Rays */}
               <svg
                 className="binary-svg-lines"
-                viewBox="0 0 1180 500"
+                viewBox="0 0 1000 500"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <defs>
                   {/* Gradients */}
+                  <linearGradient id="grad-ruby-diamond" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.95" />
+                    <stop offset="100%" stopColor="#00e5ff" stopOpacity="0.9" />
+                  </linearGradient>
                   <linearGradient id="grad-diamond-plat" x1="0%" y1="0%" x2="0%" y2="100%">
                     <stop offset="0%" stopColor="#00e5ff" stopOpacity="0.9" />
                     <stop offset="100%" stopColor="#e2e8f0" stopOpacity="0.9" />
@@ -634,12 +675,20 @@ function Home() {
                     <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.9" />
                     <stop offset="100%" stopColor="#94a3b8" stopOpacity="0.9" />
                   </linearGradient>
+                  <filter id="svg-glow-ruby" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3.5" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
                   <filter id="svg-glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur stdDeviation="3" result="blur" />
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                   </filter>
+                  <filter id="svg-glow-plat" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
                   <filter id="svg-glow-gold" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
                     <feComposite in="SourceGraphic" in2="blur" operator="over" />
                   </filter>
                   <filter id="svg-glow-silver" x="-20%" y="-20%" width="140%" height="140%">
@@ -648,458 +697,376 @@ function Home() {
                   </filter>
                 </defs>
 
-                {/* STAGE 1 -> STAGE 2 (Diamond Root to 2 Platinum Executives) */}
-                <path
-                  d="M 590 78 C 590 120, 330 100, 330 145"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 590 78 C 590 120, 330 100, 330 145"
-                  stroke="url(#grad-diamond-plat)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="4" fill="#00e5ff" filter="url(#svg-glow-cyan)">
-                  <animateMotion
-                    path="M 590 78 C 590 120, 330 100, 330 145"
-                    dur="2s"
-                    repeatCount="indefinite"
-                  />
+                {/* 1. RUBY APEX -> 2 DIAMONDS */}
+                <path d="M 500 56 C 500 90, 260 84, 260 118" className="tree-track-line" />
+                <path d="M 500 56 C 500 90, 260 84, 260 118" stroke="url(#grad-ruby-diamond)" className="tree-flow-line flowing" />
+                <circle r="3.5" fill="#f43f5e" filter="url(#svg-glow-ruby)">
+                  <animateMotion path="M 500 56 C 500 90, 260 84, 260 118" dur="2s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 590 78 C 590 120, 850 100, 850 145"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 590 78 C 590 120, 850 100, 850 145"
-                  stroke="url(#grad-diamond-plat)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="4" fill="#00e5ff" filter="url(#svg-glow-cyan)">
-                  <animateMotion
-                    path="M 590 78 C 590 120, 850 100, 850 145"
-                    dur="2s"
-                    repeatCount="indefinite"
-                  />
+                <path d="M 500 56 C 500 90, 740 84, 740 118" className="tree-track-line" />
+                <path d="M 500 56 C 500 90, 740 84, 740 118" stroke="url(#grad-ruby-diamond)" className="tree-flow-line flowing" />
+                <circle r="3.5" fill="#f43f5e" filter="url(#svg-glow-ruby)">
+                  <animateMotion path="M 500 56 C 500 90, 740 84, 740 118" dur="2s" begin="0.4s" repeatCount="indefinite" />
                 </circle>
 
-                {/* STAGE 2 -> STAGE 3 (2 Platinum Executives to 4 Gold Managers) */}
-                <path
-                  d="M 330 195 C 330 240, 200 225, 200 270"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 330 195 C 330 240, 200 225, 200 270"
-                  stroke="url(#grad-plat-gold)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3.5" fill="#fbbf24" filter="url(#svg-glow-gold)">
-                  <animateMotion
-                    path="M 330 195 C 330 240, 200 225, 200 270"
-                    dur="2.2s"
-                    begin="0.3s"
-                    repeatCount="indefinite"
-                  />
+                {/* 2. DIAMONDS -> 4 PLATINUMS */}
+                {/* Left Diamond to Plat 1 & Plat 2 */}
+                <path d="M 260 158 C 260 190, 140 186, 140 218" className="tree-track-line" />
+                <path d="M 260 158 C 260 190, 140 186, 140 218" stroke="url(#grad-diamond-plat)" className="tree-flow-line flowing" />
+                <circle r="3" fill="#00e5ff" filter="url(#svg-glow-cyan)">
+                  <animateMotion path="M 260 158 C 260 190, 140 186, 140 218" dur="2.2s" begin="0.2s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 330 195 C 330 240, 460 225, 460 270"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 330 195 C 330 240, 460 225, 460 270"
-                  stroke="url(#grad-plat-gold)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3.5" fill="#fbbf24" filter="url(#svg-glow-gold)">
-                  <animateMotion
-                    path="M 330 195 C 330 240, 460 225, 460 270"
-                    dur="2.2s"
-                    begin="0.5s"
-                    repeatCount="indefinite"
-                  />
+                <path d="M 260 158 C 260 190, 380 186, 380 218" className="tree-track-line" />
+                <path d="M 260 158 C 260 190, 380 186, 380 218" stroke="url(#grad-diamond-plat)" className="tree-flow-line flowing" />
+                <circle r="3" fill="#00e5ff" filter="url(#svg-glow-cyan)">
+                  <animateMotion path="M 260 158 C 260 190, 380 186, 380 218" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 850 195 C 850 240, 720 225, 720 270"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 850 195 C 850 240, 720 225, 720 270"
-                  stroke="url(#grad-plat-gold)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3.5" fill="#fbbf24" filter="url(#svg-glow-gold)">
-                  <animateMotion
-                    path="M 850 195 C 850 240, 720 225, 720 270"
-                    dur="2.2s"
-                    begin="0.3s"
-                    repeatCount="indefinite"
-                  />
+                {/* Right Diamond to Plat 3 & Plat 4 */}
+                <path d="M 740 158 C 740 190, 620 186, 620 218" className="tree-track-line" />
+                <path d="M 740 158 C 740 190, 620 186, 620 218" stroke="url(#grad-diamond-plat)" className="tree-flow-line flowing" />
+                <circle r="3" fill="#00e5ff" filter="url(#svg-glow-cyan)">
+                  <animateMotion path="M 740 158 C 740 190, 620 186, 620 218" dur="2.2s" begin="0.3s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 850 195 C 850 240, 980 225, 980 270"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 850 195 C 850 240, 980 225, 980 270"
-                  stroke="url(#grad-plat-gold)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3.5" fill="#fbbf24" filter="url(#svg-glow-gold)">
-                  <animateMotion
-                    path="M 850 195 C 850 240, 980 225, 980 270"
-                    dur="2.2s"
-                    begin="0.5s"
-                    repeatCount="indefinite"
-                  />
+                <path d="M 740 158 C 740 190, 860 186, 860 218" className="tree-track-line" />
+                <path d="M 740 158 C 740 190, 860 186, 860 218" stroke="url(#grad-diamond-plat)" className="tree-flow-line flowing" />
+                <circle r="3" fill="#00e5ff" filter="url(#svg-glow-cyan)">
+                  <animateMotion path="M 740 158 C 740 190, 860 186, 860 218" dur="2.2s" begin="0.6s" repeatCount="indefinite" />
                 </circle>
 
-                {/* STAGE 3 -> STAGE 4 (4 Gold Managers to 8 Silver Associates) */}
-                <path
-                  d="M 200 318 C 200 365, 135 350, 135 395"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 200 318 C 200 365, 135 350, 135 395"
-                  stroke="url(#grad-gold-silver)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3" fill="#94a3b8" filter="url(#svg-glow-silver)">
-                  <animateMotion
-                    path="M 200 318 C 200 365, 135 350, 135 395"
-                    dur="2.4s"
-                    begin="0.6s"
-                    repeatCount="indefinite"
-                  />
+                {/* 3. PLATINUMS -> 4 GOLDS */}
+                <path d="M 140 256 L 140 318" className="tree-track-line" />
+                <path d="M 140 256 L 140 318" stroke="url(#grad-plat-gold)" className="tree-flow-line flowing" />
+                <circle r="3" fill="#e2e8f0" filter="url(#svg-glow-plat)">
+                  <animateMotion path="M 140 256 L 140 318" dur="1.8s" begin="0.1s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 200 318 C 200 365, 265 350, 265 395"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 200 318 C 200 365, 265 350, 265 395"
-                  stroke="url(#grad-gold-silver)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3" fill="#94a3b8" filter="url(#svg-glow-silver)">
-                  <animateMotion
-                    path="M 200 318 C 200 365, 265 350, 265 395"
-                    dur="2.4s"
-                    begin="0.8s"
-                    repeatCount="indefinite"
-                  />
+                <path d="M 380 256 L 380 318" className="tree-track-line" />
+                <path d="M 380 256 L 380 318" stroke="url(#grad-plat-gold)" className="tree-flow-line flowing" />
+                <circle r="3" fill="#e2e8f0" filter="url(#svg-glow-plat)">
+                  <animateMotion path="M 380 256 L 380 318" dur="1.8s" begin="0.4s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 460 318 C 460 365, 395 350, 395 395"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 460 318 C 460 365, 395 350, 395 395"
-                  stroke="url(#grad-gold-silver)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3" fill="#94a3b8" filter="url(#svg-glow-silver)">
-                  <animateMotion
-                    path="M 460 318 C 460 365, 395 350, 395 395"
-                    dur="2.4s"
-                    begin="0.6s"
-                    repeatCount="indefinite"
-                  />
+                <path d="M 620 256 L 620 318" className="tree-track-line" />
+                <path d="M 620 256 L 620 318" stroke="url(#grad-plat-gold)" className="tree-flow-line flowing" />
+                <circle r="3" fill="#e2e8f0" filter="url(#svg-glow-plat)">
+                  <animateMotion path="M 620 256 L 620 318" dur="1.8s" begin="0.2s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 460 318 C 460 365, 525 350, 525 395"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 460 318 C 460 365, 525 350, 525 395"
-                  stroke="url(#grad-gold-silver)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3" fill="#94a3b8" filter="url(#svg-glow-silver)">
-                  <animateMotion
-                    path="M 460 318 C 460 365, 525 350, 525 395"
-                    dur="2.4s"
-                    begin="0.8s"
-                    repeatCount="indefinite"
-                  />
+                <path d="M 860 256 L 860 318" className="tree-track-line" />
+                <path d="M 860 256 L 860 318" stroke="url(#grad-plat-gold)" className="tree-flow-line flowing" />
+                <circle r="3" fill="#e2e8f0" filter="url(#svg-glow-plat)">
+                  <animateMotion path="M 860 256 L 860 318" dur="1.8s" begin="0.5s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 720 318 C 720 365, 655 350, 655 395"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 720 318 C 720 365, 655 350, 655 395"
-                  stroke="url(#grad-gold-silver)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3" fill="#94a3b8" filter="url(#svg-glow-silver)">
-                  <animateMotion
-                    path="M 720 318 C 720 365, 655 350, 655 395"
-                    dur="2.4s"
-                    begin="0.6s"
-                    repeatCount="indefinite"
-                  />
+                {/* 4. GOLDS -> 8 SILVERS */}
+                {/* Gold 1 to Silver 1 & Silver 2 */}
+                <path d="M 140 354 C 140 390, 80 384, 80 420" className="tree-track-line" />
+                <path d="M 140 354 C 140 390, 80 384, 80 420" stroke="url(#grad-gold-silver)" className="tree-flow-line flowing" />
+                <circle r="2.8" fill="#fbbf24" filter="url(#svg-glow-gold)">
+                  <animateMotion path="M 140 354 C 140 390, 80 384, 80 420" dur="2.2s" begin="0.2s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 720 318 C 720 365, 785 350, 785 395"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 720 318 C 720 365, 785 350, 785 395"
-                  stroke="url(#grad-gold-silver)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3" fill="#94a3b8" filter="url(#svg-glow-silver)">
-                  <animateMotion
-                    path="M 720 318 C 720 365, 785 350, 785 395"
-                    dur="2.4s"
-                    begin="0.8s"
-                    repeatCount="indefinite"
-                  />
+                <path d="M 140 354 C 140 390, 200 384, 200 420" className="tree-track-line" />
+                <path d="M 140 354 C 140 390, 200 384, 200 420" stroke="url(#grad-gold-silver)" className="tree-flow-line flowing" />
+                <circle r="2.8" fill="#fbbf24" filter="url(#svg-glow-gold)">
+                  <animateMotion path="M 140 354 C 140 390, 200 384, 200 420" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 980 318 C 980 365, 915 350, 915 395"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 980 318 C 980 365, 915 350, 915 395"
-                  stroke="url(#grad-gold-silver)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3" fill="#94a3b8" filter="url(#svg-glow-silver)">
-                  <animateMotion
-                    path="M 980 318 C 980 365, 915 350, 915 395"
-                    dur="2.4s"
-                    begin="0.6s"
-                    repeatCount="indefinite"
-                  />
+                {/* Gold 2 to Silver 3 & Silver 4 */}
+                <path d="M 380 354 C 380 390, 320 384, 320 420" className="tree-track-line" />
+                <path d="M 380 354 C 380 390, 320 384, 320 420" stroke="url(#grad-gold-silver)" className="tree-flow-line flowing" />
+                <circle r="2.8" fill="#fbbf24" filter="url(#svg-glow-gold)">
+                  <animateMotion path="M 380 354 C 380 390, 320 384, 320 420" dur="2.2s" begin="0.3s" repeatCount="indefinite" />
                 </circle>
 
-                <path
-                  d="M 980 318 C 980 365, 1045 350, 1045 395"
-                  className="tree-track-line"
-                />
-                <path
-                  d="M 980 318 C 980 365, 1045 350, 1045 395"
-                  stroke="url(#grad-gold-silver)"
-                  className="tree-flow-line flowing"
-                />
-                <circle r="3" fill="#94a3b8" filter="url(#svg-glow-silver)">
-                  <animateMotion
-                    path="M 980 318 C 980 365, 1045 350, 1045 395"
-                    dur="2.4s"
-                    begin="0.8s"
-                    repeatCount="indefinite"
-                  />
+                <path d="M 380 354 C 380 390, 440 384, 440 420" className="tree-track-line" />
+                <path d="M 380 354 C 380 390, 440 384, 440 420" stroke="url(#grad-gold-silver)" className="tree-flow-line flowing" />
+                <circle r="2.8" fill="#fbbf24" filter="url(#svg-glow-gold)">
+                  <animateMotion path="M 380 354 C 380 390, 440 384, 440 420" dur="2.2s" begin="0.6s" repeatCount="indefinite" />
+                </circle>
+
+                {/* Gold 3 to Silver 5 & Silver 6 */}
+                <path d="M 620 354 C 620 390, 560 384, 560 420" className="tree-track-line" />
+                <path d="M 620 354 C 620 390, 560 384, 560 420" stroke="url(#grad-gold-silver)" className="tree-flow-line flowing" />
+                <circle r="2.8" fill="#fbbf24" filter="url(#svg-glow-gold)">
+                  <animateMotion path="M 620 354 C 620 390, 560 384, 560 420" dur="2.2s" begin="0.2s" repeatCount="indefinite" />
+                </circle>
+
+                <path d="M 620 354 C 620 390, 680 384, 680 420" className="tree-track-line" />
+                <path d="M 620 354 C 620 390, 680 384, 680 420" stroke="url(#grad-gold-silver)" className="tree-flow-line flowing" />
+                <circle r="2.8" fill="#fbbf24" filter="url(#svg-glow-gold)">
+                  <animateMotion path="M 620 354 C 620 390, 680 384, 680 420" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
+                </circle>
+
+                {/* Gold 4 to Silver 7 & Silver 8 */}
+                <path d="M 860 354 C 860 390, 800 384, 800 420" className="tree-track-line" />
+                <path d="M 860 354 C 860 390, 800 384, 800 420" stroke="url(#grad-gold-silver)" className="tree-flow-line flowing" />
+                <circle r="2.8" fill="#fbbf24" filter="url(#svg-glow-gold)">
+                  <animateMotion path="M 860 354 C 860 390, 800 384, 800 420" dur="2.2s" begin="0.3s" repeatCount="indefinite" />
+                </circle>
+
+                <path d="M 860 354 C 860 390, 920 384, 920 420" className="tree-track-line" />
+                <path d="M 860 354 C 860 390, 920 384, 920 420" stroke="url(#grad-gold-silver)" className="tree-flow-line flowing" />
+                <circle r="2.8" fill="#fbbf24" filter="url(#svg-glow-gold)">
+                  <animateMotion path="M 860 354 C 860 390, 920 384, 920 420" dur="2.2s" begin="0.7s" repeatCount="indefinite" />
                 </circle>
               </svg>
 
-              {/* HTML NODES OVERLAY (4 Symmetrical Stages) */}
+              {/* HTML NODES OVERLAY (5 Symmetrical Stages, 19 Cards) */}
 
-              {/* STAGE 1: DIAMOND (Apex Root) */}
-              <div className="binary-node-card node-root tier-diamond">
-                <div className="node-avatar avatar-diamond">
-                  <Crown size={18} />
+              {/* STAGE 1: RUBY (Apex Root) */}
+              <div className="vadic-tree-card node-ruby tier-ruby">
+                <div className="vadic-tree-avatar avatar-ruby">
+                  <Crown size={16} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.root.name}</span>
-                    <span className="node-status-dot dot-active" title="Active Member" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.ruby.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" title="Active Member" />
                   </div>
-                  <span className="node-rank rank-diamond">{binaryNodes.root.rank}</span>
+                  <span className="vadic-tree-rank rank-ruby">{binaryNodes.ruby.rank}</span>
                 </div>
               </div>
 
-              {/* STAGE 2: PLATINUM (Dual Frontline Leaders) */}
-              <div className="binary-node-card node-plat-1 tier-platinum">
-                <div className="node-avatar avatar-platinum">
-                  <Award size={16} />
+              {/* STAGE 2: DIAMOND (Dual Frontline Leaders) */}
+              <div className="vadic-tree-card node-diamond-1 tier-diamond">
+                <div className="vadic-tree-avatar avatar-diamond">
+                  <Gem size={15} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.plat1.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.diamond1.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-platinum">{binaryNodes.plat1.rank}</span>
+                  <span className="vadic-tree-rank rank-diamond">{binaryNodes.diamond1.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-plat-2 tier-platinum">
-                <div className="node-avatar avatar-platinum">
-                  <Award size={16} />
+              <div className="vadic-tree-card node-diamond-2 tier-diamond">
+                <div className="vadic-tree-avatar avatar-diamond">
+                  <Gem size={15} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.plat2.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.diamond2.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-platinum">{binaryNodes.plat2.rank}</span>
+                  <span className="vadic-tree-rank rank-diamond">{binaryNodes.diamond2.rank}</span>
                 </div>
               </div>
 
-              {/* STAGE 3: GOLD (Team Builders) */}
-              <div className="binary-node-card node-gold-1 tier-gold">
-                <div className="node-avatar avatar-gold">
-                  <Users size={14} />
+              {/* STAGE 3: PLATINUM (Senior Directors) */}
+              <div className="vadic-tree-card node-plat-1 tier-platinum">
+                <div className="vadic-tree-avatar avatar-platinum">
+                  <Award size={14} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.gold1.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.plat1.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-gold">{binaryNodes.gold1.rank}</span>
+                  <span className="vadic-tree-rank rank-platinum">{binaryNodes.plat1.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-gold-2 tier-gold">
-                <div className="node-avatar avatar-gold">
-                  <Users size={14} />
+              <div className="vadic-tree-card node-plat-2 tier-platinum">
+                <div className="vadic-tree-avatar avatar-platinum">
+                  <Award size={14} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.gold2.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.plat2.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-gold">{binaryNodes.gold2.rank}</span>
+                  <span className="vadic-tree-rank rank-platinum">{binaryNodes.plat2.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-gold-3 tier-gold">
-                <div className="node-avatar avatar-gold">
-                  <Users size={14} />
+              <div className="vadic-tree-card node-plat-3 tier-platinum">
+                <div className="vadic-tree-avatar avatar-platinum">
+                  <Award size={14} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.gold3.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.plat3.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-gold">{binaryNodes.gold3.rank}</span>
+                  <span className="vadic-tree-rank rank-platinum">{binaryNodes.plat3.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-gold-4 tier-gold">
-                <div className="node-avatar avatar-gold">
-                  <Users size={14} />
+              <div className="vadic-tree-card node-plat-4 tier-platinum">
+                <div className="vadic-tree-avatar avatar-platinum">
+                  <Award size={14} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.gold4.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.plat4.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-gold">{binaryNodes.gold4.rank}</span>
+                  <span className="vadic-tree-rank rank-platinum">{binaryNodes.plat4.rank}</span>
                 </div>
               </div>
 
-              {/* STAGE 4: SILVER (Foundation Associates) */}
-              <div className="binary-node-card node-silver-1 tier-silver">
-                <div className="node-avatar avatar-silver">
-                  <CheckCircle2 size={13} />
+              {/* STAGE 4: GOLD (Team Managers) */}
+              <div className="vadic-tree-card node-gold-1 tier-gold">
+                <div className="vadic-tree-avatar avatar-gold">
+                  <Users size={13} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.silver1.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.gold1.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-silver">{binaryNodes.silver1.rank}</span>
+                  <span className="vadic-tree-rank rank-gold">{binaryNodes.gold1.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-silver-2 tier-silver">
-                <div className="node-avatar avatar-silver">
-                  <CheckCircle2 size={13} />
+              <div className="vadic-tree-card node-gold-2 tier-gold">
+                <div className="vadic-tree-avatar avatar-gold">
+                  <Users size={13} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.silver2.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.gold2.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-silver">{binaryNodes.silver2.rank}</span>
+                  <span className="vadic-tree-rank rank-gold">{binaryNodes.gold2.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-silver-3 tier-silver">
-                <div className="node-avatar avatar-silver">
-                  <CheckCircle2 size={13} />
+              <div className="vadic-tree-card node-gold-3 tier-gold">
+                <div className="vadic-tree-avatar avatar-gold">
+                  <Users size={13} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.silver3.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.gold3.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-silver">{binaryNodes.silver3.rank}</span>
+                  <span className="vadic-tree-rank rank-gold">{binaryNodes.gold3.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-silver-4 tier-silver">
-                <div className="node-avatar avatar-silver">
-                  <CheckCircle2 size={13} />
+              <div className="vadic-tree-card node-gold-4 tier-gold">
+                <div className="vadic-tree-avatar avatar-gold">
+                  <Users size={13} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.silver4.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.gold4.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-silver">{binaryNodes.silver4.rank}</span>
+                  <span className="vadic-tree-rank rank-gold">{binaryNodes.gold4.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-silver-5 tier-silver">
-                <div className="node-avatar avatar-silver">
-                  <CheckCircle2 size={13} />
+              {/* STAGE 5: SILVER (Foundation Associates) */}
+              <div className="vadic-tree-card node-silver-1 tier-silver">
+                <div className="vadic-tree-avatar avatar-silver">
+                  <CheckCircle2 size={12} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.silver5.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.silver1.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-silver">{binaryNodes.silver5.rank}</span>
+                  <span className="vadic-tree-rank rank-silver">{binaryNodes.silver1.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-silver-6 tier-silver">
-                <div className="node-avatar avatar-silver">
-                  <CheckCircle2 size={13} />
+              <div className="vadic-tree-card node-silver-2 tier-silver">
+                <div className="vadic-tree-avatar avatar-silver">
+                  <CheckCircle2 size={12} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.silver6.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.silver2.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-silver">{binaryNodes.silver6.rank}</span>
+                  <span className="vadic-tree-rank rank-silver">{binaryNodes.silver2.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-silver-7 tier-silver">
-                <div className="node-avatar avatar-silver">
-                  <CheckCircle2 size={13} />
+              <div className="vadic-tree-card node-silver-3 tier-silver">
+                <div className="vadic-tree-avatar avatar-silver">
+                  <CheckCircle2 size={12} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.silver7.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.silver3.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-silver">{binaryNodes.silver7.rank}</span>
+                  <span className="vadic-tree-rank rank-silver">{binaryNodes.silver3.rank}</span>
                 </div>
               </div>
 
-              <div className="binary-node-card node-silver-8 tier-silver">
-                <div className="node-avatar avatar-silver">
-                  <CheckCircle2 size={13} />
+              <div className="vadic-tree-card node-silver-4 tier-silver">
+                <div className="vadic-tree-avatar avatar-silver">
+                  <CheckCircle2 size={12} />
                 </div>
-                <div className="node-meta">
-                  <div className="node-title-row">
-                    <span className="node-name">{binaryNodes.silver8.name}</span>
-                    <span className="node-status-dot dot-active" />
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.silver4.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
                   </div>
-                  <span className="node-rank rank-silver">{binaryNodes.silver8.rank}</span>
+                  <span className="vadic-tree-rank rank-silver">{binaryNodes.silver4.rank}</span>
+                </div>
+              </div>
+
+              <div className="vadic-tree-card node-silver-5 tier-silver">
+                <div className="vadic-tree-avatar avatar-silver">
+                  <CheckCircle2 size={12} />
+                </div>
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.silver5.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
+                  </div>
+                  <span className="vadic-tree-rank rank-silver">{binaryNodes.silver5.rank}</span>
+                </div>
+              </div>
+
+              <div className="vadic-tree-card node-silver-6 tier-silver">
+                <div className="vadic-tree-avatar avatar-silver">
+                  <CheckCircle2 size={12} />
+                </div>
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.silver6.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
+                  </div>
+                  <span className="vadic-tree-rank rank-silver">{binaryNodes.silver6.rank}</span>
+                </div>
+              </div>
+
+              <div className="vadic-tree-card node-silver-7 tier-silver">
+                <div className="vadic-tree-avatar avatar-silver">
+                  <CheckCircle2 size={12} />
+                </div>
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.silver7.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
+                  </div>
+                  <span className="vadic-tree-rank rank-silver">{binaryNodes.silver7.rank}</span>
+                </div>
+              </div>
+
+              <div className="vadic-tree-card node-silver-8 tier-silver">
+                <div className="vadic-tree-avatar avatar-silver">
+                  <CheckCircle2 size={12} />
+                </div>
+                <div className="vadic-tree-meta">
+                  <div className="vadic-tree-title-row">
+                    <span className="vadic-tree-name">{binaryNodes.silver8.name}</span>
+                    <span className="vadic-tree-status-dot dot-active" />
+                  </div>
+                  <span className="vadic-tree-rank rank-silver">{binaryNodes.silver8.rank}</span>
                 </div>
               </div>
             </div>

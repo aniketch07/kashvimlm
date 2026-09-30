@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { MlmTreeService } from './mlmTree.service.js';
-import { AuthRequest } from '../../middleware/auth.js';
+import { AuthRequest, canAccessDistributorNetwork } from '../../middleware/auth.js';
 import { DistributorService } from '../distributor/distributor.service.js';
 import { TreeValidationService } from './treeValidation.service.js';
+import { BinaryTreeService } from './binaryTree.service.js';
 
 export class MlmTreeController {
   static async getMyNetworkTree(req: any, res: Response): Promise<void> {
@@ -156,7 +157,10 @@ export class MlmTreeController {
    */
   static async placeMember(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { memberId, sponsorId, placementParentId, position, reason } = req.body;
+      const { memberId, sponsorId, placementParentId, position, reason, parentId, distributorId } = req.body;
+      const targetMemberId = memberId || distributorId;
+      const targetParentId = placementParentId || parentId;
+      const targetSponsorId = sponsorId || targetParentId;
       const actorId = req.user?.id || req.user?.memberId || 'system';
       const ip =
         req.ip ||
@@ -166,9 +170,9 @@ export class MlmTreeController {
       const userAgent = (req.headers['user-agent'] as string) || 'KashviMLM-Tree-Client';
 
       const result = await MlmTreeService.placeMember({
-        memberId,
-        sponsorId,
-        placementParentId,
+        memberId: targetMemberId,
+        sponsorId: targetSponsorId,
+        placementParentId: targetParentId,
         position,
         actorId,
         reason,
@@ -312,6 +316,63 @@ export class MlmTreeController {
   }
 
   /**
+   * Helper: Handle error responses consistently.
+   */
+  private static handleTreeError(err: any, res: Response, next: NextFunction): void {
+    if (err.statusCode === 404 || err.message?.includes('not found') || err.message?.includes('Not found')) {
+      res.status(404).json({ success: false, message: err.message || 'Distributor not found' });
+      return;
+    }
+    if (err.statusCode === 400 || err.message?.includes('required') || err.message?.includes('Invalid')) {
+      res.status(400).json({ success: false, message: err.message });
+      return;
+    }
+    next(err);
+  }
+
+  /**
+   * GET /api/tree/:distributorId
+   * Retrieve complete hierarchical binary tree starting from distributorId with depth limit.
+   */
+  static async getCompleteTree(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      // Prompt 6 Section 8 & 17: Network Access Control
+      const currentUser = (req as any).user;
+      if (currentUser) {
+        const allowed = await canAccessDistributorNetwork(currentUser, distributorId);
+        if (!allowed) {
+          res.status(403).json({
+            success: false,
+            message: 'Forbidden: You do not have permission to access or view this distributor network.',
+          });
+          return;
+        }
+      }
+
+      const rawDepth = parseInt(req.query.depth as string, 10);
+      const depth = isNaN(rawDepth) ? 5 : Math.min(Math.max(1, rawDepth), 10);
+      const tree = await BinaryTreeService.getTree(distributorId, depth);
+      const rootCopy = { ...tree };
+      res.status(200).json({
+        success: true,
+        data: {
+          ...tree,
+          root: rootCopy,
+        },
+        message: 'Tree retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
    * GET /api/tree/:distributorId/children
    * Retrieve direct LEFT and RIGHT children of a distributor.
    */
@@ -323,16 +384,20 @@ export class MlmTreeController {
         return;
       }
 
-      const children = await DistributorService.getChildren(distributorId);
-      res.status(200).json({ success: true, data: children });
-    } catch (err) {
-      next(err);
+      const children = await BinaryTreeService.getDirectChildren(distributorId);
+      res.status(200).json({
+        success: true,
+        data: children,
+        message: 'Direct children retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
     }
   }
 
   /**
    * GET /api/tree/:distributorId/downline
-   * Retrieve full downline hierarchy of a distributor.
+   * Retrieve complete downline list with pagination and depth limit.
    */
   static async getDownline(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -342,12 +407,258 @@ export class MlmTreeController {
         return;
       }
 
-      const rawDepth = parseInt(req.query.depth as string, 10);
-      const depth = isNaN(rawDepth) ? 5 : Math.min(Math.max(1, rawDepth), 10);
-      const downline = await DistributorService.getDownline(distributorId, depth);
-      res.status(200).json({ success: true, data: downline });
-    } catch (err) {
-      next(err);
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const rawDepth = req.query.depth ? parseInt(req.query.depth as string, 10) : undefined;
+
+      const downline = await BinaryTreeService.getDownline(distributorId, { page, limit, depth: rawDepth });
+      const dist = await BinaryTreeService.resolveDistributor(distributorId);
+      (downline as any).root = dist ? { distributorId: dist.memberId, name: dist.fullName, ...dist } : { distributorId, name: distributorId };
+
+      res.status(200).json({
+        success: true,
+        data: downline,
+        message: 'Downline retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/left
+   * Retrieve complete LEFT subtree downline.
+   */
+  static async getLeftTeam(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const depth = req.query.depth ? parseInt(req.query.depth as string, 10) : undefined;
+
+      const leftTeam = await BinaryTreeService.getLeftDownline(distributorId, { page, limit, depth });
+      res.status(200).json({
+        success: true,
+        data: leftTeam,
+        message: 'LEFT team retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/right
+   * Retrieve complete RIGHT subtree downline.
+   */
+  static async getRightTeam(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+      const depth = req.query.depth ? parseInt(req.query.depth as string, 10) : undefined;
+
+      const rightTeam = await BinaryTreeService.getRightDownline(distributorId, { page, limit, depth });
+      res.status(200).json({
+        success: true,
+        data: rightTeam,
+        message: 'RIGHT team retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/path
+   * Retrieve path from root to distributor.
+   */
+  static async getPath(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const pathResult = await BinaryTreeService.getPath(distributorId);
+      res.status(200).json({
+        success: true,
+        data: pathResult,
+        message: 'Tree path retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/ancestors
+   * Retrieve all ancestors ordered from root to immediate parent.
+   */
+  static async getAncestors(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const ancestors = await BinaryTreeService.getAncestors(distributorId);
+      res.status(200).json({
+        success: true,
+        data: ancestors,
+        message: 'Ancestors retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/statistics
+   * Retrieve network statistics (directChildren, totalDownline, leftTeam, rightTeam, etc.)
+   */
+  static async getStatistics(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const stats = await BinaryTreeService.getNetworkStatistics(distributorId);
+      res.status(200).json({
+        success: true,
+        data: stats,
+        message: 'Network statistics retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/search
+   * Search only within the distributor's downline.
+   */
+  static async searchDownline(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const q = ((req.query.query as string) || (req.query.q as string) || '').trim();
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+      const searchResult = await BinaryTreeService.searchDownline(distributorId, q, { page, limit });
+      res.status(200).json({
+        success: true,
+        data: searchResult,
+        message: 'Downline search completed',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/parent
+   * Retrieve tree parent of distributor.
+   */
+  static async getParent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const parent = await BinaryTreeService.getParent(distributorId);
+      res.status(200).json({
+        success: true,
+        data: parent,
+        message: 'Parent retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/sponsor
+   * Retrieve sponsor of distributor (separate from tree parent).
+   */
+  static async getSponsor(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const sponsor = await BinaryTreeService.getSponsor(distributorId);
+      res.status(200).json({
+        success: true,
+        data: sponsor,
+        message: 'Sponsor retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/level
+   * Retrieve calculated distributor tree level.
+   */
+  static async getLevel(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      if (!distributorId) {
+        res.status(400).json({ success: false, message: 'Distributor ID required.' });
+        return;
+      }
+
+      const levelInfo = await BinaryTreeService.getDistributorLevel(distributorId);
+      res.status(200).json({
+        success: true,
+        data: levelInfo,
+        message: 'Distributor level retrieved successfully',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
+    }
+  }
+
+  /**
+   * GET /api/tree/:distributorId/validate
+   * Validate tree integrity starting from distributor.
+   */
+  static async validateTree(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const distributorId = req.params.distributorId;
+      const report = await BinaryTreeService.validateTreeIntegrity(distributorId);
+      res.status(200).json({
+        success: report.valid,
+        data: report,
+        message: 'Tree validation completed',
+      });
+    } catch (err: any) {
+      MlmTreeController.handleTreeError(err, res, next);
     }
   }
 

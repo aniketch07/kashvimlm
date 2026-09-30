@@ -147,6 +147,38 @@ export async function seedDatabase(): Promise<void> {
   });
 
   // ==========================================
+  // 2B. Configurable MLM Levels (Prompt 2)
+  // ==========================================
+  const mlmLevels = [
+    { name: 'Silver', code: 'SILVER', order: 1, requiredBB: '250.00', requiredMatching: '2000.00' },
+    { name: 'Gold', code: 'GOLD', order: 2, requiredBB: '250.00', requiredMatching: '5000.00' },
+    { name: 'Platinum', code: 'PLATINUM', order: 3, requiredBB: '500.00', requiredMatching: '50000.00' },
+    { name: 'Diamond', code: 'DIAMOND', order: 4, requiredBB: '1000.00', requiredMatching: '60000.00' },
+    { name: 'Ruby', code: 'RUBY', order: 5, requiredBB: '1000.00', requiredMatching: '100000.00' },
+  ];
+
+  for (const lvl of mlmLevels) {
+    await prisma.level.upsert({
+      where: { code: lvl.code },
+      update: {
+        name: lvl.name,
+        order: lvl.order,
+        requiredBB: new Prisma.Decimal(lvl.requiredBB),
+        requiredMatching: new Prisma.Decimal(lvl.requiredMatching),
+        isActive: true,
+      },
+      create: {
+        name: lvl.name,
+        code: lvl.code,
+        order: lvl.order,
+        requiredBB: new Prisma.Decimal(lvl.requiredBB),
+        requiredMatching: new Prisma.Decimal(lvl.requiredMatching),
+        isActive: true,
+      },
+    });
+  }
+
+  // ==========================================
   // 3. Commission Rules
   // ==========================================
   const binaryRule = await prisma.commissionRule.upsert({

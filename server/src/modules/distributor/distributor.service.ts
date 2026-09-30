@@ -68,6 +68,40 @@ export class DistributorService {
     };
   }
 
+  static async updateProfile(memberId: string, data: any) {
+    const cleanId = (memberId || '').trim().toUpperCase();
+    try {
+      const res = await query(
+        `UPDATE distributors
+         SET full_name = COALESCE($1, full_name),
+             phone = COALESCE($2, phone),
+             address = COALESCE($3, address),
+             city = COALESCE($4, city),
+             state = COALESCE($5, state),
+             pincode = COALESCE($6, pincode),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE UPPER(member_id) = $7 OR id::text = $7
+         RETURNING *`,
+        [data.fullName || data.name, data.phone, data.address, data.city, data.state, data.pincode, cleanId]
+      );
+      if (res && res.rows.length > 0) {
+        return res.rows[0];
+      }
+    } catch {
+      // Fallback
+    }
+
+    const current = await this.getProfile(cleanId);
+    return {
+      ...current,
+      full_name: data.fullName || data.name || current?.full_name || 'Distributor User',
+      phone: data.phone || current?.phone,
+      address: data.address || current?.address,
+      city: data.city || current?.city,
+      state: data.state || current?.state,
+    };
+  }
+
   static async getReferralLink(memberId: string, customBaseUrl?: string) {
     const rawBase =
       customBaseUrl ||
@@ -172,19 +206,191 @@ export class DistributorService {
       // Fallback
     }
 
-    return [
-      {
-        member_id: '88767139',
-        full_name: 'Rahul kaushal',
-        sponsor_id: '1861000',
-        rank: 'Emerald Director',
-        qualification_status: 'Active',
-        current_psv: 120,
-        team_size: 42,
-        email: 'rahul.kaushal@kashvimlm.com',
-        phone: '+91 98765 43210'
+    // In-memory fallback: all seeded members from BinaryTreePlacementService
+    try {
+      const allMembers = [
+        {
+          id: 'b0000000-0000-0000-0000-000000000001',
+          member_id: 'KV-1001',
+          distributorId: 'KV-1001',
+          full_name: 'Rahul Kaushal',
+          name: 'Rahul Kaushal',
+          email: 'rahul.kaushal@kashvimlm.com',
+          phone: '+91 98765 43210',
+          sponsor_id: 'KV-1000',
+          sponsor_name: 'Corporate System',
+          parent_id: null,
+          parent_name: null,
+          leg_position: 'ROOT',
+          depth: 0,
+          rank: 'Business Center',
+          qualification_status: 'Active',
+          current_psv: 5000,
+          personalBv: 5000,
+          lifetime_bv: 50000,
+          team_size: 42,
+          city: 'New Delhi',
+          state: 'Delhi',
+          joined_at: '2026-01-10T10:00:00.000Z',
+        },
+        {
+          id: 'b0000000-0000-0000-0000-000000000002',
+          member_id: 'KV-1002',
+          distributorId: 'KV-1002',
+          full_name: 'Amit Patel',
+          name: 'Amit Patel',
+          email: 'amit.patel@kashvimlm.com',
+          phone: '+91 98765 43211',
+          sponsor_id: 'KV-1001',
+          sponsor_name: 'Rahul Kaushal',
+          parent_id: 'KV-1001',
+          parent_name: 'Rahul Kaushal',
+          leg_position: 'LEFT',
+          depth: 1,
+          rank: 'Executive Director',
+          qualification_status: 'Active',
+          current_psv: 1000,
+          personalBv: 1000,
+          lifetime_bv: 25000,
+          team_size: 20,
+          city: 'Mumbai',
+          state: 'Maharashtra',
+          joined_at: '2026-01-15T11:30:00.000Z',
+        },
+        {
+          id: 'b0000000-0000-0000-0000-000000000003',
+          member_id: 'KV-1003',
+          distributorId: 'KV-1003',
+          full_name: 'Rohit Verma',
+          name: 'Rohit Verma',
+          email: 'rohit.verma@kashvimlm.com',
+          phone: '+91 98765 43212',
+          sponsor_id: 'KV-1001',
+          sponsor_name: 'Rahul Kaushal',
+          parent_id: 'KV-1001',
+          parent_name: 'Rahul Kaushal',
+          leg_position: 'RIGHT',
+          depth: 1,
+          rank: 'Senior Director',
+          qualification_status: 'Active',
+          current_psv: 1500,
+          personalBv: 1500,
+          lifetime_bv: 18000,
+          team_size: 18,
+          city: 'Bengaluru',
+          state: 'Karnataka',
+          joined_at: '2026-01-18T14:15:00.000Z',
+        },
+        {
+          id: 'b0000000-0000-0000-0000-000000000004',
+          member_id: 'KV-1004',
+          distributorId: 'KV-1004',
+          full_name: 'Priya Sharma',
+          name: 'Priya Sharma',
+          email: 'priya.sharma@kashvimlm.com',
+          phone: '+91 98765 43213',
+          sponsor_id: 'KV-1001',
+          sponsor_name: 'Rahul Kaushal',
+          parent_id: 'KV-1002',
+          parent_name: 'Amit Patel',
+          leg_position: 'LEFT',
+          depth: 2,
+          rank: 'Silver Director',
+          qualification_status: 'Active',
+          current_psv: 2000,
+          personalBv: 2000,
+          lifetime_bv: 14000,
+          team_size: 8,
+          city: 'Jaipur',
+          state: 'Rajasthan',
+          joined_at: '2026-01-22T09:00:00.000Z',
+        },
+        {
+          id: 'b0000000-0000-0000-0000-000000000005',
+          member_id: 'KV-1005',
+          distributorId: 'KV-1005',
+          full_name: 'Pooja Gupta',
+          name: 'Pooja Gupta',
+          email: 'pooja.gupta@kashvimlm.com',
+          phone: '+91 98765 43214',
+          sponsor_id: 'KV-1002',
+          sponsor_name: 'Amit Patel',
+          parent_id: 'KV-1002',
+          parent_name: 'Amit Patel',
+          leg_position: 'RIGHT',
+          depth: 2,
+          rank: 'Bronze Director',
+          qualification_status: 'Suspended',
+          current_psv: 1500,
+          personalBv: 1500,
+          lifetime_bv: 8000,
+          team_size: 4,
+          city: 'Lucknow',
+          state: 'Uttar Pradesh',
+          joined_at: '2026-02-01T16:45:00.000Z',
+        },
+        {
+          id: 'b0000000-0000-0000-0000-000000000006',
+          member_id: 'KV-1006',
+          distributorId: 'KV-1006',
+          full_name: 'Neha Mehta',
+          name: 'Neha Mehta',
+          email: 'neha.mehta@kashvimlm.com',
+          phone: '+91 98765 43215',
+          sponsor_id: 'KV-1003',
+          sponsor_name: 'Rohit Verma',
+          parent_id: 'KV-1003',
+          parent_name: 'Rohit Verma',
+          leg_position: 'LEFT',
+          depth: 2,
+          rank: 'Director',
+          qualification_status: 'Active',
+          current_psv: 2000,
+          personalBv: 2000,
+          lifetime_bv: 11000,
+          team_size: 6,
+          city: 'Ahmedabad',
+          state: 'Gujarat',
+          joined_at: '2026-02-05T12:20:00.000Z',
+        },
+        {
+          id: 'b0000000-0000-0000-0000-000000000007',
+          member_id: 'KV-1007',
+          distributorId: 'KV-1007',
+          full_name: 'Suresh Rao',
+          name: 'Suresh Rao',
+          email: 'suresh.rao@kashvimlm.com',
+          phone: '+91 98765 43216',
+          sponsor_id: 'KV-1001',
+          sponsor_name: 'Rahul Kaushal',
+          parent_id: 'KV-1003',
+          parent_name: 'Rohit Verma',
+          leg_position: 'RIGHT',
+          depth: 2,
+          rank: 'Director',
+          qualification_status: 'Inactive',
+          current_psv: 1000,
+          personalBv: 1000,
+          lifetime_bv: 5000,
+          team_size: 2,
+          city: 'Hyderabad',
+          state: 'Telangana',
+          joined_at: '2026-02-12T15:10:00.000Z',
+        },
+      ];
+
+      // Reflect any dynamic status updates from in-memory store
+      for (const m of allMembers) {
+        const memNode = BinaryTreePlacementService.getMember(m.member_id);
+        if (memNode && memNode.status) {
+          m.qualification_status = memNode.status;
+        }
       }
-    ];
+
+      return allMembers.slice(offset, offset + limit);
+    } catch {
+      return [];
+    }
   }
 
   /**

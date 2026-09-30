@@ -69,6 +69,51 @@ VALUES
     '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
     'distributor',
     FALSE
+),
+(
+    'a0000000-0000-0000-0000-000000000008',
+    'harsh.kapoor@kashvimlm.com',
+    '+91 98765 43217',
+    '@harsh_kapoor',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    TRUE
+),
+(
+    'a0000000-0000-0000-0000-000000000009',
+    'isha.nair@kashvimlm.com',
+    '+91 98765 43218',
+    '@isha_nair',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    TRUE
+),
+(
+    'a0000000-0000-0000-0000-000000000091',
+    'admin@example.com',
+    '+91 98765 00001',
+    '@admin_example',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'admin',
+    TRUE
+),
+(
+    'a0000000-0000-0000-0000-000000000092',
+    'distributor@example.com',
+    '+91 98765 00002',
+    '@distributor_example',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    TRUE
+),
+(
+    'a0000000-0000-0000-0000-000000000093',
+    'suspended@example.com',
+    '+91 98765 00003',
+    '@suspended_example',
+    '$2a$10$w8TfVzPZZlV7k6YQhG/4OecEwJ9i7q.F1q7GkJ2bU8o5x4fK7v7qO',
+    'distributor',
+    FALSE
 )
 ON CONFLICT (email) DO UPDATE SET is_active = EXCLUDED.is_active;
 
@@ -239,6 +284,52 @@ INSERT INTO distributors (
     'Gujarat',
     '390007',
     'India'
+),
+(
+    'b0000000-0000-0000-0000-000000000008',
+    'a0000000-0000-0000-0000-000000000008',
+    'KV-1008',
+    'Harsh Kapoor',
+    'KV-1001',
+    'KV-1004',
+    'left',
+    'Senior Associate',
+    'Active',
+    100.00,
+    2200.00,
+    2,
+    'HDFC Bank',
+    '50100492819208',
+    'HDFC0000123',
+    'HIJKL8901M',
+    'Kankarbagh',
+    'Patna',
+    'Bihar',
+    '800020',
+    'India'
+),
+(
+    'b0000000-0000-0000-0000-000000000009',
+    'a0000000-0000-0000-0000-000000000009',
+    'KV-1009',
+    'Isha Nair',
+    'KV-1001',
+    'KV-1004',
+    'right',
+    'Associate',
+    'Active',
+    100.00,
+    1800.00,
+    1,
+    'ICICI Bank',
+    '30100492819209',
+    'ICIC0000789',
+    'IJKLM9012N',
+    'Panampilly Nagar',
+    'Kochi',
+    'Kerala',
+    '682036',
+    'India'
 )
 ON CONFLICT (member_id) DO UPDATE SET
     full_name = EXCLUDED.full_name,
@@ -254,7 +345,9 @@ VALUES
 ('c0000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000004', 9800.00, 2800.00, 62000.00, 52200.00),
 ('c0000000-0000-0000-0000-000000000005', 'b0000000-0000-0000-0000-000000000005', 3200.00, 0.00, 32000.00, 28800.00),
 ('c0000000-0000-0000-0000-000000000006', 'b0000000-0000-0000-0000-000000000006', 7400.00, 1900.00, 48000.00, 40600.00),
-('c0000000-0000-0000-0000-000000000007', 'b0000000-0000-0000-0000-000000000007', 1200.00, 0.00, 18000.00, 16800.00)
+('c0000000-0000-0000-0000-000000000007', 'b0000000-0000-0000-0000-000000000007', 1200.00, 0.00, 18000.00, 16800.00),
+('c0000000-0000-0000-0000-000000000008', 'b0000000-0000-0000-0000-000000000008', 3500.00, 500.00, 15000.00, 11500.00),
+('c0000000-0000-0000-0000-000000000009', 'b0000000-0000-0000-0000-000000000009', 2100.00, 300.00, 9000.00, 6900.00)
 ON CONFLICT (distributor_id) DO NOTHING;
 
 -- 4. MLM TREE TOPOLOGY (Parent -> Left Child / Right Child)
@@ -266,7 +359,9 @@ DELETE FROM mlm_tree WHERE distributor_id IN (
     'b0000000-0000-0000-0000-000000000004',
     'b0000000-0000-0000-0000-000000000005',
     'b0000000-0000-0000-0000-000000000006',
-    'b0000000-0000-0000-0000-000000000007'
+    'b0000000-0000-0000-0000-000000000007',
+    'b0000000-0000-0000-0000-000000000008',
+    'b0000000-0000-0000-0000-000000000009'
 );
 
 -- Root: Rahul (KV-1001)
@@ -318,8 +413,8 @@ VALUES (
     'b0000000-0000-0000-0000-000000000004',
     'BC-002',
     'b0000000-0000-0000-0000-000000000002', -- Parent: Amit
-    NULL,
-    NULL,
+    'b0000000-0000-0000-0000-000000000008', -- Left: Harsh
+    'b0000000-0000-0000-0000-000000000009', -- Right: Isha
     'left',
     2,
     '/KV-1001/KV-1002/KV-1004'
@@ -365,6 +460,34 @@ VALUES (
     'right',
     2,
     '/KV-1001/KV-1003/KV-1007'
+);
+
+-- Left Child of Priya: Harsh (KV-1008)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000008',
+    'b0000000-0000-0000-0000-000000000008',
+    'BC-002',
+    'b0000000-0000-0000-0000-000000000004', -- Parent: Priya
+    NULL,
+    NULL,
+    'left',
+    3,
+    '/KV-1001/KV-1002/KV-1004/KV-1008'
+);
+
+-- Right Child of Priya: Isha (KV-1009)
+INSERT INTO mlm_tree (id, distributor_id, business_center_code, parent_distributor_id, left_child_id, right_child_id, leg_position, depth, tree_path)
+VALUES (
+    'd0000000-0000-0000-0000-000000000009',
+    'b0000000-0000-0000-0000-000000000009',
+    'BC-002',
+    'b0000000-0000-0000-0000-000000000004', -- Parent: Priya
+    NULL,
+    NULL,
+    'right',
+    3,
+    '/KV-1001/KV-1002/KV-1004/KV-1009'
 );
 
 -- 5. PRODUCTS (Clothes & Hosiery + Electronics)

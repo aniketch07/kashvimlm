@@ -32,6 +32,7 @@ import ProductManagerView from './ProductManagerView';
 import NetworkTreePage from '../../pages/NetworkTreePage';
 import { getStoredCatalog } from '../../data/productCatalog';
 import { api } from '../../services/api.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 // Import generated & project assets
 import reportsTabletImg from '../../assets/dashboard/reports_tablet.jpg';
@@ -222,11 +223,26 @@ function DistributorDashboard({ user, onSignOut, defaultNav }) {
     );
   };
 
-  // Member data (Owner: Rahul Example)
-  const memberName = user?.name || 'Rahul Example';
-  const memberId = user?.memberId || 'KV-DEMO-1001';
-  const memberSince = user?.since || '2026';
-  const memberRank = user?.tier || 'Gold Executive';
+  const auth = useAuth();
+  const effectiveUser = user || auth.currentUser || {
+    name: 'Rahul Kaushal',
+    memberId: 'KV-1001',
+    role: 'ADMIN',
+    isOwner: true,
+  };
+
+  // Member data (Owner: Rahul Kaushal)
+  const memberName =
+    effectiveUser?.name ||
+    effectiveUser?.displayName ||
+    effectiveUser?.fullName ||
+    'Rahul Kaushal';
+  const memberId =
+    effectiveUser?.memberId ||
+    effectiveUser?.distributorId ||
+    'KV-1001';
+  const memberSince = effectiveUser?.since || '2026';
+  const memberRank = effectiveUser?.tier || effectiveUser?.rank || 'Company Owner / Emerald Director';
 
   // Format today's date dynamically
   const todayDateStr = new Intl.DateTimeFormat('en-US', {
@@ -253,9 +269,65 @@ function DistributorDashboard({ user, onSignOut, defaultNav }) {
       <header className="kashvimlm-top-navbar">
         <div className="kashvimlm-top-navbar-left">
           {/* Kashvimlm Blue Corporate Logo */}
-          <div className="kashvimlm-brand-logo">
+          <div
+            className="kashvimlm-brand-logo"
+            onClick={() => {
+              setActiveNavIcon('dashboard');
+              setActiveTab('home');
+              navigate('/dashboard');
+            }}
+            style={{ cursor: 'pointer' }}
+          >
             <span className="kashvimlm-logo-svg">KASHVIMLM</span>
           </div>
+        </div>
+
+        {/* 5 Prominent Quick Navigation Buttons */}
+        <div className="kashvimlm-quick-nav-bar">
+          <button
+            type="button"
+            className={`quick-nav-pill-btn ${activeNavIcon === 'dashboard' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveNavIcon('dashboard');
+              setActiveTab('home');
+              navigate('/dashboard');
+            }}
+          >
+            <BarChart3 size={16} />
+            <span>Dashboard</span>
+          </button>
+          <button
+            type="button"
+            className={`quick-nav-pill-btn ${activeNavIcon === 'enroll' ? 'active' : ''}`}
+            onClick={() => setActiveNavIcon('enroll')}
+          >
+            <UserPlus size={16} />
+            <span>Enrollment</span>
+          </button>
+          <button
+            type="button"
+            className={`quick-nav-pill-btn ${activeNavIcon === 'network_tree' ? 'active' : ''}`}
+            onClick={() => setActiveNavIcon('network_tree')}
+          >
+            <Network size={16} />
+            <span>Tree</span>
+          </button>
+          <button
+            type="button"
+            className={`quick-nav-pill-btn ${activeNavIcon === 'manage_products' ? 'active' : ''}`}
+            onClick={() => setActiveNavIcon('manage_products')}
+          >
+            <PackagePlus size={16} />
+            <span>Add Product</span>
+          </button>
+          <button
+            type="button"
+            className={`quick-nav-pill-btn ${activeNavIcon === 'shop' ? 'active' : ''}`}
+            onClick={() => setActiveNavIcon('shop')}
+          >
+            <ShoppingCart size={16} />
+            <span>See Products</span>
+          </button>
         </div>
 
         <div className="kashvimlm-top-navbar-right">
@@ -1479,14 +1551,14 @@ function DistributorDashboard({ user, onSignOut, defaultNav }) {
               ROLE 2: ENROLL VIEW (Enroll New Distributor or Customer)
               =================================================================== */}
           {activeNavIcon === 'enroll' && (
-            <EnrollmentView user={user} onNavigate={setActiveNavIcon} />
+            <EnrollmentView user={effectiveUser} onNavigate={setActiveNavIcon} />
           )}
 
           {/* ===================================================================
               ROLE 3: SHOP VIEW (Wholesale Distributor Store & Cart)
               =================================================================== */}
           {activeNavIcon === 'shop' && (
-            <ShopView user={user} catalog={catalog} onNavigate={setActiveNavIcon} />
+            <ShopView user={effectiveUser} catalog={catalog} onNavigate={setActiveNavIcon} />
           )}
 
           {/* ===================================================================
@@ -1494,7 +1566,7 @@ function DistributorDashboard({ user, onSignOut, defaultNav }) {
               =================================================================== */}
           {activeNavIcon === 'manage_products' && (
             <ProductManagerView
-              user={user}
+              user={effectiveUser}
               catalog={catalog}
               onUpdateCatalog={setCatalog}
               onNavigate={setActiveNavIcon}

@@ -1,9 +1,11 @@
 import * as argon2 from 'argon2';
+import bcrypt from 'bcryptjs';
 
 /**
  * Enterprise Password Security Service
  * Utilizes Argon2id (winner of Password Hashing Competition)
  * Memory-hard, GPU-resistant, side-channel attack mitigation.
+ * Also supports bcrypt verification for backward compatibility.
  */
 export class SecurityUtils {
   private static readonly ARGON2_OPTIONS: argon2.HashOptions = {
@@ -21,7 +23,7 @@ export class SecurityUtils {
   }
 
   /**
-   * Verifies a plain text password against an Argon2id hash.
+   * Verifies a plain text password against an Argon2id or bcrypt hash.
    */
   static async verifyPassword(hash: string, plainText: string): Promise<boolean> {
     if (!hash || !plainText) return false;
@@ -29,6 +31,9 @@ export class SecurityUtils {
     try {
       if (hash.startsWith('$argon2')) {
         return await argon2.verify(hash, plainText);
+      }
+      if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$')) {
+        return await bcrypt.compare(plainText, hash);
       }
       // Demo development fallback only when hash is an exact mock password
       return hash === plainText;

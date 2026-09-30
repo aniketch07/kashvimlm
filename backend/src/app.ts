@@ -45,8 +45,13 @@ app.use(requestLogger);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// API v1 Routes
+// Zero-Trust Security Guard: Block any client injection of bb, matching, level, rank, or financial fields
+import { protectMlmFields } from './middleware/protectMlmFields';
+app.use('/api', protectMlmFields);
+
+// API v1 and Root API Routes
 app.use('/api/v1', apiRouter);
+app.use('/api', apiRouter);
 
 // 404 Handler
 app.use(notFoundHandler);

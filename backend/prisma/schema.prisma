@@ -359,6 +359,13 @@ model DistributorProfile {
   user                  User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   currentRank           Rank?                     @relation("CurrentRank", fields: [currentRankId], references: [id])
   highestRank           Rank?                     @relation("HighestRank", fields: [highestRankId], references: [id])
+  
+  // MLM Level System (PROMPT 2)
+  currentLevelId        String?
+  currentLevel          Level?                    @relation("CurrentMemberLevel", fields: [currentLevelId], references: [id], onDelete: SetNull)
+  currentBB             Decimal                   @default(0.00) @db.Decimal(12, 2)
+  currentMatching       Decimal                   @default(0.00) @db.Decimal(12, 2)
+  
   sponsor               DistributorProfile?       @relation("SponsorReferrals", fields: [sponsorId], references: [id])
   sponsoredDistributors DistributorProfile[]      @relation("SponsorReferrals")
 
@@ -369,6 +376,10 @@ model DistributorProfile {
   mlmNodes              MLMNode[]
   customers             Customer[]
   rankHistories         DistributorRankHistory[]
+  memberLevelHistories  MemberLevelHistory[]
+  bbTransactions        BBTransaction[]
+  matchingTransactions  MatchingTransaction[]
+  reconciliationAudits  ReconciliationAudit[]
   statusHistories       DistributorStatusHistory[]
   badges                DistributorBadge[]
   kycProfile            KYCProfile?
@@ -392,6 +403,7 @@ model DistributorProfile {
   @@index([status])
   @@index([rankId])
   @@index([currentRankId])
+  @@index([currentLevelId])
   @@map("distributor_profiles")
 }
 
@@ -1486,5 +1498,134 @@ model PasswordResetToken {
   @@index([userId])
   @@index([tokenHash])
   @@map("password_reset_tokens")
+}
+
+// ==========================================
+// MLM LEVEL ARCHITECTURE MODELS (PROMPT 2)
+// ==========================================
+
+// 50. Level (Configurable MLM Levels: Silver, Gold, Platinum, Diamond, Ruby)
+model Level {
+  id               String               @id @default(uuid())
+  name             String               // "Silver", "Gold", "Platinum", "Diamond", "Ruby"
+  code             String               @unique // "SILVER", "GOLD", "PLATINUM", "DIAMOND", "RUBY"
+  order            Int                  @unique // 1, 2, 3, 4, 5
+  requiredBB       Decimal              @default(0.00) @db.Decimal(12, 2)
+  requiredMatching Decimal              @default(0.00) @db.Decimal(12, 2)
+  isActive         Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  currentMembers   DistributorProfile[] @relation("CurrentMemberLevel")
+  historiesAsNew   MemberLevelHistory[] @relation("NewLevel")
+  historiesAsPrev  MemberLevelHistory[] @relation("PreviousLevel")
+
+  @@index([code])
+  @@index([order])
+  @@index([isActive])
+  @@map("levels")
+}
+
+// 51. MemberLevelHistory (Immutable Level Promotion Audit Trail)
+model MemberLevelHistory {
+  id                 String             @id @default(uuid())
+  memberId           String
+  previousLevelId    String?
+  newLevelId         String
+  previousBB         Decimal            @default(0.00) @db.Decimal(12, 2)
+  previousMatching   Decimal            @default(0.00) @db.Decimal(12, 2)
+  qualifyingBB       Decimal            @default(0.00) @db.Decimal(12, 2)
+  qualifyingMatching Decimal            @default(0.00) @db.Decimal(12, 2)
+  reason             String?            @default("QUALIFICATION_MET")
+  source             String?            @default("SYSTEM_AUTO") // "SYSTEM_AUTO", "ADMIN_RECALC", "ORDER_ACCRUAL"
+  createdAt          DateTime           @default(now())
+
+  member             DistributorProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  previousLevel      Level?             @relation("PreviousLevel", fields: [previousLevelId], references: [id], onDelete: Restrict)
+  newLevel           Level              @relation("NewLevel", fields: [newLevelId], references: [id], onDelete: Restrict)
+
+  @@index([memberId])
+  @@index([previousLevelId])
+  @@index([newLevelId])
+  @@index([createdAt])
+  @@map("member_level_histories")
+}
+
+// 52. BBTransaction (Immutable Personal Business Volume Ledger)
+model BBTransaction {
+  id           String             @id @default(uuid())
+  memberId     String
+  amount       Decimal            @db.Decimal(12, 2)
+  balanceAfter Decimal            @default(0.00) @db.Decimal(12, 2)
+  type         String             @default("CREDIT") // "CREDIT", "DEBIT", "ADJUSTMENT"
+  source       String             // "ORDER", "REFUND", "ADMIN_ADJUSTMENT", "BONUS"
+  referenceId  String             // Order ID, Refund ID, or Ref Number
+  description  String?
+  createdAt    DateTime           @default(now())
+
+  member       DistributorProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // Idempotency: Prevent the same source transaction from being credited twice to a member
+  @@unique([memberId, source, referenceId])
+  @@index([memberId])
+  @@index([referenceId])
+  @@index([source])
+  @@index([createdAt])
+  @@map("bb_transactions")
+}
+
+// 53. MatchingTransaction (Immutable Binary Matching Volume Ledger)
+model MatchingTransaction {
+  id           String             @id @default(uuid())
+  memberId     String
+  amount       Decimal            @db.Decimal(12, 2)
+  balanceAfter Decimal            @default(0.00) @db.Decimal(12, 2)
+  type         String             @default("CREDIT") // "CREDIT", "DEBIT", "MATCH_CYCLE", "ADJUSTMENT"
+  source       String             // "BINARY_MATCH", "ORDER_ROLLUP", "COMMISSION_CYCLE", "ADMIN_ADJUSTMENT"
+  referenceId  String             // Commission Period ID, Order ID, or Ref Number
+  description  String?
+  createdAt    DateTime           @default(now())
+
+  member       DistributorProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  // Idempotency: Prevent the same source transaction from being credited twice to a member
+  @@unique([memberId, source, referenceId])
+  @@index([memberId])
+  @@index([referenceId])
+  @@index([source])
+  @@index([createdAt])
+  @@map("matching_transactions")
+}
+
+// 54. ReconciliationAudit (Audit Trail for Recalculation and Volume/Level Verification)
+model ReconciliationAudit {
+  id                    String             @id @default(uuid())
+  memberId              String
+  oldBB                 Decimal            @default(0.00) @db.Decimal(12, 2)
+  calculatedBB          Decimal            @default(0.00) @db.Decimal(12, 2)
+  bbDiscrepancy         Decimal            @default(0.00) @db.Decimal(12, 2)
+  oldMatching           Decimal            @default(0.00) @db.Decimal(12, 2)
+  calculatedMatching    Decimal            @default(0.00) @db.Decimal(12, 2)
+  matchingDiscrepancy   Decimal            @default(0.00) @db.Decimal(12, 2)
+  oldLeftVolume         Decimal            @default(0.00) @db.Decimal(12, 2)
+  calculatedLeftVolume  Decimal            @default(0.00) @db.Decimal(12, 2)
+  oldRightVolume        Decimal            @default(0.00) @db.Decimal(12, 2)
+  calculatedRightVolume Decimal            @default(0.00) @db.Decimal(12, 2)
+  oldLevel              String             @default("BASE")
+  calculatedLevel       String             @default("BASE")
+  promoted              Boolean            @default(false)
+  hasDiscrepancy        Boolean            @default(false)
+  discrepancyDetails    Json?
+  reason                String             @default("ADMIN_AUDIT")
+  actor                 String             @default("SYSTEM") // Admin User ID, Email, or "SYSTEM"
+  createdAt             DateTime           @default(now())
+
+  member                DistributorProfile @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([hasDiscrepancy])
+  @@index([actor])
+  @@index([createdAt])
+  @@map("reconciliation_audits")
 }
 

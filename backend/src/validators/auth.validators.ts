@@ -2,22 +2,30 @@ import { z } from 'zod';
 
 export const registerSchema = z.object({
   email: z.string().email('Please enter a valid email address').toLowerCase().trim(),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number'),
-  role: z.enum(['DISTRIBUTOR', 'CUSTOMER']).default('DISTRIBUTOR'),
-  firstName: z.string().min(1, 'First name is required').trim(),
-  lastName: z.string().min(1, 'Last name is required').trim(),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  role: z.enum(['DISTRIBUTOR', 'CUSTOMER']).default('DISTRIBUTOR').optional(),
+  firstName: z.string().trim().optional(),
+  lastName: z.string().trim().optional(),
+  fullName: z.string().trim().optional(),
+  name: z.string().trim().optional(),
   phone: z.string().trim().optional(),
+  username: z.string().trim().optional(),
   sponsorCode: z.string().trim().optional(),
+  sponsorId: z.string().trim().optional(),
+  placementPosition: z.string().trim().optional(),
+  confirmPassword: z.string().trim().optional(),
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address').toLowerCase().trim(),
+  email: z.string().trim().optional(),
+  username: z.string().trim().optional(),
+  identifier: z.string().trim().optional(),
   password: z.string().min(1, 'Password is required'),
+  rememberMe: z.boolean().optional(),
+  sponsorId: z.string().optional(),
+}).refine((data) => Boolean(data.email || data.username || data.identifier), {
+  message: 'Please provide your email or username',
+  path: ['identifier'],
 });
 
 export const refreshTokenSchema = z.object({

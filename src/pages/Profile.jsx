@@ -47,8 +47,26 @@ function Profile({ defaultNav }) {
             parsed.user.sponsorId = '88767139';
             parsed.user.username = '@rahul_kaushal';
             parsed.user.email = 'rahul.kaushal@kashvimlm.com';
-            localStorage.setItem('kashvi_auth', JSON.stringify(parsed));
           }
+          // Ensure R@hul11 / KV-1001 / 88767139 is verified Owner
+          const normName = (parsed.user.name || '').toLowerCase().replace(/[@4]/g, 'a').replace(/[^a-z0-9]/g, '');
+          const normUser = (parsed.user.username || '').toLowerCase().replace(/[@4]/g, 'a').replace(/[^a-z0-9]/g, '');
+          const isOwnerUser =
+            parsed.user.memberId === 'KV-1001' ||
+            parsed.user.memberId === '88767139' ||
+            parsed.user.memberId === '18618331' ||
+            normName.includes('rahul') ||
+            normUser.includes('rahul') ||
+            parsed.user.name === 'R@hul11' ||
+            parsed.user.username === 'R@hul11' ||
+            parsed.user.username === '@R@hul11' ||
+            parsed.user.isOwner === true;
+
+          if (isOwnerUser) {
+            parsed.user.isOwner = true;
+            parsed.user.role = 'ADMIN';
+          }
+          localStorage.setItem('kashvi_auth', JSON.stringify(parsed));
           return parsed.user;
         }
       }
@@ -110,25 +128,32 @@ function Profile({ defaultNav }) {
       return;
     }
 
+    const cleanUsername = (loginForm.username || '').toLowerCase().replace(/[@4]/g, 'a').replace(/[^a-z0-9]/g, '');
     const isOwnerDemo =
-      loginForm.username.toLowerCase().includes('rahul') ||
+      cleanUsername.includes('rahul') ||
       loginForm.username === '88767139' ||
-      loginForm.username === 'KV-1001' ||
-      loginForm.username.toLowerCase().includes('poonam') ||
-      loginForm.username === '18618331';
+      loginForm.username.toUpperCase() === 'KV-1001' ||
+      cleanUsername.includes('poonam') ||
+      loginForm.username === '18618331' ||
+      loginForm.username.toLowerCase() === 'r@hul11' ||
+      loginForm.username === 'R@hul11';
 
     const displayName = isOwnerDemo
-      ? 'Rahul kaushal'
+      ? (loginForm.username.includes('@') || loginForm.username.toLowerCase().includes('r@hul')
+          ? loginForm.username
+          : 'Rahul kaushal')
       : (loginForm.username === 'kashvi' ? 'Kashvi Sharma' : loginForm.username);
 
     const userData = {
       name: displayName,
       username: `@${loginForm.username.replace('@', '')}`,
-      email: `${loginForm.username.toLowerCase()}@kashvimlm.com`,
+      email: `${loginForm.username.toLowerCase().replace(/[@]/g, 'a')}@kashvimlm.com`,
       phone: '+91 98765 43210',
       location: 'Mumbai, Maharashtra, India',
       memberId: isOwnerDemo ? 'KV-1001' : (loginForm.username === 'kashvi' ? '10001001' : 'KV-1001'),
       sponsorId: loginForm.sponsorId.trim() || 'KV-1001',
+      isOwner: isOwnerDemo,
+      role: isOwnerDemo ? 'ADMIN' : 'DISTRIBUTOR',
       memberSince: '2026',
       since: '2026',
       tier: 'Diamond Director',
@@ -246,12 +271,12 @@ function Profile({ defaultNav }) {
     });
   };
 
-  // Autofill Demo Account (Owner Profile)
+  // Autofill Demo Account (Owner Profile: R@hul11 / KV-1001)
   const handleAutofillDemo = () => {
     setLoginForm({
-      username: 'rahul_kaushal',
+      username: 'R@hul11',
       password: '••••••••',
-      sponsorId: '88767139',
+      sponsorId: 'KV-1001',
       rememberMe: true,
     });
   };

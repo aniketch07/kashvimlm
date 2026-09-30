@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -131,7 +131,8 @@ export default function AdminNetworkTreePage() {
   // =========================================================================
   // 2. Tree Root, Member, & Navigation State
   // =========================================================================
-  const urlMemberId = searchParams.get('member');
+  const { distributorId } = useParams();
+  const urlMemberId = distributorId || searchParams.get('member') || searchParams.get('rootId');
   const [currentRootId, setCurrentRootId] = useState(urlMemberId || 'KV-1001');
   const [depth, setDepth] = useState(3);
   const [treeData, setTreeData] = useState(null);
@@ -271,7 +272,7 @@ export default function AdminNetworkTreePage() {
 
   // Synchronize state when browser URL parameter changes
   useEffect(() => {
-    const memberParam = searchParams.get('member');
+    const memberParam = distributorId || searchParams.get('member') || searchParams.get('rootId');
     if (memberParam && memberParam !== currentRootId) {
       setCurrentRootId(memberParam);
       setBreadcrumbs((prev) => {
@@ -281,7 +282,7 @@ export default function AdminNetworkTreePage() {
         return prev;
       });
     }
-  }, [searchParams, currentRootId]);
+  }, [searchParams, distributorId, currentRootId]);
 
   // =========================================================================
   // 6. Member Navigation & Search Selection Handlers

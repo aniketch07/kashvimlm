@@ -91,6 +91,42 @@ body:has(.kashvimlm-portal-root) .footer,
   margin-top: 3px;
 }
 
+.kashvimlm-quick-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+}
+
+.quick-nav-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.quick-nav-pill-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #005086;
+}
+
+.quick-nav-pill-btn.active {
+  background: #005086;
+  border-color: #005086;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 80, 134, 0.25);
+}
+
 .kashvimlm-top-navbar-right {
   display: flex;
   align-items: center;

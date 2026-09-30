@@ -1613,61 +1613,95 @@
 }
 
 
-/* Board Wrapper and Responsive Scroll */
+/* 5-Stage Rank Legend Bar */
+.binary-rank-legend-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.rank-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(3, 16, 36, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.rank-legend-chip:hover {
+  transform: translateY(-2px);
+}
+
+.chip-ruby {
+  color: #fb7185;
+  border-color: rgba(244, 63, 94, 0.45);
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.2);
+}
+
+.chip-diamond {
+  color: #00e5ff;
+  border-color: rgba(0, 229, 255, 0.45);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+}
+
+.chip-platinum {
+  color: #e2e8f0;
+  border-color: rgba(226, 232, 240, 0.45);
+  box-shadow: 0 0 12px rgba(226, 232, 240, 0.15);
+}
+
+.chip-gold {
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.18);
+}
+
+.chip-silver {
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.4);
+  box-shadow: 0 0 12px rgba(148, 163, 184, 0.12);
+}
+
+/* Board Wrapper - GUARANTEED NON-SCROLLABLE */
 .binary-board-wrapper {
   width: 100%;
-  overflow-x: auto;
-  padding-bottom: 1.5rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  overflow: hidden;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(56, 189, 248, 0.4) #030d1e;
+  justify-content: center;
+  align-items: flex-start;
+  position: relative;
+  height: 500px;
 }
 
-.binary-board-wrapper::-webkit-scrollbar {
-  height: 8px;
-}
-
-.binary-board-wrapper::-webkit-scrollbar-track {
-  background: #020914;
-  border-radius: 4px;
-}
-
-.binary-board-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(56, 189, 248, 0.4);
-  border-radius: 4px;
-}
-
-.binary-scroll-hint {
-  display: none;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #38bdf8;
-  margin-bottom: 0.75rem;
-  letter-spacing: 0.04em;
-}
-
-@media (max-width: 1024px) {
-  .binary-scroll-hint {
-    display: block;
-  }
-}
-
-/* The Main Binary Tree Board (1180px x 500px - Increased Size) */
+/* The Main Binary Tree Board (1000px x 500px matching SVG viewBox) */
 .binary-tree-board {
   position: relative;
-  width: 1180px;
+  width: 1000px;
   height: 500px;
-  background: rgba(2, 11, 24, 0.9);
-  border: 1.5px solid rgba(56, 189, 248, 0.25);
-  border-radius: 22px;
-  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), inset 0 0 45px rgba(56, 189, 248, 0.04);
+  background: radial-gradient(circle at 50% 20%, rgba(15, 23, 42, 0.85) 0%, rgba(2, 11, 24, 0.96) 100%);
+  border: 1.5px solid rgba(56, 189, 248, 0.28);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), inset 0 0 50px rgba(56, 189, 248, 0.05);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   flex-shrink: 0;
-  background-image: radial-gradient(rgba(56, 189, 248, 0.08) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image: radial-gradient(rgba(56, 189, 248, 0.09) 1px, transparent 1px);
+  background-size: 20px 20px;
+  transform-origin: top center;
+  overflow: hidden;
 }
 
 /* SVG Vector Lines & Animations */
@@ -1675,8 +1709,8 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 1000px;
+  height: 500px;
   pointer-events: none;
   z-index: 1;
 }
@@ -1715,334 +1749,455 @@
 }
 
 /* Node Cards Layout & Styling */
-.binary-node-card {
-  position: absolute;
+.vadic-tree-card {
+  position: absolute !important;
   z-index: 2;
-  background: #031024;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  border-radius: 10px;
+  display: flex !important;
+  align-items: center !important;
   cursor: pointer;
   user-select: none;
+  transform: translateX(-50%) !important;
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
               border-color 0.25s ease,
               box-shadow 0.25s ease;
-  box-sizing: border-box;
+  box-sizing: border-box !important;
+  text-align: left;
 }
 
-.binary-node-card:hover {
-  transform: translateX(-50%) translateY(-3px) scale(1.03);
+.vadic-tree-card:hover {
+  transform: translateX(-50%) translateY(-3px) scale(1.04) !important;
 }
 
-/* 4 Stage Tier Themes */
-.tier-diamond {
-  border: 1.5px solid rgba(0, 229, 255, 0.45);
-  background: linear-gradient(180deg, rgba(0, 229, 255, 0.08) 0%, rgba(2, 13, 29, 0.95) 100%);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(0, 229, 255, 0.2);
+/* 5 Stage Tier Themes */
+.vadic-tree-card.tier-ruby {
+  background: linear-gradient(145deg, rgba(244, 63, 94, 0.16) 0%, rgba(3, 16, 36, 0.98) 100%) !important;
+  border: 1.5px solid rgba(244, 63, 94, 0.55) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), 0 0 18px rgba(244, 63, 94, 0.22) !important;
 }
 
-.tier-diamond:hover {
-  border-color: #00e5ff;
-  box-shadow: 0 12px 30px rgba(0, 229, 255, 0.35), 0 0 20px rgba(0, 229, 255, 0.3);
+.vadic-tree-card.tier-ruby:hover {
+  border-color: #f43f5e !important;
+  box-shadow: 0 10px 28px rgba(244, 63, 94, 0.35), 0 0 24px rgba(244, 63, 94, 0.3) !important;
 }
 
-.tier-platinum {
-  border: 1.5px solid rgba(226, 232, 240, 0.35);
-  background: linear-gradient(180deg, rgba(226, 232, 240, 0.06) 0%, rgba(2, 13, 29, 0.95) 100%);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), 0 0 12px rgba(226, 232, 240, 0.12);
+.vadic-tree-card.tier-diamond {
+  background: linear-gradient(145deg, rgba(0, 229, 255, 0.12) 0%, rgba(3, 16, 36, 0.98) 100%) !important;
+  border: 1.5px solid rgba(0, 229, 255, 0.45) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 229, 255, 0.2) !important;
 }
 
-.tier-platinum:hover {
-  border-color: #f1f5f9;
-  box-shadow: 0 10px 25px rgba(226, 232, 240, 0.25);
+.vadic-tree-card.tier-diamond:hover {
+  border-color: #00e5ff !important;
+  box-shadow: 0 10px 26px rgba(0, 229, 255, 0.35), 0 0 20px rgba(0, 229, 255, 0.28) !important;
 }
 
-.tier-gold {
-  border: 1.5px solid rgba(245, 158, 11, 0.35);
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.06) 0%, rgba(2, 13, 29, 0.95) 100%);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.12);
+.vadic-tree-card.tier-platinum {
+  background: linear-gradient(145deg, rgba(226, 232, 240, 0.10) 0%, rgba(3, 16, 36, 0.98) 100%) !important;
+  border: 1.5px solid rgba(226, 232, 240, 0.38) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), 0 0 12px rgba(226, 232, 240, 0.15) !important;
 }
 
-.tier-gold:hover {
-  border-color: #fbbf24;
-  box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+.vadic-tree-card.tier-platinum:hover {
+  border-color: #f1f5f9 !important;
+  box-shadow: 0 8px 22px rgba(226, 232, 240, 0.28) !important;
 }
 
-.tier-silver {
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.05) 0%, rgba(2, 13, 29, 0.95) 100%);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+.vadic-tree-card.tier-gold {
+  background: linear-gradient(145deg, rgba(245, 158, 11, 0.12) 0%, rgba(3, 16, 36, 0.98) 100%) !important;
+  border: 1.5px solid rgba(245, 158, 11, 0.38) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.15) !important;
 }
 
-.tier-silver:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 8px 20px rgba(148, 163, 184, 0.22);
+.vadic-tree-card.tier-gold:hover {
+  border-color: #fbbf24 !important;
+  box-shadow: 0 8px 22px rgba(245, 158, 11, 0.3) !important;
 }
 
-/* Stage 1: Diamond (Root) Position */
-.node-root {
-  top: 22px;
-  left: 590px;
-  transform: translateX(-50%);
-  width: 170px;
-  padding: 0.5rem 0.75rem;
+.vadic-tree-card.tier-silver {
+  background: linear-gradient(145deg, rgba(148, 163, 184, 0.08) 0%, rgba(3, 16, 36, 0.98) 100%) !important;
+  border: 1px solid rgba(148, 163, 184, 0.32) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
 }
 
-/* Stage 2: Platinum Positions */
-.node-plat-1 {
-  top: 145px;
-  left: 330px;
-  transform: translateX(-50%);
-  width: 142px;
-  padding: 0.45rem 0.65rem;
+.vadic-tree-card.tier-silver:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 6px 18px rgba(148, 163, 184, 0.25) !important;
 }
 
-.node-plat-2 {
-  top: 145px;
-  left: 850px;
-  transform: translateX(-50%);
-  width: 142px;
-  padding: 0.45rem 0.65rem;
+/* Stage 1: Ruby (Apex Leader) */
+.vadic-tree-card.node-ruby {
+  top: 14px !important;
+  left: 500px !important;
+  width: 160px !important;
+  padding: 0.38rem 0.65rem !important;
+  gap: 0.55rem;
 }
 
-/* Stage 3: Gold Positions */
-.node-gold-1 {
-  top: 270px;
-  left: 200px;
-  transform: translateX(-50%);
-  width: 118px;
-  padding: 0.4rem 0.55rem;
+/* Stage 2: Diamond (Frontline Leaders) */
+.vadic-tree-card.node-diamond-1 {
+  top: 118px !important;
+  left: 260px !important;
+  width: 144px !important;
+  padding: 0.35rem 0.55rem !important;
+  gap: 0.5rem;
 }
 
-.node-gold-2 {
-  top: 270px;
-  left: 460px;
-  transform: translateX(-50%);
-  width: 118px;
-  padding: 0.4rem 0.55rem;
+.vadic-tree-card.node-diamond-2 {
+  top: 118px !important;
+  left: 740px !important;
+  width: 144px !important;
+  padding: 0.35rem 0.55rem !important;
+  gap: 0.5rem;
 }
 
-.node-gold-3 {
-  top: 270px;
-  left: 720px;
-  transform: translateX(-50%);
-  width: 118px;
-  padding: 0.4rem 0.55rem;
-}
-
-.node-gold-4 {
-  top: 270px;
-  left: 980px;
-  transform: translateX(-50%);
-  width: 118px;
-  padding: 0.4rem 0.55rem;
-}
-
-/* Stage 4: Silver Positions (Below - Foundation) */
-.node-silver-1 {
-  top: 395px;
-  left: 135px;
-  transform: translateX(-50%);
-  width: 104px;
-  padding: 0.35rem 0.45rem;
+/* Stage 3: Platinum (Senior Directors) */
+.vadic-tree-card.node-plat-1 {
+  top: 218px !important;
+  left: 140px !important;
+  width: 126px !important;
+  padding: 0.32rem 0.5rem !important;
   gap: 0.45rem;
 }
 
-.node-silver-2 {
-  top: 395px;
-  left: 265px;
-  transform: translateX(-50%);
-  width: 104px;
-  padding: 0.35rem 0.45rem;
+.vadic-tree-card.node-plat-2 {
+  top: 218px !important;
+  left: 380px !important;
+  width: 126px !important;
+  padding: 0.32rem 0.5rem !important;
   gap: 0.45rem;
 }
 
-.node-silver-3 {
-  top: 395px;
-  left: 395px;
-  transform: translateX(-50%);
-  width: 104px;
-  padding: 0.35rem 0.45rem;
+.vadic-tree-card.node-plat-3 {
+  top: 218px !important;
+  left: 620px !important;
+  width: 126px !important;
+  padding: 0.32rem 0.5rem !important;
   gap: 0.45rem;
 }
 
-.node-silver-4 {
-  top: 395px;
-  left: 525px;
-  transform: translateX(-50%);
-  width: 104px;
-  padding: 0.35rem 0.45rem;
+.vadic-tree-card.node-plat-4 {
+  top: 218px !important;
+  left: 860px !important;
+  width: 126px !important;
+  padding: 0.32rem 0.5rem !important;
   gap: 0.45rem;
 }
 
-.node-silver-5 {
-  top: 395px;
-  left: 655px;
-  transform: translateX(-50%);
-  width: 104px;
-  padding: 0.35rem 0.45rem;
-  gap: 0.45rem;
+/* Stage 4: Gold (Team Managers) */
+.vadic-tree-card.node-gold-1 {
+  top: 318px !important;
+  left: 140px !important;
+  width: 120px !important;
+  padding: 0.30rem 0.45rem !important;
+  gap: 0.4rem;
 }
 
-.node-silver-6 {
-  top: 395px;
-  left: 785px;
-  transform: translateX(-50%);
-  width: 104px;
-  padding: 0.35rem 0.45rem;
-  gap: 0.45rem;
+.vadic-tree-card.node-gold-2 {
+  top: 318px !important;
+  left: 380px !important;
+  width: 120px !important;
+  padding: 0.30rem 0.45rem !important;
+  gap: 0.4rem;
 }
 
-.node-silver-7 {
-  top: 395px;
-  left: 915px;
-  transform: translateX(-50%);
-  width: 104px;
-  padding: 0.35rem 0.45rem;
-  gap: 0.45rem;
+.vadic-tree-card.node-gold-3 {
+  top: 318px !important;
+  left: 620px !important;
+  width: 120px !important;
+  padding: 0.30rem 0.45rem !important;
+  gap: 0.4rem;
 }
 
-.node-silver-8 {
-  top: 395px;
-  left: 1045px;
-  transform: translateX(-50%);
-  width: 104px;
-  padding: 0.35rem 0.45rem;
-  gap: 0.45rem;
+.vadic-tree-card.node-gold-4 {
+  top: 318px !important;
+  left: 860px !important;
+  width: 120px !important;
+  padding: 0.30rem 0.45rem !important;
+  gap: 0.4rem;
+}
+
+/* Stage 5: Silver (Foundation Associates) */
+.vadic-tree-card.node-silver-1 {
+  top: 420px !important;
+  left: 80px !important;
+  width: 96px !important;
+  padding: 0.26rem 0.38rem !important;
+  gap: 0.35rem;
+}
+
+.vadic-tree-card.node-silver-2 {
+  top: 420px !important;
+  left: 200px !important;
+  width: 96px !important;
+  padding: 0.26rem 0.38rem !important;
+  gap: 0.35rem;
+}
+
+.vadic-tree-card.node-silver-3 {
+  top: 420px !important;
+  left: 320px !important;
+  width: 96px !important;
+  padding: 0.26rem 0.38rem !important;
+  gap: 0.35rem;
+}
+
+.vadic-tree-card.node-silver-4 {
+  top: 420px !important;
+  left: 440px !important;
+  width: 96px !important;
+  padding: 0.26rem 0.38rem !important;
+  gap: 0.35rem;
+}
+
+.vadic-tree-card.node-silver-5 {
+  top: 420px !important;
+  left: 560px !important;
+  width: 96px !important;
+  padding: 0.26rem 0.38rem !important;
+  gap: 0.35rem;
+}
+
+.vadic-tree-card.node-silver-6 {
+  top: 420px !important;
+  left: 680px !important;
+  width: 96px !important;
+  padding: 0.26rem 0.38rem !important;
+  gap: 0.35rem;
+}
+
+.vadic-tree-card.node-silver-7 {
+  top: 420px !important;
+  left: 800px !important;
+  width: 96px !important;
+  padding: 0.26rem 0.38rem !important;
+  gap: 0.35rem;
+}
+
+.vadic-tree-card.node-silver-8 {
+  top: 420px !important;
+  left: 920px !important;
+  width: 96px !important;
+  padding: 0.26rem 0.38rem !important;
+  gap: 0.35rem;
 }
 
 /* Node Internal Elements */
-.node-avatar {
-  border-radius: 9px;
+.vadic-tree-avatar {
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.avatar-diamond {
-  width: 34px;
-  height: 34px;
+.vadic-tree-avatar.avatar-ruby {
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.3) 0%, rgba(225, 29, 72, 0.5) 100%);
+  border: 1px solid #f43f5e;
+  color: #fb7185;
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.35);
+}
+
+.vadic-tree-avatar.avatar-diamond {
+  width: 28px;
+  height: 28px;
   background: linear-gradient(135deg, rgba(0, 229, 255, 0.25) 0%, rgba(2, 132, 199, 0.4) 100%);
   border: 1px solid #00e5ff;
   color: #00e5ff;
   box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
 }
 
-.avatar-platinum {
-  width: 30px;
-  height: 30px;
+.vadic-tree-avatar.avatar-platinum {
+  width: 26px;
+  height: 26px;
   background: linear-gradient(135deg, rgba(226, 232, 240, 0.2) 0%, rgba(148, 163, 184, 0.35) 100%);
   border: 1px solid #e2e8f0;
   color: #f8fafc;
 }
 
-.avatar-gold {
-  width: 28px;
-  height: 28px;
+.vadic-tree-avatar.avatar-gold {
+  width: 24px;
+  height: 24px;
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.4) 100%);
   border: 1px solid #f59e0b;
   color: #fbbf24;
 }
 
-.avatar-silver {
-  width: 25px;
-  height: 25px;
+.vadic-tree-avatar.avatar-silver {
+  width: 21px;
+  height: 21px;
   background: linear-gradient(135deg, rgba(148, 163, 184, 0.15) 0%, rgba(100, 116, 139, 0.3) 100%);
   border: 1px solid #94a3b8;
   color: #cbd5e1;
 }
 
-.node-meta {
+.vadic-tree-meta {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-.node-title-row {
+.vadic-tree-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.25rem;
+  gap: 0.2rem;
 }
 
-.node-name {
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.vadic-tree-name {
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin: 0 !important;
+  line-height: 1.2 !important;
 }
 
-.node-root .node-name {
-  font-size: 0.84rem;
-  font-weight: 800;
+.node-ruby .vadic-tree-name {
+  font-size: 0.80rem !important;
+  font-weight: 800 !important;
 }
 
-.node-plat-1 .node-name,
-.node-plat-2 .node-name {
-  font-size: 0.78rem;
-  font-weight: 700;
+.node-diamond-1 .vadic-tree-name,
+.node-diamond-2 .vadic-tree-name {
+  font-size: 0.74rem !important;
+  font-weight: 700 !important;
 }
 
-.node-silver-1 .node-name,
-.node-silver-2 .node-name,
-.node-silver-3 .node-name,
-.node-silver-4 .node-name,
-.node-silver-5 .node-name,
-.node-silver-6 .node-name,
-.node-silver-7 .node-name,
-.node-silver-8 .node-name {
-  font-size: 0.69rem;
+.node-silver-1 .vadic-tree-name,
+.node-silver-2 .vadic-tree-name,
+.node-silver-3 .vadic-tree-name,
+.node-silver-4 .vadic-tree-name,
+.node-silver-5 .vadic-tree-name,
+.node-silver-6 .vadic-tree-name,
+.node-silver-7 .vadic-tree-name,
+.node-silver-8 .vadic-tree-name {
+  font-size: 0.64rem !important;
 }
 
-.node-status-dot {
+.vadic-tree-status-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   flex-shrink: 0;
-}
-
-.dot-active {
   background: #10b981;
   box-shadow: 0 0 6px #10b981;
 }
 
-.node-rank {
-  font-size: 0.68rem;
-  font-weight: 700;
-  margin-top: 0.1rem;
+.vadic-tree-rank {
+  font-size: 0.65rem !important;
+  font-weight: 700 !important;
+  margin-top: 0.05rem !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
 }
 
-.rank-diamond {
-  color: #00e5ff;
-  font-weight: 800;
-  font-size: 0.72rem;
-  letter-spacing: 0.03em;
+.vadic-tree-rank.rank-ruby {
+  color: #fb7185 !important;
+  font-weight: 800 !important;
+  font-size: 0.69rem !important;
 }
 
-.rank-platinum {
-  color: #e2e8f0;
-  font-weight: 800;
-  font-size: 0.70rem;
-  letter-spacing: 0.02em;
+.vadic-tree-rank.rank-diamond {
+  color: #00e5ff !important;
+  font-weight: 800 !important;
+  font-size: 0.67rem !important;
 }
 
-.rank-gold {
-  color: #fbbf24;
-  font-weight: 800;
-  font-size: 0.68rem;
-  letter-spacing: 0.02em;
+.vadic-tree-rank.rank-platinum {
+  color: #e2e8f0 !important;
+  font-weight: 800 !important;
+  font-size: 0.65rem !important;
 }
 
-.rank-silver {
-  color: #94a3b8;
-  font-weight: 700;
-  font-size: 0.65rem;
-  letter-spacing: 0.01em;
+.vadic-tree-rank.rank-gold {
+  color: #fbbf24 !important;
+  font-weight: 800 !important;
+  font-size: 0.64rem !important;
+}
+
+.vadic-tree-rank.rank-silver {
+  color: #94a3b8 !important;
+  font-weight: 700 !important;
+  font-size: 0.60rem !important;
+}
+
+/* RESPONSIVE SCALING - NEVER PRODUCES SCROLLBARS */
+@media (max-width: 1060px) {
+  .binary-board-wrapper {
+    height: 460px;
+  }
+  .binary-tree-board {
+    transform: scale(0.90);
+  }
+}
+
+@media (max-width: 960px) {
+  .binary-board-wrapper {
+    height: 410px;
+  }
+  .binary-tree-board {
+    transform: scale(0.81);
+  }
+}
+
+@media (max-width: 860px) {
+  .binary-board-wrapper {
+    height: 365px;
+  }
+  .binary-tree-board {
+    transform: scale(0.72);
+  }
+}
+
+@media (max-width: 768px) {
+  .binary-board-wrapper {
+    height: 320px;
+  }
+  .binary-tree-board {
+    transform: scale(0.63);
+  }
+}
+
+@media (max-width: 640px) {
+  .binary-board-wrapper {
+    height: 265px;
+  }
+  .binary-tree-board {
+    transform: scale(0.52);
+  }
+}
+
+@media (max-width: 520px) {
+  .binary-board-wrapper {
+    height: 215px;
+  }
+  .binary-tree-board {
+    transform: scale(0.42);
+  }
+}
+
+@media (max-width: 420px) {
+  .binary-board-wrapper {
+    height: 175px;
+  }
+  .binary-tree-board {
+    transform: scale(0.34);
+  }
+}
+
+@media (max-width: 360px) {
+  .binary-board-wrapper {
+    height: 150px;
+  }
+  .binary-tree-board {
+    transform: scale(0.30);
+  }
 }
 
 

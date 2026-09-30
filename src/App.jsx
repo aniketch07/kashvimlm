@@ -1,73 +1,236 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+import ProtectedRoute from './components/auth/ProtectedRoute.jsx';
+import DashboardLayout from './layouts/DashboardLayout.jsx';
+import AdminLayout from './layouts/AdminLayout.jsx';
+
+// Public pages
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import Contact from './pages/Contact';
-import Profile from './pages/Profile';
 import Join from './pages/Join';
-import NetworkTreePage from './pages/NetworkTreePage';
-import AdminNetworkTreePage from './pages/AdminNetworkTreePage';
+import Login from './pages/Login';
+import Register from './pages/Register';
 
-/**
- * Inner layout component that inspects the current route and auth status.
- * When a user is logged in and viewing their distributor dashboard (/profile or /dashboard):
- * - Displays the full-width Kashvimlm distributor portal matching the reference snapshot
- * - Omits external headers and footers as requested ("dont copy the footer just make the page like this and finctionable")
- */
+// Protected Distributor Portal Pages
+import Dashboard from './pages/Dashboard';
+import NetworkPage from './pages/NetworkPage';
+import NetworkTreePage from './pages/NetworkTreePage';
+import BusinessVolumePage from './pages/BusinessVolumePage';
+import CommissionPage from './pages/CommissionPage';
+import ProfilePage from './pages/ProfilePage';
+
+// Admin Pages (Prompt 8)
+import AdminDashboard from './pages/admin/AdminDashboard';
+import DistributorManagementPage from './pages/admin/DistributorManagementPage';
+import DistributorDetailPage from './pages/admin/DistributorDetailPage';
+import AdminNetworkPage from './pages/admin/AdminNetworkPage';
+import BusinessVolumeManagementPage from './pages/admin/BusinessVolumeManagementPage';
+import CommissionManagementPage from './pages/admin/CommissionManagementPage';
+import AuditLogsPage from './pages/admin/AuditLogsPage';
+import CommissionSettingsPage from './pages/admin/CommissionSettingsPage';
+
 function AppContent() {
   const location = useLocation();
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    try {
-      const saved = localStorage.getItem('kashvi_auth');
-      return saved ? Boolean(JSON.parse(saved).isLoggedIn) : false;
-    } catch {
-      return false;
-    }
-  });
+  const { isAuthenticated } = useAuth();
 
-  useEffect(() => {
-    const syncAuth = () => {
-      try {
-        const saved = localStorage.getItem('kashvi_auth');
-        setIsLoggedIn(saved ? Boolean(JSON.parse(saved).isLoggedIn) : false);
-      } catch {
-        setIsLoggedIn(false);
-      }
-    };
+  const isPortalRoute = [
+    '/dashboard',
+    '/network',
+    '/network-tree',
+    '/business-volume',
+    '/commissions',
+    '/profile',
+    '/admin',
+  ].some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
 
-    syncAuth();
-    window.addEventListener('storage', syncAuth);
-    window.addEventListener('kashvi_auth_change', syncAuth);
-    return () => {
-      window.removeEventListener('storage', syncAuth);
-      window.removeEventListener('kashvi_auth_change', syncAuth);
-    };
-  }, [location.pathname]);
-
-  const isDashboardView =
-    (location.pathname === '/profile' ||
-      location.pathname === '/dashboard' ||
-      location.pathname === '/network-tree' ||
-      location.pathname === '/admin/network-tree') &&
-    isLoggedIn;
+  const isDashboardView = isPortalRoute && isAuthenticated;
 
   return (
     <div className={`app-wrapper ${isDashboardView ? 'dashboard-mode' : ''}`}>
       {!isDashboardView && <Navbar />}
       <main className={`main-content ${isDashboardView ? 'main-dashboard-canvas' : ''}`}>
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/dashboard" element={<Profile />} />
+          <Route path="/join" element={<Join />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Protected Distributor Operations Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/network"
+            element={
+              <ProtectedRoute>
+                <Dashboard defaultNav="network_tree" />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/network-tree"
-            element={isLoggedIn ? <Profile defaultNav="network_tree" /> : <NetworkTreePage />}
+            element={
+              <ProtectedRoute>
+                <Dashboard defaultNav="network_tree" />
+              </ProtectedRoute>
+            }
           />
-          <Route path="/admin/network-tree" element={<AdminNetworkTreePage />} />
-          <Route path="/join" element={<Join />} />
-          <Route path="*" element={<Home />} />
+          <Route
+            path="/business-volume"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <BusinessVolumePage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/commissions"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <CommissionPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ProfilePage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected Admin Console Routes (Prompt 8) */}
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <AdminDashboard />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/distributors"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <DistributorManagementPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/distributors/:id"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <DistributorDetailPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/network"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <AdminNetworkPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/network-tree"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <AdminNetworkPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/business-volume"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <BusinessVolumeManagementPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/commissions"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <CommissionManagementPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <AuditLogsPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <CommissionSettingsPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings/commission"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <CommissionSettingsPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/network/:distributorId"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminLayout>
+                  <AdminNetworkPage />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Catch-All Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       {!isDashboardView && <Footer />}
@@ -78,7 +241,9 @@ function AppContent() {
 function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

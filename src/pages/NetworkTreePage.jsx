@@ -1,17 +1,12 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Network,
-  Users,
-  Award,
   ShieldAlert,
   ArrowRight,
-  TrendingUp,
   ShieldCheck,
   ArrowLeftRight,
-  FileText,
   X,
-  Search,
   RefreshCw,
   AlertTriangle,
   CheckCircle2,
@@ -22,6 +17,8 @@ import TreeControls from '../components/networkTree/TreeControls';
 import TreeSearch from '../components/networkTree/TreeSearch';
 import MemberHoverCard from '../components/networkTree/MemberHoverCard';
 import MemberDetailsPanel from '../components/networkTree/MemberDetailsPanel';
+import { useAuth } from '../context/AuthContext.jsx';
+import { treeApi } from '../api/treeApi.js';
 import { api } from '../services/api.js';
 import '../components/networkTree/NetworkTree.css';
 
@@ -58,17 +55,8 @@ function NetworkTreePage({ embedded = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // 1. Authenticated User Session
-  const [authData, setAuthData] = useState(() => {
-    try {
-      const saved = localStorage.getItem('kashvi_auth');
-      return saved ? JSON.parse(saved) : { isLoggedIn: false, user: null };
-    } catch {
-      return { isLoggedIn: false, user: null };
-    }
-  });
-
-  const currentUser = authData?.user;
-  const isAuthorized = Boolean(authData?.isLoggedIn);
+  const { currentUser, isAuthenticated } = useAuth();
+  const isAuthorized = Boolean(isAuthenticated);
   const initialDistributorId = currentUser?.memberId || currentUser?.distributorId || 'KV-1001';
 
   // Read URL member param for state persistence on refresh (?member=KV-1002)
@@ -256,14 +244,38 @@ function NetworkTreePage({ embedded = false }) {
       try {
         const targetId = rootId || initialDistributorId;
 
-        // Fetch tree from Prompt 7 network-tree endpoints
+        // Fetch tree: try treeApi.getTree first (handles downline security check & 403 authorization)
         let data = null;
-        if (targetId && targetId !== initialDistributorId) {
-          const res = await api.getMemberNetworkTree(targetId, maxDepth);
-          data = res?.root || res;
-        } else {
-          const res = await api.getNetworkTree(maxDepth);
-          data = res?.root || res;
+        try {
+          const treeRes = await treeApi.getTree(targetId, maxDepth);
+          if (treeRes && treeRes.success) {
+            data = treeRes.data?.root || treeRes.data;
+          }
+        } catch (apiErr) {
+          if (
+            apiErr?.status === 403 ||
+            apiErr?.isForbidden ||
+            apiErr?.message?.includes('403') ||
+            apiErr?.message?.includes('Forbidden')
+          ) {
+            setError(
+              apiErr.message ||
+                '403 Forbidden: You do not have permission to access or view this distributor network.'
+            );
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Fallback to secondary endpoints if needed
+        if (!data) {
+          if (targetId && targetId !== initialDistributorId) {
+            const res = await api.getMemberNetworkTree(targetId, maxDepth);
+            data = res?.root || res?.data?.root || res?.data || res;
+          } else {
+            const res = await api.getNetworkTree(maxDepth);
+            data = res?.root || res?.data?.root || res?.data || res;
+          }
         }
 
         // Fallback to binary tree if needed
@@ -277,10 +289,22 @@ function NetworkTreePage({ embedded = false }) {
           setError('Unable to load network tree from database.');
         }
 
-        // Fetch network summary
-        const summary = await api.getMemberNetworkSummary(targetId);
-        if (summary) {
-          setNetworkSummary(summary);
+        // Fetch network statistics / summary
+        try {
+          const statsRes = await treeApi.getNetworkStats(targetId);
+          if (statsRes && statsRes.success && statsRes.data) {
+            setNetworkSummary(statsRes.data);
+          } else {
+            const summary = await api.getMemberNetworkSummary(targetId);
+            if (summary) {
+              setNetworkSummary(summary);
+            }
+          }
+        } catch {
+          const summary = await api.getMemberNetworkSummary(targetId);
+          if (summary) {
+            setNetworkSummary(summary);
+          }
         }
       } catch (err) {
         setError(err.message || 'Error fetching network genealogy.');

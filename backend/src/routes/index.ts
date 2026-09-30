@@ -58,6 +58,10 @@ apiRouter.use('/orders', orderRouter);
 // Business Volume (BV) Ledger: /api/v1/bv
 apiRouter.use('/bv', bvRouter);
 
+// Configurable MLM Levels / Ranks (Silver, Gold, Platinum, Diamond, Ruby): /api/v1/levels
+import { levelRouter } from './level.routes';
+apiRouter.use('/levels', levelRouter);
+
 // Commission Engine & Rules: /api/v1/commissions
 import { commissionRouter } from './commission.routes';
 apiRouter.use('/commissions', commissionRouter);
@@ -108,5 +112,13 @@ apiRouter.use('/notifications', notificationRouter);
 // Admin Control & Audit Logs: /api/v1/admin
 import { adminRouter } from './admin.routes';
 apiRouter.use('/admin', adminRouter);
+
+// Member Level & Volume APIs (Prompt 7): /api/v1/members & /api/members
+import { memberRouter } from './member.routes';
+apiRouter.use('/members', memberRouter);
+
+// Admin Member Recalculation Engine (Prompt 7): /api/v1/admin/members & /api/admin/members
+import { adminMemberRouter } from './adminMember.routes';
+apiRouter.use('/admin/members', adminMemberRouter);
 
 export default apiRouter;

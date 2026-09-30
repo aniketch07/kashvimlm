@@ -1,5 +1,7 @@
 import { query } from '../../config/db.js';
 import { AuditService } from '../audit/audit.service.js';
+import { BinaryTreePlacementService } from './binaryTreePlacement.service.js';
+import { BinaryTreeService } from './binaryTree.service.js';
 import {
   AuditAction,
   AdminMoveDistributorParams,
@@ -576,6 +578,12 @@ export class MlmTreeService {
       throw new Error('Circular hierarchy violation: A distributor cannot be placed under themselves.');
     }
 
+    // Check circular placement (ancestor under descendant)
+    const isDescendant = await BinaryTreeService.isDescendant(memberId.trim(), newParent.trim());
+    if (isDescendant) {
+      throw new Error('Circular hierarchy violation: Cannot place an ancestor under a descendant.');
+    }
+
     // Check circular placement (ancestor under descendant) & target slot occupancy
     try {
       const parentCheck = await query(
@@ -601,6 +609,15 @@ export class MlmTreeService {
       if (occCheck.rows.length > 0) {
         throw new Error(`Position ${upperNewPos} under ${newParent.trim()} is already occupied.`);
       }
+
+      const distOccCheck = await query(
+        `SELECT member_id FROM distributors
+         WHERE parent_id = $1 AND UPPER(placement_leg) = $2 AND member_id <> $3`,
+        [newParent.trim(), upperNewPos, memberId.trim()]
+      );
+      if (distOccCheck && distOccCheck.rows.length > 0) {
+        throw new Error(`Position ${upperNewPos} under ${newParent.trim()} is already occupied.`);
+      }
     } catch (err: any) {
       if (
         err.message &&
@@ -610,6 +627,15 @@ export class MlmTreeService {
       ) {
         throw err;
       }
+    }
+
+    // Topological availability verification
+    const slots = await BinaryTreePlacementService.getAvailablePositions(newParent.trim(), memberId.trim());
+    if (upperNewPos === 'LEFT' && !slots.leftAvailable) {
+      throw new Error(`Position LEFT under parent ${newParent.trim()} is already occupied.`);
+    }
+    if (upperNewPos === 'RIGHT' && !slots.rightAvailable) {
+      throw new Error(`Position RIGHT under parent ${newParent.trim()} is already occupied.`);
     }
 
     // Attempt database update
@@ -717,6 +743,15 @@ export class MlmTreeService {
 
     if (memberId.trim().toUpperCase() === placementParentId.trim().toUpperCase()) {
       throw new Error('Circular hierarchy violation: A distributor cannot be placed under themselves.');
+    }
+
+    // Topological availability verification
+    const placeSlots = await BinaryTreePlacementService.getAvailablePositions(placementParentId.trim(), memberId.trim());
+    if (upperPos === 'LEFT' && !placeSlots.leftAvailable) {
+      throw new Error(`Position LEFT under parent ${placementParentId.trim()} is already occupied.`);
+    }
+    if (upperPos === 'RIGHT' && !placeSlots.rightAvailable) {
+      throw new Error(`Position RIGHT under parent ${placementParentId.trim()} is already occupied.`);
     }
 
     try {

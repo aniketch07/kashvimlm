@@ -15,10 +15,29 @@ router.get('/structure/:memberId?', optionalAuth, MlmTreeController.getTree);
 router.get('/node/:memberId?', optionalAuth, MlmTreeController.getTree);
 router.get('/placement-suggest', optionalAuth, MlmTreeController.getPlacementSuggestion);
 
-// Direct Children, Downline, and Root Tree by Distributor ID
+// Tree route aliases
+router.get('/children/:distributorId', MlmTreeController.getChildren);
+router.get('/downline/:distributorId/left', MlmTreeController.getLeftTeam);
+router.get('/downline/:distributorId/right', MlmTreeController.getRightTeam);
+router.get('/downline/:distributorId', MlmTreeController.getDownline);
+router.get('/path/:distributorId', MlmTreeController.getPath);
+router.get('/stats/:distributorId', MlmTreeController.getStatistics);
+router.get('/statistics/:distributorId', MlmTreeController.getStatistics);
+
+// Prompt 4: Binary MLM Tree Retrieval & Calculations
 router.get('/:distributorId/children', MlmTreeController.getChildren);
 router.get('/:distributorId/downline', MlmTreeController.getDownline);
-router.get('/:distributorId', optionalAuth, MlmTreeController.getMemberNetworkTree);
+router.get('/:distributorId/left', MlmTreeController.getLeftTeam);
+router.get('/:distributorId/right', MlmTreeController.getRightTeam);
+router.get('/:distributorId/path', MlmTreeController.getPath);
+router.get('/:distributorId/ancestors', MlmTreeController.getAncestors);
+router.get('/:distributorId/statistics', MlmTreeController.getStatistics);
+router.get('/:distributorId/search', MlmTreeController.searchDownline);
+router.get('/:distributorId/parent', MlmTreeController.getParent);
+router.get('/:distributorId/sponsor', MlmTreeController.getSponsor);
+router.get('/:distributorId/level', MlmTreeController.getLevel);
+router.get('/:distributorId/validate', MlmTreeController.validateTree);
+router.get('/:distributorId', optionalAuth, MlmTreeController.getCompleteTree);
 
 
 // MLM Binary Tree Operations & Audit Logging (Prompt 16)

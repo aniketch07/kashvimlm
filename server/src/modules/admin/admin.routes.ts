@@ -18,6 +18,7 @@ adminRoutes.use(requireAdmin);
 
 // System Metrics & Audit (Immutable Compliance Trail)
 adminRoutes.get('/metrics', AdminController.getMetrics);
+adminRoutes.get('/dashboard', AdminController.getDashboard);
 adminRoutes.get('/audit-logs', AdminController.getAuditLogs);
 adminRoutes.delete('/audit-logs', AdminController.blockAuditDeletion);
 adminRoutes.delete('/audit-logs/:id', AdminController.blockAuditDeletion);
@@ -25,7 +26,28 @@ adminRoutes.delete('/audit-logs/:id', AdminController.blockAuditDeletion);
 // Financial & Operations
 adminRoutes.post('/calculate-commissions', AdminController.triggerWeeklyCommissionCalculation);
 adminRoutes.post('/settle-payouts', AdminController.triggerPayoutSettlement);
-adminRoutes.patch('/distributors/:memberId/status', AdminController.updateMemberStatus);
+adminRoutes.patch('/distributors/:id/status', AdminController.updateDistributorStatus);
+adminRoutes.patch('/distributors/:memberId/status', AdminController.updateDistributorStatus);
+
+// Prompt 8: Admin Distributor & Network Management Endpoints
+adminRoutes.get('/distributors', AdminController.listDistributors);
+adminRoutes.get('/distributors/:id', AdminController.getDistributorById);
+adminRoutes.patch('/distributors/:id', AdminController.updateDistributor);
+adminRoutes.put('/distributors/:id', AdminController.updateDistributor);
+adminRoutes.get('/network/:distributorId', AdminController.getDistributorNetwork);
+adminRoutes.get('/business-volume', AdminController.getBusinessVolume);
+adminRoutes.post('/business-volume/adjust', AdminController.adjustBusinessVolume);
+adminRoutes.get('/commissions', AdminController.getCommissions);
+adminRoutes.post('/commissions/approve', AdminController.approveCommissions);
+adminRoutes.post('/commissions/reverse', AdminController.reverseCommission);
+
+// Prompt 8: System Settings / Commission Rules Endpoints
+adminRoutes.get('/settings', AdminController.getSettings);
+adminRoutes.put('/settings', AdminController.updateSettings);
+adminRoutes.patch('/settings', AdminController.updateSettings);
+adminRoutes.get('/settings/commission', AdminController.getSettings);
+adminRoutes.put('/settings/commission', AdminController.updateSettings);
+adminRoutes.patch('/settings/commission', AdminController.updateSettings);
 
 // MLM Binary Tree Operations & Audit Trail (Prompt 16 & 17)
 adminRoutes.post('/tree/move', AdminController.moveDistributor);

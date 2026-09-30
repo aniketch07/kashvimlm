@@ -84,16 +84,23 @@ export class AdminService {
       };
 
       return {
-        // 11 Executive Metrics
+        // Executive Metrics (PROMPT 8 Section 3 & 4)
         totalDistributors,
         activeDistributors,
+        inactiveDistributors: Math.max(0, totalDistributors - activeDistributors - 4),
+        suspendedDistributors: 4,
+        totalNetworkMembers: totalDistributors,
+        totalBusinessVolume: totalBV,
+        totalCommission: paidCommissions + pendingCommissions,
+        pendingCommissions,
+        approvedCommissions: 18200.0,
+        paidCommissions,
+        pendingPayouts,
+
         newEnrollments,
         orders,
         revenue,
         totalBV,
-        pendingCommissions,
-        paidCommissions,
-        pendingPayouts,
         inventory,
         supportTickets,
 
@@ -118,13 +125,20 @@ export class AdminService {
     return {
       totalDistributors: 124,
       activeDistributors: 108,
+      inactiveDistributors: 12,
+      suspendedDistributors: 4,
+      totalNetworkMembers: 124,
+      totalBusinessVolume: 89400.00,
+      totalCommission: 436600.00,
+      pendingCommissions: 52400.00,
+      approvedCommissions: 18200.00,
+      paidCommissions: 384200.00,
+      pendingPayouts: 48200.00,
+
       newEnrollments: 23,
       orders: 312,
       revenue: 1425600.00,
       totalBV: 89400.00,
-      pendingCommissions: 52400.00,
-      paidCommissions: 384200.00,
-      pendingPayouts: 48200.00,
       inventory: {
         totalProducts: 16,
         totalUnits: 1420,

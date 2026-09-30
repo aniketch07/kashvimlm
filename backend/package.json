@@ -11,6 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "test": "vitest run",
+    "test:matching": "vitest run tests/matching.test.ts",
+    "test:bb": "vitest run tests/bb.test.ts",
     "test:watch": "vitest",
     "test:runner": "tsx tests/runner.ts"
   },

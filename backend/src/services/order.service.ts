@@ -5,6 +5,7 @@ import { AppError } from '../utils/appError';
 import { CreateOrderInput, OrderQueryInput } from '../validators/order.validators';
 import { BVService } from './bv.service';
 import { CommissionService } from './commission.service';
+import { LevelPromotionService } from './level';
 
 export class OrderService {
   /**
@@ -269,6 +270,7 @@ export class OrderService {
       });
 
       // Step 9: Create BV ledger entries
+      const ancestorDistributorIds: string[] = [];
       if (distributorId && Number(orderTotalBV) > 0) {
         // Accrue Personal Order Volume via immutable BVLedger
         await BVService.creditBV(
@@ -347,6 +349,8 @@ export class OrderService {
                 tx
               );
 
+              ancestorDistributorIds.push(ancestorNode.distributorId);
+
               currentLeg = ancestorNode.placementPosition;
               parentNodeId = ancestorNode.placementParentId;
               depthCount++;
@@ -356,9 +360,27 @@ export class OrderService {
       }
 
       // Step 10: Trigger commission processing only after the order qualifies according to configuration
-      // If order is paid/confirmed, invoke commission calculation
+      // If order is paid/confirmed, invoke commission calculation and automatic level promotion
       if (orderStatus === 'PAID') {
         await CommissionService.processOrderCommissions(order.id, tx);
+
+        // Automatic Level Promotion: Evaluate purchaser (Personal BB updated)
+        if (distributorId) {
+          try {
+            await LevelPromotionService.evaluateAndPromote(distributorId, tx);
+          } catch (promoErr: any) {
+            logger.warn({ error: promoErr.message, distributorId }, 'Purchaser level promotion evaluation warning');
+          }
+        }
+
+        // Automatic Level Promotion: Evaluate binary upline ancestors (Matching volume updated)
+        for (const ancestorDistId of ancestorDistributorIds) {
+          try {
+            await LevelPromotionService.evaluateAndPromote(ancestorDistId, tx);
+          } catch (promoErr: any) {
+            logger.warn({ error: promoErr.message, ancestorDistId }, 'Ancestor level promotion evaluation warning');
+          }
+        }
       }
 
       // Clear user cart if order was checked out from cart
