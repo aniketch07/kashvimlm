@@ -113,7 +113,7 @@ function Navbar() {
         {/* Right: Extreme Right Profile Logo & Mobile Toggle */}
         <div className="navbar-right">
           <NavLink
-            to="/profile"
+            to={authState.isLoggedIn ? '/profile' : '/login'}
             className={({ isActive }) =>
               isActive ? 'navbar-profile-btn active' : 'navbar-profile-btn'
             }
@@ -159,7 +159,7 @@ function Navbar() {
           >
             {/* Mobile Profile Card */}
             <NavLink
-              to="/profile"
+              to={authState.isLoggedIn ? '/profile' : '/login'}
               className={({ isActive }) =>
                 isActive ? 'mobile-profile-card active' : 'mobile-profile-card'
               }

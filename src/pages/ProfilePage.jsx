@@ -29,8 +29,8 @@ export function ProfilePage() {
 
   // Edit Profile Form State
   const [editForm, setEditForm] = useState({
-    name: '',
-    phone: '',
+    name: currentUser?.name || '',
+    phone: currentUser?.phone || '',
   });
   const [editLoading, setEditLoading] = useState(false);
   const [editSuccess, setEditSuccess] = useState('');
@@ -72,6 +72,15 @@ export function ProfilePage() {
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  useEffect(() => {
+    if (currentUser) {
+      setEditForm((prev) => ({
+        name: prev.name || currentUser.name || '',
+        phone: prev.phone || currentUser.phone || '',
+      }));
+    }
+  }, [currentUser]);
 
   // Handle Edit Profile Submission
   const handleUpdateProfile = async (e) => {
@@ -155,23 +164,29 @@ export function ProfilePage() {
   };
 
   const displayName = profileData?.name || currentUser?.name || 'Distributor';
-  const distributorId = profileData?.memberId || currentUser?.memberId || 'KV-1001';
+  const distributorId =
+    profileData?.memberId ||
+    profileData?.distributorCode ||
+    currentUser?.memberId ||
+    currentUser?.distributorId ||
+    'KV-1001';
+  const email = profileData?.email || currentUser?.email || 'distributor@kashvimlm.com';
   const sponsor =
     typeof profileData?.sponsor === 'object' && profileData?.sponsor !== null
       ? profileData.sponsor.displayName || profileData.sponsor.distributorCode || 'KV-1001'
-      : (profileData?.sponsor || currentUser?.sponsorName || 'KV-1001');
-  const parent = profileData?.parent || 'KV-1000';
-  const position = profileData?.position || 'LEFT';
-  const level = profileData?.level || 1;
+      : (profileData?.sponsor || currentUser?.sponsorName || currentUser?.sponsorId || 'KV-1001');
+  const parent = profileData?.parent || profileData?.parentId || currentUser?.parent || 'KV-1000';
+  const position = profileData?.position || currentUser?.position || 'LEFT';
+  const level = profileData?.level || currentUser?.level || 1;
   const status = profileData?.status || currentUser?.status || 'ACTIVE';
-  const role = currentUser?.role || 'DISTRIBUTOR';
+  const role = currentUser?.role || profileData?.role || 'DISTRIBUTOR';
 
   return (
     <div className="profile-page">
       {/* 1. Profile Top Card */}
       <div className="profile-identity-card">
         <div className="identity-avatar-large">
-          {displayName.charAt(0).toUpperCase()}
+          {(displayName || 'D').charAt(0).toUpperCase()}
         </div>
         <div className="identity-meta-column">
           <div className="identity-title-row">

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
+import ErrorBoundary from './components/common/ErrorBoundary.jsx';
 
 // Public pages
 import Navbar from './components/Navbar';
@@ -242,7 +243,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppContent />
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   );
