@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { OrderService } from '../services/order.service';
+import { AuthoritativeBVService } from '../services/authoritativeBV.service';
 import { sendSuccess } from '../utils/apiResponse';
 
 export class OrderController {
@@ -63,6 +64,29 @@ export class OrderController {
       sendSuccess(res, {
         message: 'Order cancelled and restocked successfully.',
         data: cancelled,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Adjusts an order's commissionable Business Volume (Admin only).
+   * PUT /api/v1/orders/:id/bv
+   */
+  public static async adminAdjustBV(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { commissionableBusinessVolume, reason } = req.body;
+      const updated = await AuthoritativeBVService.adminAdjustOrderBV({
+        orderId: id,
+        newCommissionableBV: commissionableBusinessVolume,
+        reason,
+        adminUserId: req.user!.id,
+      });
+      sendSuccess(res, {
+        message: 'Order commissionable Business Volume adjusted successfully.',
+        data: updated,
       });
     } catch (error) {
       next(error);

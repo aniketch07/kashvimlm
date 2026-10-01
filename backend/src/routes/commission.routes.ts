@@ -39,6 +39,12 @@ const optionalAuth = (req: Request, _res: Response, next: NextFunction) => {
 // DISTRIBUTOR COMMISSION VIEWS
 // ==========================================
 
+// 5-Level Unilevel Commissions sub-router
+import levelCommissionRouter from './levelCommission.routes';
+import commissionConfigRoutes from './commissionConfig.routes';
+router.use('/levels', levelCommissionRouter);
+router.use('/config', commissionConfigRoutes);
+
 // GET /api/v1/commissions/current - Current active period and qualification
 router.get('/current', optionalAuth, CommissionController.getCurrentPeriod);
 

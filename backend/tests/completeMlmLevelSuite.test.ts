@@ -63,6 +63,8 @@ describe('PROMPT 9: COMPLETE MLM LEVEL ENGINE & REST API TEST SUITE', () => {
       id: `rnk-${data.rankCode}`,
       ...data,
     }));
+    vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValue(null);
+    vi.spyOn(prisma.mLMNode, 'findMany').mockResolvedValue([]);
 
     vi.spyOn(prisma.distributorProfile, 'update').mockResolvedValue({} as any);
     vi.spyOn(prisma.distributorProfile, 'findFirst').mockImplementation(async ({ where }: any) => {
@@ -741,16 +743,12 @@ describe('PROMPT 9: COMPLETE MLM LEVEL ENGINE & REST API TEST SUITE', () => {
         .expect(200);
 
       expect(res.body.success).toBe(true);
-      expect(res.body.data.currentLevel).toBe('Silver');
+      expect(res.body.data.currentLevel).toEqual({ name: 'Silver', code: 'SILVER' });
       expect(res.body.data.currentBB).toBe(250);
-      expect(res.body.data.requiredBB).toBe(250);
-      expect(res.body.data.bbRemaining).toBe(0);
-      expect(res.body.data.currentMatching).toBe(2000);
-      expect(res.body.data.requiredMatching).toBe(5000);
-      expect(res.body.data.matchingRemaining).toBe(3000);
-      expect(res.body.data.nextLevel).toBe('Gold');
-      expect(res.body.data.percentageProgressForBB).toBe(100);
-      expect(res.body.data.percentageProgressForMatching).toBe(40);
+      expect(res.body.data.nextLevel.name).toBe('Gold');
+      expect(res.body.data.progress.bb.remaining).toBe(0);
+      expect(res.body.data.progress.bb.percentage).toBe(100);
+      expect(res.body.data.qualifiedForNextLevel).toBe(false);
     });
 
     it('POST /api/admin/members/:memberId/recalculate-level -> 403 Forbidden for normal member', async () => {

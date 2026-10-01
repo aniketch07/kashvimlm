@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { LevelService } from '../services/level.service';
 import { BBService } from '../services/bb.service';
 import { MatchingService } from '../services/matching.service';
+import { MemberRankProgressService } from '../services/memberRankProgress.service';
 import { sendSuccess } from '../utils/apiResponse';
 import {
   memberIdParamSchema,
@@ -42,20 +43,30 @@ export class MemberLevelController {
         currentLevelCode: details.currentLevel.code,
         currentLevelOrder: details.currentLevel.order,
         bb: details.currentBB,
+        leftMatching: details.currentLeftMatching,
+        rightMatching: details.currentRightMatching,
         matching: details.currentMatching,
         nextLevel: details.nextLevel ? details.nextLevel.name : null,
         nextLevelRequirements: details.nextLevel
           ? {
               bb: details.nextLevel.requiredBB,
-              matching: details.nextLevel.requiredMatching,
+              leftMatching: details.nextLevel.requiredLeftMatching,
+              rightMatching: details.nextLevel.requiredRightMatching,
+              matching: details.nextLevel.requiredMatching ?? details.nextLevel.requiredLeftMatching,
               requiredBB: details.nextLevel.requiredBB,
-              requiredMatching: details.nextLevel.requiredMatching,
+              requiredLeftMatching: details.nextLevel.requiredLeftMatching,
+              requiredRightMatching: details.nextLevel.requiredRightMatching,
+              requiredMatching: details.nextLevel.requiredMatching ?? details.nextLevel.requiredLeftMatching,
             }
           : null,
         progress: {
           bbGap: details.progress.bbGap,
+          leftMatchingGap: details.progress.leftMatchingGap,
+          rightMatchingGap: details.progress.rightMatchingGap,
           matchingGap: details.progress.matchingGap,
           bbProgressPercentage: details.progress.bbProgressPercentage,
+          leftMatchingProgressPercentage: details.progress.leftMatchingProgressPercentage,
+          rightMatchingProgressPercentage: details.progress.rightMatchingProgressPercentage,
           matchingProgressPercentage: details.progress.matchingProgressPercentage,
           isQualifiedForNext: details.progress.isQualifiedForNext,
         },
@@ -80,27 +91,7 @@ export class MemberLevelController {
   ): Promise<void> {
     try {
       const { memberId } = memberIdParamSchema.parse(req.params);
-      const details = await LevelService.getMemberLevel(memberId);
-
-      const requiredBB = details.nextLevel
-        ? details.nextLevel.requiredBB
-        : details.currentLevel.requiredBB;
-      const requiredMatching = details.nextLevel
-        ? details.nextLevel.requiredMatching
-        : details.currentLevel.requiredMatching;
-
-      const progressData = {
-        currentLevel: details.currentLevel.name,
-        currentBB: details.currentBB,
-        requiredBB,
-        bbRemaining: details.progress.bbGap,
-        currentMatching: details.currentMatching,
-        requiredMatching,
-        matchingRemaining: details.progress.matchingGap,
-        nextLevel: details.nextLevel ? details.nextLevel.name : null,
-        percentageProgressForBB: details.progress.bbProgressPercentage,
-        percentageProgressForMatching: details.progress.matchingProgressPercentage,
-      };
+      const progressData = await MemberRankProgressService.getMemberRankProgress(memberId);
 
       sendSuccess(res, {
         message: 'Member next level progress retrieved successfully',

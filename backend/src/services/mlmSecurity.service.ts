@@ -46,6 +46,17 @@ export const PROTECTED_MLM_FIELDS = [
   'lifetimegv',
   'totalleftbv',
   'totalrightbv',
+  'bv',
+  'totalbv',
+  'total_bv',
+  'unitbv',
+  'unit_bv',
+  'businessvolume',
+  'business_volume',
+  'commissionablebv',
+  'commissionable_bv',
+  'commissionablebusinessvolume',
+  'commissionable_business_volume',
 ];
 
 export interface ValidateTransactionReferenceInput {
@@ -111,6 +122,16 @@ export class MLMSecurityService {
     context?: { userId?: string; userRole?: string; path?: string; ipAddress?: string }
   ): void {
     if (!payload || typeof payload !== 'object') return;
+
+    // Allow administrator level and system configuration operations
+    if (
+      context?.path?.includes('/admin/config') ||
+      context?.path?.includes('/admin/levels') ||
+      context?.userRole === 'ADMIN' ||
+      context?.userRole === 'SUPER_ADMIN'
+    ) {
+      return;
+    }
 
     const violatingFields: string[] = [];
     const keys = Object.keys(payload);

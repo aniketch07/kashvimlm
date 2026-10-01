@@ -7,3 +7,4 @@ export * from './levelHistory.service';
 export * from './levelRecalculation.service';
 export * from '../level.service';
 export * from '../levelPromotionEvent.service';
+export * from '../rankQualificationEngine.service';

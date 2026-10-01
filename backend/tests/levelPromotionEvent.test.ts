@@ -24,11 +24,13 @@ describe('CONNECT BB/MATCHING EVENTS TO AUTOMATIC LEVEL PROMOTION (PROMPT 6)', (
 
     // Default resolved mocks for Prisma models to ensure offline fast execution (<50ms)
     vi.spyOn((prisma as any).level, 'findFirst').mockResolvedValue(null);
+    vi.spyOn((prisma as any).level, 'findMany').mockResolvedValue([]);
     vi.spyOn((prisma as any).level, 'create').mockImplementation(async ({ data }: any) => ({
       id: `lvl-${data.code}`,
       ...data,
     }));
     vi.spyOn(prisma.rank, 'findFirst').mockResolvedValue(null);
+    vi.spyOn(prisma.rank, 'findMany').mockResolvedValue([]);
     vi.spyOn(prisma.rank, 'create').mockImplementation(async ({ data }: any) => ({
       id: `rnk-${data.rankCode}`,
       ...data,
@@ -36,6 +38,12 @@ describe('CONNECT BB/MATCHING EVENTS TO AUTOMATIC LEVEL PROMOTION (PROMPT 6)', (
     vi.spyOn(prisma.distributorProfile, 'update').mockResolvedValue({} as any);
     vi.spyOn(prisma.distributorProfile, 'findUnique').mockResolvedValue({ userId: 'usr-001' } as any);
     vi.spyOn(prisma.distributorRankHistory, 'create').mockResolvedValue({} as any);
+    vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValue(null);
+    vi.spyOn(prisma.mLMNode, 'findUnique').mockResolvedValue(null);
+    vi.spyOn(prisma.mLMNode, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.businessCenter, 'findFirst').mockResolvedValue(null);
+    vi.spyOn(prisma.businessCenter, 'findMany').mockResolvedValue([]);
+    vi.spyOn(prisma.businessCenter, 'update').mockResolvedValue({} as any);
     vi.spyOn(prisma.notification, 'create').mockResolvedValue({} as any);
     vi.spyOn(prisma.bVLedger, 'create').mockResolvedValue({} as any);
     vi.spyOn(prisma.bVLedger, 'aggregate').mockResolvedValue({ _sum: { bv: 0 as any } } as any);

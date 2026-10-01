@@ -4,11 +4,14 @@ export interface MlmLevelConfig {
   code: string;
   name: string;
   requiredBB: number;
-  requiredMatching: number;
+  requiredLeftMatching: number;
+  requiredRightMatching: number;
+  requiredMatching?: number;
   binaryWeeklyCap?: number;
   oneTimeBonus?: number;
   iconUrl?: string | null;
   description?: string;
+  isActive?: boolean;
 }
 
 export interface MemberLevelStatus {
@@ -16,7 +19,9 @@ export interface MemberLevelStatus {
   distributorCode: string;
   displayName: string | null;
   currentBB: number;
-  totalMatching: number;
+  leftMatching: number;
+  rightMatching: number;
+  totalMatching?: number;
   accumulatedLeftVolume: number;
   accumulatedRightVolume: number;
   currentLevel: MlmLevelConfig;
@@ -25,9 +30,13 @@ export interface MemberLevelStatus {
   isMaxLevel: boolean;
   progress: {
     bbGap: number;
-    matchingGap: number;
+    leftMatchingGap: number;
+    rightMatchingGap: number;
+    matchingGap?: number;
     bbProgressPercentage: number;
-    matchingProgressPercentage: number;
+    leftMatchingProgressPercentage: number;
+    rightMatchingProgressPercentage: number;
+    matchingProgressPercentage?: number;
     isQualifiedForNext: boolean;
   };
   achievedAt: Date | null;
@@ -41,6 +50,8 @@ export interface LevelPromotionResult {
   newLevel: MlmLevelConfig;
   snapshot: {
     qualifiedBB: number;
+    qualifiedLeftMatching: number;
+    qualifiedRightMatching: number;
     qualifiedMatching: number;
     timestamp: Date;
   };

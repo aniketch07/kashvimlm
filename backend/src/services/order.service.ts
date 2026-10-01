@@ -5,6 +5,7 @@ import { AppError } from '../utils/appError';
 import { CreateOrderInput, OrderQueryInput } from '../validators/order.validators';
 import { BVService } from './bv.service';
 import { CommissionService } from './commission.service';
+import { LevelCommissionService } from './levelCommission.service';
 import { LevelPromotionService } from './level';
 
 export class OrderService {
@@ -220,6 +221,7 @@ export class OrderService {
           discountAmount: new Prisma.Decimal(0),
           totalAmount: orderSubtotal,
           totalBV: orderTotalBV,
+          commissionableBusinessVolume: orderTotalBV,
           shippingAddressId: shippingId,
           billingAddressId: billingId,
           paidAt: markPaid ? new Date() : null,
@@ -237,6 +239,7 @@ export class OrderService {
             unitBV: vi.unitBV,
             totalPrice: vi.totalPrice,
             totalBV: vi.totalBV,
+            commissionableBV: vi.totalBV,
           },
         });
 
@@ -363,6 +366,13 @@ export class OrderService {
       // If order is paid/confirmed, invoke commission calculation and automatic level promotion
       if (orderStatus === 'PAID') {
         await CommissionService.processOrderCommissions(order.id, tx);
+
+        // 5-Level Unilevel Commission Engine (Prompt 12)
+        try {
+          await LevelCommissionService.calculateCommissionsForOrder(order.id, tx);
+        } catch (levelCommErr: any) {
+          logger.warn({ error: levelCommErr.message, orderId: order.id }, 'Level commission calculation warning');
+        }
 
         // Automatic Level Promotion: Evaluate purchaser (Personal BB updated)
         if (distributorId) {
@@ -617,6 +627,17 @@ export class OrderService {
         );
       }
 
+      // 2b. Reverse 5-level unilevel commissions
+      try {
+        await LevelCommissionService.reverseCommissionsForOrder(
+          order.id,
+          `Order cancellation ${order.orderNumber}`,
+          tx
+        );
+      } catch (revErr: any) {
+        logger.warn({ error: revErr.message, orderId: order.id }, 'Level commission reversal warning');
+      }
+
       // 3. Update Order status to CANCELLED
       return await tx.order.update({
         where: { id: order.id },
@@ -663,6 +684,7 @@ export class OrderService {
       discountAmount: Number(order.discountAmount),
       totalAmount: Number(order.totalAmount),
       totalBV: Number(order.totalBV),
+      commissionableBusinessVolume: Number(order.commissionableBusinessVolume ?? order.totalBV ?? 0),
       shippingAddress: order.shippingAddress || null,
       billingAddress: order.billingAddress || null,
       trackingNumber: order.trackingNumber,
@@ -680,6 +702,7 @@ export class OrderService {
         unitBV: Number(i.unitBV),
         totalPrice: Number(i.totalPrice),
         totalBV: Number(i.totalBV),
+        commissionableBV: Number(i.commissionableBV ?? i.totalBV ?? 0),
       })),
       payments: (order.payments || []).map((p: any) => ({
         id: p.id,

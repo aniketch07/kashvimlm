@@ -270,16 +270,21 @@ describe('PROMPT 7: MLM LEVEL AND VOLUME REST APIs (/api/members & /api/admin/me
 
       expect(res.body.success).toBe(true);
       const data = res.body.data;
-      expect(data.currentLevel).toBe('Silver');
+      expect(data.currentLevel).toEqual({ name: 'Silver', code: 'SILVER' });
       expect(data.currentBB).toBe(250);
-      expect(data.requiredBB).toBe(250);
-      expect(data.bbRemaining).toBe(0);
-      expect(data.currentMatching).toBe(2000);
-      expect(data.requiredMatching).toBe(5000);
-      expect(data.matchingRemaining).toBe(3000);
-      expect(data.nextLevel).toBe('Gold');
-      expect(data.percentageProgressForBB).toBe(100);
-      expect(data.percentageProgressForMatching).toBe(40);
+      expect(data.nextLevel).toEqual({
+        name: 'Gold',
+        requiredBB: 250,
+        requiredLeftMatching: 5000,
+        requiredRightMatching: 5000,
+      });
+      expect(data.progress.bb.current).toBe(250);
+      expect(data.progress.bb.required).toBe(250);
+      expect(data.progress.bb.remaining).toBe(0);
+      expect(data.progress.bb.percentage).toBe(100);
+      expect(data.progress.leftMatching.remaining).toBe(3000);
+      expect(data.progress.rightMatching.remaining).toBe(3000);
+      expect(data.qualifiedForNextLevel).toBe(false);
     });
   });
 

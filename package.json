@@ -12,6 +12,7 @@
     "test:admin": "node --test src/tests/admin.test.js",
     "test:final": "node --test src/tests/final.test.js",
     "test": "npm test --prefix server",
+    "test:binary": "npm run test:binary --prefix backend",
     "test:matching": "npm run test:matching --prefix backend",
     "test:tree": "npm run test:tree --prefix server",
     "test:api": "npm run test:api --prefix server",

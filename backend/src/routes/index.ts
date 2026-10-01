@@ -62,6 +62,10 @@ apiRouter.use('/bv', bvRouter);
 import { levelRouter } from './level.routes';
 apiRouter.use('/levels', levelRouter);
 
+// 5-Level Unilevel Commission Engine (Prompt 12): /api/v1/commissions/levels
+import levelCommissionRouter from './levelCommission.routes';
+apiRouter.use('/commissions/levels', levelCommissionRouter);
+
 // Commission Engine & Rules: /api/v1/commissions
 import { commissionRouter } from './commission.routes';
 apiRouter.use('/commissions', commissionRouter);

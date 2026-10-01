@@ -182,7 +182,9 @@ export class LevelController {
             code: lvl.code,
             name: lvl.name,
             requiredBB: lvl.requiredBB,
-            requiredMatching: lvl.requiredMatching,
+            requiredLeftMatching: lvl.requiredLeftMatching,
+            requiredRightMatching: lvl.requiredRightMatching,
+            requiredMatching: lvl.requiredMatching ?? lvl.requiredLeftMatching,
             memberCount: count,
           };
         })
@@ -191,6 +193,35 @@ export class LevelController {
       sendSuccess(res, {
         message: 'Level distribution statistics retrieved',
         data: counts,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/v1/levels/admin/config/:idOrCode
+   * Allows admin to dynamically update level requirements in the database without code changes.
+   */
+  public static async updateLevelConfig(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { idOrCode } = req.params;
+      const { name, requiredBB, requiredLeftMatching, requiredRightMatching, isActive } = req.body;
+      const updated = await LevelQualificationService.updateLevel(idOrCode, {
+        name,
+        requiredBB: requiredBB !== undefined ? Number(requiredBB) : undefined,
+        requiredLeftMatching: requiredLeftMatching !== undefined ? Number(requiredLeftMatching) : undefined,
+        requiredRightMatching: requiredRightMatching !== undefined ? Number(requiredRightMatching) : undefined,
+        isActive: isActive !== undefined ? Boolean(isActive) : undefined,
+      });
+
+      sendSuccess(res, {
+        message: `Level '${idOrCode}' updated successfully`,
+        data: updated,
       });
     } catch (error) {
       next(error);

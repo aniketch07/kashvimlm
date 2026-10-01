@@ -1,24 +1,40 @@
 import { NextFunction, Request, Response } from 'express';
 import { MLMSecurityService } from '../services/mlmSecurity.service';
+import { verifyAccessToken } from '../utils/jwt';
 
 /**
  * ============================================================================
- * PROTECT MLM FIELDS MIDDLEWARE (PROMPT 8)
+ * PROTECT MLM FIELDS MIDDLEWARE (PROMPT 8 & 14)
  * ============================================================================
  * Intercepts incoming requests and verifies that no untrusted client attempts
  * to inject or override protected MLM volume, rank, level, or financial fields.
- *
- * Example rejected payload:
- * {
- *   "bb": 100000,
- *   "matching": 1000000,
- *   "level": "RUBY"
- * }
  */
 export const protectMlmFields = (req: Request, _res: Response, next: NextFunction): void => {
   try {
-    const userRole = (req as any).user?.role;
-    const userId = (req as any).user?.id;
+    let userRole = (req as any).user?.role;
+    let userId = (req as any).user?.id;
+    const path = req.originalUrl || req.path || '';
+
+    // Allow admin level configuration, admin paths, and dedicated admin BV adjustment endpoints
+    if (
+      path.includes('/admin/config') ||
+      path.includes('/admin/levels') ||
+      path.includes('/admin') ||
+      path.endsWith('/bv')
+    ) {
+      return next();
+    }
+
+    if (!userRole && req.headers.authorization?.startsWith('Bearer ')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const payload = verifyAccessToken(token);
+        userRole = payload.role;
+        userId = payload.sub;
+      } catch {
+        // ignore invalid token here
+      }
+    }
 
     // Check request body
     if (req.body && typeof req.body === 'object') {

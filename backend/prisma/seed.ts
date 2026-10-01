@@ -147,14 +147,54 @@ export async function seedDatabase(): Promise<void> {
   });
 
   // ==========================================
-  // 2B. Configurable MLM Levels (Prompt 2)
+  // 2B. Configurable MLM Levels (Prompt 5 Final Requirements)
   // ==========================================
   const mlmLevels = [
-    { name: 'Silver', code: 'SILVER', order: 1, requiredBB: '250.00', requiredMatching: '2000.00' },
-    { name: 'Gold', code: 'GOLD', order: 2, requiredBB: '250.00', requiredMatching: '5000.00' },
-    { name: 'Platinum', code: 'PLATINUM', order: 3, requiredBB: '500.00', requiredMatching: '50000.00' },
-    { name: 'Diamond', code: 'DIAMOND', order: 4, requiredBB: '1000.00', requiredMatching: '60000.00' },
-    { name: 'Ruby', code: 'RUBY', order: 5, requiredBB: '1000.00', requiredMatching: '100000.00' },
+    {
+      name: 'Silver',
+      code: 'SILVER',
+      order: 1,
+      requiredBB: '250.00',
+      requiredLeftMatching: '2000.00',
+      requiredRightMatching: '2000.00',
+      requiredMatching: '2000.00',
+    },
+    {
+      name: 'Gold',
+      code: 'GOLD',
+      order: 2,
+      requiredBB: '250.00',
+      requiredLeftMatching: '5000.00',
+      requiredRightMatching: '5000.00',
+      requiredMatching: '5000.00',
+    },
+    {
+      name: 'Platinum',
+      code: 'PLATINUM',
+      order: 3,
+      requiredBB: '500.00',
+      requiredLeftMatching: '50000.00',
+      requiredRightMatching: '50000.00',
+      requiredMatching: '50000.00',
+    },
+    {
+      name: 'Diamond',
+      code: 'DIAMOND',
+      order: 4,
+      requiredBB: '1000.00',
+      requiredLeftMatching: '60000.00',
+      requiredRightMatching: '60000.00',
+      requiredMatching: '60000.00',
+    },
+    {
+      name: 'Ruby',
+      code: 'RUBY',
+      order: 5,
+      requiredBB: '1000.00',
+      requiredLeftMatching: '100000.00',
+      requiredRightMatching: '100000.00',
+      requiredMatching: '100000.00',
+    },
   ];
 
   for (const lvl of mlmLevels) {
@@ -164,6 +204,8 @@ export async function seedDatabase(): Promise<void> {
         name: lvl.name,
         order: lvl.order,
         requiredBB: new Prisma.Decimal(lvl.requiredBB),
+        requiredLeftMatching: new Prisma.Decimal(lvl.requiredLeftMatching),
+        requiredRightMatching: new Prisma.Decimal(lvl.requiredRightMatching),
         requiredMatching: new Prisma.Decimal(lvl.requiredMatching),
         isActive: true,
       },
@@ -172,6 +214,8 @@ export async function seedDatabase(): Promise<void> {
         code: lvl.code,
         order: lvl.order,
         requiredBB: new Prisma.Decimal(lvl.requiredBB),
+        requiredLeftMatching: new Prisma.Decimal(lvl.requiredLeftMatching),
+        requiredRightMatching: new Prisma.Decimal(lvl.requiredRightMatching),
         requiredMatching: new Prisma.Decimal(lvl.requiredMatching),
         isActive: true,
       },
@@ -2048,6 +2092,25 @@ export async function seedDatabase(): Promise<void> {
       where: { key: setting.key },
       update: { value: setting.value },
       create: setting,
+    });
+  }
+
+  // ==========================================
+  // 21. Configurable 5-Level Commission Rates (Prompt 13)
+  // ==========================================
+  const commissionLevels = [
+    { levelNumber: 1, percentage: new Prisma.Decimal('24.00'), isActive: true },
+    { levelNumber: 2, percentage: new Prisma.Decimal('8.00'), isActive: true },
+    { levelNumber: 3, percentage: new Prisma.Decimal('13.00'), isActive: true },
+    { levelNumber: 4, percentage: new Prisma.Decimal('5.00'), isActive: true },
+    { levelNumber: 5, percentage: new Prisma.Decimal('4.00'), isActive: true },
+  ];
+
+  for (const lvl of commissionLevels) {
+    await prisma.commissionLevel.upsert({
+      where: { levelNumber: lvl.levelNumber },
+      update: { percentage: lvl.percentage, isActive: lvl.isActive },
+      create: lvl,
     });
   }
 

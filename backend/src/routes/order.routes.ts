@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { OrderController } from '../controllers/order.controller';
 import { authenticate } from '../middleware/auth';
+import { authorizeRoles } from '../middleware/role';
 import { validate } from '../middleware/validate';
 import {
   createOrderSchema,
   orderIdParamSchema,
   orderQuerySchema,
+  adminAdjustOrderBVSchema,
 } from '../validators/order.validators';
 
 const router = Router();
@@ -39,6 +41,14 @@ router.post(
   '/:id/cancel',
   validate({ params: orderIdParamSchema }),
   OrderController.cancelOrder
+);
+
+// PUT /api/v1/orders/:id/bv - Admin adjustment of commissionable Business Volume
+router.put(
+  '/:id/bv',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  validate({ params: orderIdParamSchema, body: adminAdjustOrderBVSchema }),
+  OrderController.adminAdjustBV
 );
 
 export const orderRouter = router;

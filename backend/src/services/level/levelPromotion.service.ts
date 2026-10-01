@@ -30,11 +30,15 @@ export class LevelPromotionService {
       // 2. Find highest level the distributor strictly qualifies for
       let targetLevel: MlmLevelConfig = allLevels[0]; // STARTER / BASE
 
+      const leftMatching = status.leftMatching ?? status.totalMatching ?? 0;
+      const rightMatching = status.rightMatching ?? status.totalMatching ?? 0;
+
       for (const lvl of allLevels) {
         if (
           LevelQualificationService.isQualifiedForLevel(
             status.currentBB,
-            status.totalMatching,
+            leftMatching,
+            rightMatching,
             lvl
           )
         ) {
@@ -56,7 +60,9 @@ export class LevelPromotionService {
           newLevel: currentLevel,
           snapshot: {
             qualifiedBB: status.currentBB,
-            qualifiedMatching: status.totalMatching,
+            qualifiedLeftMatching: status.leftMatching,
+            qualifiedRightMatching: status.rightMatching,
+            qualifiedMatching: status.totalMatching ?? Math.min(status.leftMatching, status.rightMatching),
             timestamp: new Date(),
           },
           message: `Distributor maintains current level '${currentLevel.name}'.`,
@@ -77,7 +83,7 @@ export class LevelPromotionService {
             name: targetLevel.name,
             level: targetLevel.level,
             minPersonalBV: new Prisma.Decimal(targetLevel.requiredBB),
-            minGroupBV: new Prisma.Decimal(targetLevel.requiredMatching),
+            minGroupBV: new Prisma.Decimal(targetLevel.requiredMatching ?? targetLevel.requiredLeftMatching ?? 0),
             binaryWeeklyCap: new Prisma.Decimal(targetLevel.binaryWeeklyCap || 0),
             oneTimeBonus: new Prisma.Decimal(targetLevel.oneTimeBonus || 0),
           },
@@ -94,7 +100,7 @@ export class LevelPromotionService {
           currentRankId: targetRank.id,
           currentLevelId: targetLevel.id || null,
           currentBB: new Prisma.Decimal(status.currentBB),
-          currentMatching: new Prisma.Decimal(status.totalMatching),
+          currentMatching: new Prisma.Decimal(status.totalMatching ?? Math.min(status.leftMatching, status.rightMatching)),
           ...(shouldUpdateHighest ? { highestRankId: targetRank.id } : {}),
           lifetimePV: new Prisma.Decimal(status.currentBB),
         },
@@ -107,30 +113,42 @@ export class LevelPromotionService {
           distributorId,
           rankId: targetRank.id,
           personalBV: new Prisma.Decimal(status.currentBB),
-          groupBV: new Prisma.Decimal(status.totalMatching),
+          groupBV: new Prisma.Decimal(status.totalMatching ?? Math.min(status.leftMatching, status.rightMatching)),
           achievedAt,
         },
       });
 
-      // 5B. Append immutable record to MemberLevelHistory (Prompt 2)
+      // 5B. Append immutable record to MemberLevelHistory (Prompt 2 & 5)
       if (targetLevel.id) {
         try {
+          const prevCode = currentLevel.code === 'BASE' ? 'STARTER' : currentLevel.code;
+          const newCode = targetLevel.code;
           await (client as any).memberLevelHistory?.create({
             data: {
               memberId: distributorId,
               previousLevelId: currentLevel.id || null,
               newLevelId: targetLevel.id,
+              previousLevelCode: prevCode,
+              newLevelCode: newCode,
               previousBB: new Prisma.Decimal(status.currentBB),
-              previousMatching: new Prisma.Decimal(status.totalMatching),
+              previousMatching: new Prisma.Decimal(status.totalMatching ?? Math.min(status.leftMatching, status.rightMatching)),
+              previousLeftMatching: new Prisma.Decimal(status.leftMatching),
+              previousRightMatching: new Prisma.Decimal(status.rightMatching),
               qualifyingBB: new Prisma.Decimal(status.currentBB),
-              qualifyingMatching: new Prisma.Decimal(status.totalMatching),
-              reason: 'QUALIFICATION_MET',
-              source: 'SYSTEM_AUTO',
+              qualifyingMatching: new Prisma.Decimal(status.totalMatching ?? Math.min(status.leftMatching, status.rightMatching)),
+              qualifyingLeftMatching: new Prisma.Decimal(status.leftMatching),
+              qualifyingRightMatching: new Prisma.Decimal(status.rightMatching),
+              reason: 'LEVEL_REQUIREMENTS_MET',
+              source: 'SYSTEM',
               createdAt: achievedAt,
             },
           });
         } catch (mlhErr: any) {
-          logger.debug({ error: mlhErr.message }, 'MemberLevelHistory record logging note');
+          if (mlhErr.code === 'P2002') {
+            logger.info({ memberId: distributorId, level: targetLevel.code }, 'MemberLevelHistory duplicate prevented by @@unique constraint');
+          } else {
+            logger.debug({ error: mlhErr.message }, 'MemberLevelHistory record logging note');
+          }
         }
       }
 
@@ -147,7 +165,7 @@ export class LevelPromotionService {
               userId: dist.userId,
               type: 'SYSTEM',
               title: `🎉 Congratulations! Promoted to ${targetLevel.name} Level`,
-              message: `You have successfully achieved the ${targetLevel.name} rank with ${status.currentBB} BB and ${status.totalMatching} Matching Volume!`,
+              message: `You have successfully achieved the ${targetLevel.name} rank with ${status.currentBB} BB, ${status.leftMatching} Left Matching, and ${status.rightMatching} Right Matching!`,
             },
           });
         }
@@ -162,7 +180,8 @@ export class LevelPromotionService {
           fromLevel: currentLevel.name,
           toLevel: targetLevel.name,
           qualifiedBB: status.currentBB,
-          qualifiedMatching: status.totalMatching,
+          qualifiedLeftMatching: status.leftMatching,
+          qualifiedRightMatching: status.rightMatching,
         },
         'Distributor promoted to next MLM level'
       );
@@ -175,7 +194,9 @@ export class LevelPromotionService {
         newLevel: targetLevel,
         snapshot: {
           qualifiedBB: status.currentBB,
-          qualifiedMatching: status.totalMatching,
+          qualifiedLeftMatching: status.leftMatching,
+          qualifiedRightMatching: status.rightMatching,
+          qualifiedMatching: status.totalMatching ?? Math.min(status.leftMatching, status.rightMatching),
           timestamp: achievedAt,
         },
         message: `Successfully promoted from ${currentLevel.name} to ${targetLevel.name}!`,

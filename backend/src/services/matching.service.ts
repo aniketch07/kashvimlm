@@ -95,6 +95,8 @@ export interface RecordMatchingTransactionInput {
   source: 'ORDER_ROLLUP' | 'BINARY_MATCH' | 'COMMISSION_CYCLE' | 'ADMIN_ADJUSTMENT' | 'RECALCULATION' | string;
   referenceId: string;
   description?: string;
+  leg?: 'LEFT' | 'RIGHT';
+  isAbsoluteVolume?: boolean;
 }
 
 export interface MatchingTransactionResult {
@@ -504,7 +506,7 @@ export class MatchingService {
   }
 
   // =========================================================================
-  // 5. GET MATCHING VOLUME (SINGLE QUALIFYING VALUE)
+  // 5. GET MATCHING VOLUME (SINGLE QUALIFYING VALUE & INDEPENDENT LEGS)
   // =========================================================================
 
   /**
@@ -523,6 +525,77 @@ export class MatchingService {
   ): Promise<number> {
     const calculation = await this.calculateEligibleMatching(memberId, options, tx);
     return calculation.matchedVolume;
+  }
+
+  /**
+   * PROMPT 4: Independent Left-Leg Matching Volume
+   * Evaluated independently from right matching.
+   */
+  public static async getLeftMatching(
+    memberId: string,
+    options?: MatchingVolumeOptions,
+    tx?: Prisma.TransactionClient
+  ): Promise<number> {
+    const { BinaryVolumeService } = await import('./binaryVolume.service');
+    return BinaryVolumeService.getLeftMatching(memberId, options, tx);
+  }
+
+  /**
+   * PROMPT 4: Independent Right-Leg Matching Volume
+   * Evaluated independently from left matching.
+   */
+  public static async getRightMatching(
+    memberId: string,
+    options?: MatchingVolumeOptions,
+    tx?: Prisma.TransactionClient
+  ): Promise<number> {
+    const { BinaryVolumeService } = await import('./binaryVolume.service');
+    return BinaryVolumeService.getRightMatching(memberId, options, tx);
+  }
+
+  public static async recalculateLeftVolume(
+    memberId: string,
+    options?: MatchingVolumeOptions,
+    tx?: Prisma.TransactionClient
+  ): Promise<any> {
+    const { BinaryVolumeService } = await import('./binaryVolume.service');
+    return BinaryVolumeService.recalculateLeftVolume(memberId, options, tx);
+  }
+
+  public static async recalculateRightVolume(
+    memberId: string,
+    options?: MatchingVolumeOptions,
+    tx?: Prisma.TransactionClient
+  ): Promise<any> {
+    const { BinaryVolumeService } = await import('./binaryVolume.service');
+    return BinaryVolumeService.recalculateRightVolume(memberId, options, tx);
+  }
+
+  public static async recalculateLeftMatching(
+    memberId: string,
+    options?: MatchingVolumeOptions,
+    tx?: Prisma.TransactionClient
+  ): Promise<any> {
+    const { BinaryVolumeService } = await import('./binaryVolume.service');
+    return BinaryVolumeService.recalculateLeftMatching(memberId, options, tx);
+  }
+
+  public static async recalculateRightMatching(
+    memberId: string,
+    options?: MatchingVolumeOptions,
+    tx?: Prisma.TransactionClient
+  ): Promise<any> {
+    const { BinaryVolumeService } = await import('./binaryVolume.service');
+    return BinaryVolumeService.recalculateRightMatching(memberId, options, tx);
+  }
+
+  public static async recalculateBinaryVolumes(
+    memberId: string,
+    options?: MatchingVolumeOptions,
+    tx?: Prisma.TransactionClient
+  ): Promise<any> {
+    const { BinaryVolumeService } = await import('./binaryVolume.service');
+    return BinaryVolumeService.recalculateBinaryVolumes(memberId, options, tx);
   }
 
   // =========================================================================
@@ -792,6 +865,15 @@ export class MatchingService {
         // Test fallback
       }
 
+      const { leg } = input;
+      if (leg === 'LEFT') {
+        const { BinaryVolumeService } = await import('./binaryVolume.service');
+        BinaryVolumeService.updateLegMatching(cleanMemberId, 'LEFT', balanceAfter);
+      } else if (leg === 'RIGHT') {
+        const { BinaryVolumeService } = await import('./binaryVolume.service');
+        BinaryVolumeService.updateLegMatching(cleanMemberId, 'RIGHT', balanceAfter);
+      }
+
       // Step 5: Evaluate level and promote automatically if eligible
       let promotionResult: any = null;
       try {
@@ -801,7 +883,9 @@ export class MatchingService {
           {
             source: cleanSource,
             reason: description || `Automatic level promotion evaluation after ${cleanSource} matching volume change (${cleanRefId})`,
-            overrideMatching: balanceAfter,
+            ...(leg === 'LEFT' ? { overrideLeftMatching: balanceAfter } : {}),
+            ...(leg === 'RIGHT' ? { overrideRightMatching: balanceAfter } : {}),
+            ...(!leg ? { overrideMatching: balanceAfter } : {}),
           },
           client
         );

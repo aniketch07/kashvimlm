@@ -22,15 +22,19 @@ describe('AUTOMATIC MLM LEVEL PROMOTION ENGINE TESTS (PROMPT 5)', () => {
 
     // Provide default resolved mocks for Prisma models so tests never hang trying to connect to port 5432
     vi.spyOn((prisma as any).level, 'findFirst').mockResolvedValue(null);
+    vi.spyOn((prisma as any).level, 'findMany').mockResolvedValue([]);
     vi.spyOn((prisma as any).level, 'create').mockImplementation(async ({ data }: any) => ({
       id: `lvl-${data.code}`,
       ...data,
     }));
     vi.spyOn(prisma.rank, 'findFirst').mockResolvedValue(null);
+    vi.spyOn(prisma.rank, 'findMany').mockResolvedValue([]);
     vi.spyOn(prisma.rank, 'create').mockImplementation(async ({ data }: any) => ({
       id: `rnk-${data.rankCode}`,
       ...data,
     }));
+    vi.spyOn(prisma.mLMNode, 'findFirst').mockResolvedValue(null);
+    vi.spyOn(prisma.mLMNode, 'findMany').mockResolvedValue([]);
     vi.spyOn(prisma.distributorProfile, 'update').mockResolvedValue({} as any);
     vi.spyOn(prisma.distributorProfile, 'findUnique').mockResolvedValue({ userId: 'usr-001' } as any);
     vi.spyOn(prisma.distributorRankHistory, 'create').mockResolvedValue({} as any);

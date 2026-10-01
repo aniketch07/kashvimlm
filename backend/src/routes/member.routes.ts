@@ -19,10 +19,20 @@ import { authenticate } from '../middleware/auth';
  * - GET /:memberId/matching/history
  */
 
+import { AppError } from '../utils/appError';
+
 const router = Router();
 
 // Enforce standard authentication for member data lookups
 router.use(authenticate);
+
+// IMMUTABILITY GUARD (PROMPT 9): Promotion history must NEVER be modified or deleted
+router.all('/:memberId/level/history/:historyId?', (req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    throw AppError.forbidden('Promotion history is immutable. Modifying or deleting history records is strictly prohibited.');
+  }
+  next();
+});
 
 // MEMBER LEVEL & PROGRESS
 router.get('/:memberId/level/progress', MemberLevelController.getMemberLevelProgress);
