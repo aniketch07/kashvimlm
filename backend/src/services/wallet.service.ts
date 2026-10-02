@@ -32,6 +32,9 @@ export interface FormattedWalletTransaction {
   balanceBefore: number;
   balanceAfter: number;
   referenceId: string | null;
+  memberId?: string | null;
+  commissionTransactionId?: string | null;
+  orderId?: string | null;
   description: string;
   createdAt: Date;
 }
@@ -71,6 +74,9 @@ export class WalletService {
       balanceBefore: Number(Number(tx.balanceBefore).toFixed(2)),
       balanceAfter: Number(Number(tx.balanceAfter).toFixed(2)),
       referenceId: tx.referenceId ?? null,
+      memberId: tx.memberId ?? null,
+      commissionTransactionId: tx.commissionTransactionId ?? null,
+      orderId: tx.orderId ?? null,
       description: tx.description,
       createdAt: tx.createdAt,
     };

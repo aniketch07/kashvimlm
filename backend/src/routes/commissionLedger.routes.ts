@@ -15,6 +15,19 @@ router.get('/me', CommissionLedgerController.getMyLedger);
 // GET /api/v1/commissions/ledger/order/:orderId - View ledger transactions for an order
 router.get('/order/:orderId', CommissionLedgerController.getByOrder);
 
+// GET /api/v1/commissions/ledger/reconciliation - Full ledger reconciliation (Prompt 20)
+router.get(
+  '/reconciliation',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  CommissionLedgerController.reconcileLedgers
+);
+
+// GET /api/v1/commissions/ledger/withdrawal-eligibility/:memberId - Withdrawal guard check (Prompt 20)
+router.get(
+  '/withdrawal-eligibility/:memberId',
+  CommissionLedgerController.checkWithdrawalEligibility
+);
+
 // GET /api/v1/commissions/ledger/:id/audit - View full 8-dimensional audit trail
 router.get('/:id/audit', CommissionLedgerController.getAuditTrail);
 

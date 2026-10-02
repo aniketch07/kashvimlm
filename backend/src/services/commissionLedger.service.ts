@@ -813,6 +813,9 @@ export class CommissionLedgerService {
           balanceBefore,
           balanceAfter,
           referenceId: commTx.id,
+          memberId: commTx.recipientMemberId,
+          commissionTransactionId: commTx.id,
+          orderId: commTx.orderId,
           description,
         },
       });

@@ -1076,6 +1076,9 @@ model WalletTransaction {
   balanceBefore     Decimal                 @db.Decimal(12, 2)
   balanceAfter      Decimal                 @db.Decimal(12, 2)
   referenceId       String?                 // Reference ID for Commission, Order, or Payout
+  memberId          String?                 // Direct member/distributor reference (Prompt 20)
+  commissionTransactionId String?           // Direct CommissionTransaction reference (Prompt 20)
+  orderId           String?                 // Direct Order reference (Prompt 20)
   description       String
   createdAt         DateTime                @default(now())
 
@@ -1088,6 +1091,9 @@ model WalletTransaction {
   @@index([walletId])
   @@index([type])
   @@index([referenceId])
+  @@index([memberId])
+  @@index([commissionTransactionId])
+  @@index([orderId])
   @@map("wallet_transactions")
 }
 

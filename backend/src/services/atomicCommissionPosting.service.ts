@@ -424,6 +424,9 @@ export class AtomicCommissionPostingService {
             balanceBefore,
             balanceAfter,
             referenceId: commTx.id,
+            memberId: recipientMemberId,
+            commissionTransactionId: commTx.id,
+            orderId: cleanOrderId,
             description,
           },
         });

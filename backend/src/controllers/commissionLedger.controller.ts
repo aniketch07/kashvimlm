@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { CommissionLedgerService } from '../services/commissionLedger.service';
 import { AtomicCommissionPostingService } from '../services/atomicCommissionPosting.service';
+import { CommissionWalletService } from '../services/commissionWallet.service';
 import { sendSuccess } from '../utils/apiResponse';
 import { AppError } from '../utils/appError';
 import { prisma } from '../config/database';
@@ -185,6 +186,54 @@ export class CommissionLedgerController {
       sendSuccess(res, {
         data: result,
         message: result.message || 'Commissions posted atomically',
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/commissions/ledger/reconciliation
+   * Admin endpoint: Audits and reconciles Commission Ledger against Wallet Ledger (Prompt 20).
+   */
+  public static async reconcileLedgers(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const memberId = req.query.memberId as string | undefined;
+      const orderId = req.query.orderId as string | undefined;
+
+      const report = await CommissionWalletService.reconcileCommissionAndWalletLedgers({
+        memberId,
+        orderId,
+      });
+
+      sendSuccess(res, {
+        data: report,
+        message: report.isReconciled
+          ? 'Commission and Wallet ledgers are fully reconciled with 0 discrepancies'
+          : `Reconciliation detected ${report.discrepancyCount} discrepancy(s)`,
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/commissions/ledger/withdrawal-eligibility/:memberId
+   * Checks if a member can withdraw requested amount and verifies PENDING/REVERSED guards (Prompt 20).
+   */
+  public static async checkWithdrawalEligibility(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { memberId } = req.params;
+      const amount = req.query.amount ? parseFloat(req.query.amount as string) : 0;
+
+      const result = await CommissionWalletService.validateWithdrawalEligibility(memberId, amount);
+      sendSuccess(res, {
+        data: result,
+        message: result.canWithdraw
+          ? 'Member is eligible for withdrawal'
+          : result.reason || 'Member is not eligible for withdrawal',
         statusCode: 200,
       });
     } catch (error) {
