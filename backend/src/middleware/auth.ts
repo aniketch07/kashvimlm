@@ -4,15 +4,20 @@ import { AppError } from '../utils/appError';
 import { verifyAccessToken } from '../utils/jwt';
 
 export const authenticate = (req: Request, _res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
+  let token: string | undefined;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.cookies?.accessToken || req.cookies?.token) {
+    token = req.cookies.accessToken || req.cookies.token;
+  }
+
+  if (!token) {
     return next(
       AppError.unauthorized('Authorization token is missing or malformed', 'AUTH_TOKEN_MISSING')
     );
   }
-
-  const token = authHeader.split(' ')[1];
 
   try {
     const payload = verifyAccessToken(token);

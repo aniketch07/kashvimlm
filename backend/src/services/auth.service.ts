@@ -4,7 +4,7 @@ import { logger } from '../config/logger';
 import { AuthUser, JwtAccessPayload, JwtRefreshPayload } from '../types';
 import { AppError } from '../utils/appError';
 import { hashToken, signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
-import { hashPassword, verifyPassword } from '../utils/password';
+import { hashPassword, verifyPassword, validatePasswordStrength } from '../utils/password';
 import { LoginInput, RegisterInput, ResetPasswordInput } from '../validators/auth.validators';
 
 interface RequestMetadata {
@@ -112,16 +112,45 @@ export class AuthService {
     }
   }
 
+  /**
+   * Helper to retrieve an in-memory user by identifier (id, userId, email, referralCode, distributorCode)
+   */
+  public static getInMemoryUser(identifier: string): any {
+    if (!identifier) return null;
+    const clean = identifier.trim();
+    return (
+      this.inMemoryUsers.get(clean) ||
+      this.inMemoryUsers.get(clean.toLowerCase()) ||
+      this.inMemoryUsers.get(clean.toUpperCase()) ||
+      null
+    );
+  }
+
   private static saveInMemoryUser(user: any): void {
-    this.inMemoryUsers.set(user.id, user);
-    this.inMemoryUsers.set(user.email.toLowerCase(), user);
+    if (user.id) this.inMemoryUsers.set(user.id, user);
+    if (user.userId) this.inMemoryUsers.set(user.userId, user);
+    if (user.email) {
+      this.inMemoryUsers.set(user.email.toLowerCase(), user);
+      this.inMemoryUsers.set(user.email, user);
+    }
     if (user.memberId) {
       this.inMemoryUsers.set(user.memberId.toUpperCase(), user);
       this.inMemoryUsers.set(user.memberId.toLowerCase(), user);
     }
+    if (user.referralCode) {
+      this.inMemoryUsers.set(user.referralCode.toUpperCase(), user);
+      this.inMemoryUsers.set(user.referralCode.toLowerCase(), user);
+    }
+    if (user.distributorCode) {
+      this.inMemoryUsers.set(user.distributorCode.toUpperCase(), user);
+      this.inMemoryUsers.set(user.distributorCode.toLowerCase(), user);
+    }
     if (user.distributorProfile?.distributorCode) {
       this.inMemoryUsers.set(user.distributorProfile.distributorCode.toUpperCase(), user);
       this.inMemoryUsers.set(user.distributorProfile.distributorCode.toLowerCase(), user);
+    }
+    if (user.distributorProfile?.id) {
+      this.inMemoryUsers.set(user.distributorProfile.id, user);
     }
     if (user.username) {
       this.inMemoryUsers.set(user.username.toLowerCase(), user);
@@ -149,16 +178,25 @@ export class AuthService {
 
   private static async registerInMemory(input: RegisterInput, metadata: RequestMetadata = {}) {
     await this.initSeedUsers();
-    const email = input.email.trim().toLowerCase();
-    const password = input.password;
-    const role = input.role || 'DISTRIBUTOR';
-    const fullNameStr = (input.fullName || input.name || '').trim();
-    const parts = fullNameStr ? fullNameStr.split(' ') : [];
-    const firstName = input.firstName?.trim() || parts[0] || 'Distributor';
-    const lastName = input.lastName?.trim() || (parts.length > 1 ? parts.slice(1).join(' ') : 'Member');
-    const phone = input.phone?.trim() || undefined;
-    const sponsorLookup = input.sponsorCode || input.sponsorId || 'KV-1001';
 
+    // 1. Validate confirmPassword
+    if (input.confirmPassword && input.password !== input.confirmPassword) {
+      throw AppError.badRequest('Passwords do not match.', 'AUTH_PASSWORD_MISMATCH');
+    }
+
+    // 2. Validate password complexity
+    const strength = validatePasswordStrength(input.password);
+    if (!strength.isValid) {
+      throw AppError.badRequest(
+        strength.message || 'Password does not meet complexity requirements.',
+        'AUTH_WEAK_PASSWORD'
+      );
+    }
+
+    // 3. Normalize email
+    const email = input.email.trim().toLowerCase();
+
+    // 4. Duplicate email check
     if (this.inMemoryUsers.has(email)) {
       throw AppError.conflict(
         'An account with this email address already exists.',
@@ -166,14 +204,122 @@ export class AuthService {
       );
     }
 
+    // 5. Duplicate phone check if provided
+    const phone = input.phone?.trim() || undefined;
+    if (phone && this.inMemoryUsers.has(phone)) {
+      throw AppError.conflict(
+        'An account with this phone number already exists.',
+        'AUTH_PHONE_ALREADY_EXISTS'
+      );
+    }
+
+    // 6. Referral code and sponsor lookup
+    const referralInput = (input.referralCode || input.sponsorCode || input.sponsorId || '').trim();
+    const sponsorLookup = referralInput || 'KV-1001';
+
+    // Requirement 4: Do not allow a user to become their own sponsor (immediate check on input)
+    if (
+      referralInput &&
+      (referralInput.toLowerCase() === email.toLowerCase() ||
+        (phone && referralInput === phone))
+    ) {
+      throw AppError.badRequest('A user cannot be their own sponsor.', 'SELF_SPONSOR_FORBIDDEN');
+    }
+
+    let resolvedSponsorUser: any = null;
+    if (referralInput) {
+      resolvedSponsorUser =
+        this.inMemoryUsers.get(referralInput) ||
+        this.inMemoryUsers.get(referralInput.toLowerCase()) ||
+        this.inMemoryUsers.get(referralInput.toUpperCase());
+
+      if (!resolvedSponsorUser && referralInput !== 'KV-1001') {
+        throw AppError.notFound('Invalid referral code. Sponsor not found.', 'AUTH_INVALID_REFERRAL_CODE');
+      }
+    }
+
+    if (!resolvedSponsorUser) {
+      resolvedSponsorUser =
+        this.inMemoryUsers.get('KV-1001') ||
+        this.inMemoryUsers.get('kv-1001');
+    }
+
+    if (!resolvedSponsorUser) {
+      throw AppError.notFound('Default system sponsor not found.', 'SPONSOR_NOT_FOUND');
+    }
+
+    // Requirement 4: Do not allow a user to become their own sponsor (check on resolved user record)
+    if (
+      (resolvedSponsorUser.email && resolvedSponsorUser.email.toLowerCase() === email.toLowerCase()) ||
+      (phone && resolvedSponsorUser.phone === phone)
+    ) {
+      throw AppError.badRequest('A user cannot be their own sponsor.', 'SELF_SPONSOR_FORBIDDEN');
+    }
+
+    // Requirement 1: Referral code must belong to an existing eligible user
+    if (resolvedSponsorUser.status !== 'ACTIVE') {
+      throw AppError.badRequest(
+        'The specified sponsor account is inactive or not eligible to sponsor new distributors.',
+        'SPONSOR_INACTIVE'
+      );
+    }
+
+    // 7. Hash password using Argon2id (never stored plaintext)
+    const passwordHash = await hashPassword(input.password);
+
+    // 8. Generate unique IDs (backend-controlled, never trust frontend IDs)
     const userId = randomUUID();
     const uniqueSuffix = Math.floor(10000 + Math.random() * 90000);
-    const distributorCode = input.role === 'CUSTOMER' ? `CUST-${uniqueSuffix}` : `DST-${uniqueSuffix}`;
-    const displayName = `${firstName} ${lastName}`.trim();
-    const passwordHash = await hashPassword(password);
+    const generatedUserId = `USR-${uniqueSuffix}`;
+    const role = input.role || 'DISTRIBUTOR';
+    const distributorCode = role === 'CUSTOMER' ? `CUST-${uniqueSuffix}` : `DST-${uniqueSuffix}`;
 
+    const fullNameStr = (input.fullName || input.name || '').trim();
+    const parts = fullNameStr ? fullNameStr.split(/\s+/) : [];
+    const firstName = input.firstName?.trim() || parts[0] || 'Distributor';
+    const lastName = input.lastName?.trim() || (parts.length > 1 ? parts.slice(1).join(' ') : 'Member');
+    const displayName = `${firstName} ${lastName}`.trim();
+
+    const sponsorDistCode =
+      resolvedSponsorUser.distributorCode ||
+      resolvedSponsorUser.distributorProfile?.distributorCode ||
+      resolvedSponsorUser.referralCode ||
+      resolvedSponsorUser.memberId ||
+      'KV-1001';
+
+    const sponsorFirstName =
+      resolvedSponsorUser.firstName ||
+      resolvedSponsorUser.distributorProfile?.firstName ||
+      'Distributor';
+
+    const sponsorLastName =
+      resolvedSponsorUser.lastName ||
+      resolvedSponsorUser.distributorProfile?.lastName ||
+      'Member';
+
+    const sponsorFullName =
+      resolvedSponsorUser.displayName ||
+      resolvedSponsorUser.fullName ||
+      `${sponsorFirstName} ${sponsorLastName}`.trim();
+
+    const sponsorProfileId =
+      resolvedSponsorUser.distributorProfile?.id || resolvedSponsorUser.id;
+
+    // Requirement 3: Check circular network relationship
+    const sponsorAncestors: any[] =
+      resolvedSponsorUser.distributorProfile?.ancestorRelationships ||
+      resolvedSponsorUser.ancestorRelationships ||
+      [];
+    for (const anc of sponsorAncestors) {
+      if (anc.ancestorId === userId || anc.ancestorCode === distributorCode) {
+        throw AppError.badRequest('Circular network sponsorship detected.', 'CIRCULAR_SPONSOR_FORBIDDEN');
+      }
+    }
+
+    // 9. Zero-trust security: hardcoded safe status and balances
     const userObj: any = {
       id: userId,
+      userId: generatedUserId,
       email,
       passwordHash,
       roleName: role,
@@ -186,8 +332,12 @@ export class AuthService {
       name: displayName,
       fullName: displayName,
       displayName,
+      referralCode: distributorCode,
+      distributorCode,
       memberId: distributorCode,
       distributorId: distributorCode,
+      sponsorId: sponsorDistCode,
+      sponsorProfileId,
       distributorProfile: {
         id: randomUUID(),
         distributorCode,
@@ -195,10 +345,34 @@ export class AuthService {
         lastName,
         displayName,
         status: 'ACTIVE',
+        sponsorId: sponsorProfileId,
         currentRank: { name: 'Distributor' },
         lifetimePV: 0,
         lifetimeGV: 0,
-        sponsor: { distributorCode: sponsorLookup, firstName: 'Rahul', lastName: 'Kaushal' },
+        currentBB: 0,
+        currentMatching: 0,
+        sponsor: {
+          id: sponsorProfileId,
+          distributorCode: sponsorDistCode,
+          firstName: sponsorFirstName,
+          lastName: sponsorLastName,
+          displayName: sponsorFullName,
+        },
+        ancestorRelationships: [
+          {
+            ancestorId: sponsorProfileId,
+            ancestorCode: sponsorDistCode,
+            depth: 1,
+            isDirect: true,
+          },
+          ...sponsorAncestors.map((anc: any) => ({
+            ancestorId: anc.ancestorId,
+            ancestorCode: anc.ancestorCode,
+            depth: anc.depth + 1,
+            isDirect: false,
+          })),
+        ],
+        sponsoredDistributors: [],
         businessCenters: [
           {
             id: randomUUID(),
@@ -211,12 +385,29 @@ export class AuthService {
       },
       wallet: {
         balance: 0,
+        availableBalance: 0,
         pendingBalance: 0,
         currency: 'USD',
       },
       addresses: [],
       createdAt: new Date().toISOString(),
     };
+
+    // Requirement 6: Maintain sponsor's downline array
+    if (resolvedSponsorUser.distributorProfile) {
+      if (!resolvedSponsorUser.distributorProfile.sponsoredDistributors) {
+        resolvedSponsorUser.distributorProfile.sponsoredDistributors = [];
+      }
+      resolvedSponsorUser.distributorProfile.sponsoredDistributors.push({
+        id: userObj.distributorProfile.id,
+        distributorCode,
+        firstName,
+        lastName,
+        displayName,
+        status: 'ACTIVE',
+        joinedAt: new Date().toISOString(),
+      });
+    }
 
     this.saveInMemoryUser(userObj);
 
@@ -239,11 +430,12 @@ export class AuthService {
       expiresIn: 900,
     };
 
-    logger.info({ userId, email, role }, 'New user registered successfully in resilient offline store');
+    logger.info({ userId, email, role }, 'New user registered successfully in resilient store');
 
     return {
       user: {
         id: userId,
+        userId: generatedUserId,
         email,
         role,
         status: 'ACTIVE',
@@ -252,10 +444,19 @@ export class AuthService {
         name: displayName,
         fullName: displayName,
         displayName,
+        phone,
+        referralCode: distributorCode,
+        distributorCode,
         memberId: distributorCode,
         distributorId: distributorCode,
+        sponsorId: sponsorDistCode,
+        sponsorProfileId,
+        sponsor: {
+          id: sponsorProfileId,
+          distributorCode: sponsorDistCode,
+          name: sponsorFullName,
+        },
         distributorProfileId: userObj.distributorProfile.id,
-        distributorCode,
       },
       tokens,
       accessToken: tokens.accessToken,
@@ -264,17 +465,31 @@ export class AuthService {
   }
 
   private static async registerWithDb(input: RegisterInput, metadata: RequestMetadata = {}) {
+    // 1. Validate confirmPassword
+    if (input.confirmPassword && input.password !== input.confirmPassword) {
+      throw AppError.badRequest('Passwords do not match.', 'AUTH_PASSWORD_MISMATCH');
+    }
+
+    // 2. Validate password complexity
+    const strength = validatePasswordStrength(input.password);
+    if (!strength.isValid) {
+      throw AppError.badRequest(
+        strength.message || 'Password does not meet complexity requirements.',
+        'AUTH_WEAK_PASSWORD'
+      );
+    }
+
+    // 3. Normalize email
     const email = input.email.trim().toLowerCase();
     const password = input.password;
     const role = input.role || 'DISTRIBUTOR';
     const fullNameStr = (input.fullName || input.name || '').trim();
-    const parts = fullNameStr ? fullNameStr.split(' ') : [];
+    const parts = fullNameStr ? fullNameStr.split(/\s+/) : [];
     const firstName = input.firstName?.trim() || parts[0] || 'Distributor';
     const lastName = input.lastName?.trim() || (parts.length > 1 ? parts.slice(1).join(' ') : 'Member');
     const phone = input.phone?.trim() || undefined;
-    const sponsorLookup = input.sponsorCode || input.sponsorId || 'KV-1001';
 
-    // Check if email already exists
+    // 4. Check duplicate email
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -285,37 +500,109 @@ export class AuthService {
       );
     }
 
-    // Resolve sponsor if provided
-    let sponsorId: string | undefined;
-    if (sponsorLookup) {
-      const sponsor = await prisma.distributorProfile.findFirst({
-        where: {
-          OR: [
-            { distributorCode: sponsorLookup },
-            { id: sponsorLookup },
-            { distributorCode: 'KV-1001' },
-          ],
-        },
+    // 5. Check duplicate phone if provided
+    if (phone) {
+      const existingPhone = await prisma.user.findFirst({
+        where: { phone },
       });
-      if (sponsor) {
-        sponsorId = sponsor.id;
+      if (existingPhone) {
+        throw AppError.conflict(
+          'An account with this phone number already exists.',
+          'AUTH_PHONE_ALREADY_EXISTS'
+        );
       }
     }
 
-    // Hash password with Argon2id
+    // 6. Referral code and sponsor lookup
+    const referralInput = (input.referralCode || input.sponsorCode || input.sponsorId || '').trim();
+    const sponsorLookup = referralInput || 'KV-1001';
+
+    // Requirement 4: Do not allow a user to become their own sponsor (immediate check on input)
+    if (
+      referralInput &&
+      (referralInput.toLowerCase() === email.toLowerCase() ||
+        (phone && referralInput === phone))
+    ) {
+      throw AppError.badRequest('A user cannot be their own sponsor.', 'SELF_SPONSOR_FORBIDDEN');
+    }
+
+    let resolvedSponsor: any = null;
+    if (sponsorLookup) {
+      resolvedSponsor = await prisma.distributorProfile.findFirst({
+        where: {
+          OR: [
+            { distributorCode: { equals: sponsorLookup, mode: 'insensitive' } },
+            { id: sponsorLookup },
+            { distributorId: { equals: sponsorLookup, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          user: true,
+        },
+      });
+
+      if (!resolvedSponsor && referralInput && referralInput !== 'KV-1001') {
+        throw AppError.notFound('Invalid referral code. Sponsor not found.', 'AUTH_INVALID_REFERRAL_CODE');
+      }
+
+      if (!resolvedSponsor) {
+        resolvedSponsor = await prisma.distributorProfile.findFirst({
+          where: {
+            OR: [
+              { distributorCode: 'KV-1001' },
+              { distributorCode: 'KV-88767139' },
+            ],
+          },
+          include: {
+            user: true,
+          },
+        });
+      }
+    }
+
+    if (resolvedSponsor) {
+      // Requirement 4: Do not allow a user to become their own sponsor (check on resolved user record)
+      if (
+        (resolvedSponsor.user?.email && resolvedSponsor.user.email.toLowerCase() === email.toLowerCase()) ||
+        (phone && resolvedSponsor.user?.phone === phone)
+      ) {
+        throw AppError.badRequest('A user cannot be their own sponsor.', 'SELF_SPONSOR_FORBIDDEN');
+      }
+
+      // Requirement 1: Referral code must belong to an existing eligible user
+      if (resolvedSponsor.status !== 'ACTIVE') {
+        throw AppError.badRequest(
+          'The specified sponsor account is inactive or not eligible to sponsor new distributors.',
+          'SPONSOR_INACTIVE'
+        );
+      }
+    }
+
+    // 7. Hash password with Argon2id (never stored plaintext)
     const passwordHash = await hashPassword(password);
 
-    // Atomic Registration Transaction
+    // 8. Generate unique IDs (backend controlled)
+    const uniqueSuffix = Math.floor(10000 + Math.random() * 90000);
+    const generatedUserId = `USR-${uniqueSuffix}`;
+    const distributorCode = role === 'CUSTOMER' ? `CUST-${uniqueSuffix}` : `DST-${uniqueSuffix}`;
+    const displayName = `${firstName} ${lastName}`.trim();
+    const sponsorId = resolvedSponsor?.id || undefined;
+
+    // 9. Atomic Registration Transaction
     return await prisma.$transaction(async (tx) => {
       // 1. Create User
       const user = await tx.user.create({
         data: {
           email,
+          userId: generatedUserId,
+          fullName: displayName,
           passwordHash,
           roleName: role,
           phone,
-          status: 'ACTIVE',
-          emailVerifiedAt: null,
+          referralCode: distributorCode,
+          sponsorId: sponsorId || null,
+          status: 'ACTIVE', // backend controlled
+          emailVerified: false,
           securityProfile: {
             create: {
               twoFactorEnabled: false,
@@ -323,7 +610,7 @@ export class AuthService {
           },
           wallet: {
             create: {
-              balance: 0,
+              balance: 0, // backend controlled
               availableBalance: 0,
               currency: 'USD',
             },
@@ -338,9 +625,6 @@ export class AuthService {
       let customerData: any = null;
 
       if (role === 'DISTRIBUTOR') {
-        const uniqueSuffix = Math.floor(10000 + Math.random() * 90000);
-        const distributorCode = `DST-${uniqueSuffix}`;
-
         // Create Distributor Profile
         const profile = await tx.distributorProfile.create({
           data: {
@@ -348,9 +632,13 @@ export class AuthService {
             distributorCode,
             firstName,
             lastName,
-            displayName: `${firstName} ${lastName}`,
+            displayName,
             status: 'ACTIVE',
             sponsorId,
+            lifetimePV: 0, // backend controlled
+            lifetimeGV: 0, // backend controlled
+            currentBB: 0,
+            currentMatching: 0,
             activatedAt: new Date(),
           },
         });
@@ -362,11 +650,28 @@ export class AuthService {
             centerNumber: 1,
             centerCode: `${distributorCode}-BC1`,
             status: 'ACTIVE',
+            leftVolume: 0,
+            rightVolume: 0,
           },
         });
 
         // Record Sponsorship Lineage if sponsored
         if (sponsorId) {
+          if (sponsorId === profile.id) {
+            throw AppError.badRequest('A user cannot be their own sponsor.', 'SELF_SPONSOR_FORBIDDEN');
+          }
+
+          // Check circular network relationship
+          const ancestors = await tx.sponsorRelationship.findMany({
+            where: { descendantId: sponsorId },
+          });
+
+          for (const anc of ancestors) {
+            if (anc.ancestorId === profile.id) {
+              throw AppError.badRequest('Circular network sponsorship detected.', 'CIRCULAR_SPONSOR_FORBIDDEN');
+            }
+          }
+
           await tx.sponsorRelationship.create({
             data: {
               ancestorId: sponsorId,
@@ -377,10 +682,6 @@ export class AuthService {
           });
 
           // Propagate indirect sponsors
-          const ancestors = await tx.sponsorRelationship.findMany({
-            where: { descendantId: sponsorId },
-          });
-
           for (const anc of ancestors) {
             await tx.sponsorRelationship.create({
               data: {
@@ -395,13 +696,10 @@ export class AuthService {
 
         distributorProfileData = profile;
       } else {
-        const uniqueSuffix = Math.floor(10000 + Math.random() * 90000);
-        const customerCode = `CUST-${uniqueSuffix}`;
-
         const customer = await tx.customer.create({
           data: {
             userId: user.id,
-            customerCode,
+            customerCode: distributorCode,
             sponsorId,
             isPreferred: false,
           },
@@ -422,25 +720,31 @@ export class AuthService {
 
       logger.info({ userId: user.id, email: user.email, role }, 'New user successfully registered');
 
-      const displayName = `${firstName} ${lastName}`.trim();
-      const memberCode = distributorProfileData?.distributorCode || 'KV-1001';
+      const memberCode = distributorProfileData?.distributorCode || distributorCode;
 
       return {
         user: {
           id: user.id,
+          userId: generatedUserId,
+          fullName: displayName,
+          name: displayName,
           email: user.email,
           role: user.roleName,
           status: user.status,
-          firstName,
-          lastName,
-          name: displayName,
-          fullName: displayName,
-          displayName,
+          referralCode: memberCode,
+          distributorCode: memberCode,
           memberId: memberCode,
           distributorId: memberCode,
+          phone: user.phone,
+          sponsorId: resolvedSponsor?.distributorCode || sponsorId || 'KV-1001',
+          sponsorProfileId: sponsorId,
+          sponsor: resolvedSponsor ? {
+            id: resolvedSponsor.id,
+            distributorCode: resolvedSponsor.distributorCode,
+            name: resolvedSponsor.displayName || `${resolvedSponsor.firstName} ${resolvedSponsor.lastName}`.trim(),
+          } : undefined,
           ...(distributorProfileData && {
             distributorProfileId: distributorProfileData.id,
-            distributorCode: distributorProfileData.distributorCode,
           }),
           ...(customerData && {
             customerId: customerData.id,
@@ -471,14 +775,20 @@ export class AuthService {
 
   private static async loginInMemory(input: LoginInput, metadata: RequestMetadata = {}) {
     await this.initSeedUsers();
+    // 1. Validate input
     const rawId = (input.email || input.username || input.identifier || '').trim();
-    const cleanId = rawId.toLowerCase();
-    const password = input.password;
-
     if (!rawId) {
       throw AppError.badRequest('Please enter your email or username.', 'AUTH_MISSING_IDENTIFIER');
     }
+    const password = input.password;
+    if (!password) {
+      throw AppError.badRequest('Password is required.', 'AUTH_MISSING_PASSWORD');
+    }
 
+    // 2. Normalize email / identifier
+    const cleanId = rawId.toLowerCase();
+
+    // 3. Find user (generic message if not found to avoid account enumeration)
     const user =
       this.inMemoryUsers.get(cleanId) ||
       this.inMemoryUsers.get(rawId) ||
@@ -487,11 +797,33 @@ export class AuthService {
       throw AppError.invalidCredentials('Invalid email or password.');
     }
 
+    // 4. Check account status (blocked/suspended accounts must not authenticate)
+    if (user.status === 'BLOCKED') {
+      throw AppError.accountInactive(
+        'Your account has been blocked. Please contact support.',
+        'AUTH_ACCOUNT_BLOCKED'
+      );
+    }
+    if (user.status === 'SUSPENDED') {
+      throw AppError.accountInactive(
+        'Your account is currently suspended. Please contact support.',
+        'AUTH_ACCOUNT_SUSPENDED'
+      );
+    }
+    if (user.status === 'INACTIVE' || user.status === 'TERMINATED' || user.status !== 'ACTIVE') {
+      throw AppError.accountInactive(
+        'Your account is inactive or not eligible to sign in. Please contact support.',
+        'AUTH_ACCOUNT_INACTIVE'
+      );
+    }
+
+    // 5. Compare password hash with Argon2id
     const isMatch = await verifyPassword(password, user.passwordHash);
     if (!isMatch) {
       throw AppError.invalidCredentials('Invalid email or password.');
     }
 
+    // 6. Create secure authentication session
     const accessToken = signAccessToken({
       sub: user.id,
       email: user.email,
@@ -511,13 +843,19 @@ export class AuthService {
       expiresIn: 900,
     };
 
+    // 7. Update lastLoginAt
+    const now = new Date().toISOString();
+    user.lastLoginAt = now;
+
+    // 8. Return safe user information (never passwordHash, secrets, or reset tokens)
     const userDisplayName =
-      user.displayName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-    const memberCode = user.distributorProfile?.distributorCode || user.memberId || 'KV-1001';
+      user.displayName || user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+    const memberCode = user.distributorProfile?.distributorCode || user.referralCode || user.memberId || 'KV-1001';
 
     return {
       user: {
         id: user.id,
+        userId: user.userId || user.id,
         email: user.email,
         role: user.roleName || user.role,
         status: user.status,
@@ -526,10 +864,14 @@ export class AuthService {
         name: userDisplayName,
         fullName: userDisplayName,
         displayName: userDisplayName,
+        referralCode: user.referralCode || memberCode,
+        distributorCode: memberCode,
         memberId: memberCode,
         distributorId: memberCode,
         distributorProfileId: user.distributorProfile?.id,
-        distributorCode: memberCode,
+        sponsorId: user.sponsorId,
+        phone: user.phone,
+        lastLoginAt: user.lastLoginAt,
       },
       tokens,
       accessToken: tokens.accessToken,
@@ -538,15 +880,20 @@ export class AuthService {
   }
 
   private static async loginWithDb(input: LoginInput, metadata: RequestMetadata = {}) {
+    // 1. Validate input
     const rawId = (input.email || input.username || input.identifier || '').trim();
-    const cleanId = rawId.toLowerCase();
-    const password = input.password;
-
     if (!rawId) {
       throw AppError.badRequest('Please enter your email or username.', 'AUTH_MISSING_IDENTIFIER');
     }
+    const password = input.password;
+    if (!password) {
+      throw AppError.badRequest('Password is required.', 'AUTH_MISSING_PASSWORD');
+    }
 
-    // Fetch user with security profile and domain profiles (by email, phone, or distributor code)
+    // 2. Normalize email / identifier
+    const cleanId = rawId.toLowerCase();
+
+    // 3. Fetch user with security profile and domain profiles (by email, phone, or distributor code)
     const user = await prisma.user.findFirst({
       where: {
         OR: [
@@ -566,7 +913,7 @@ export class AuthService {
       throw AppError.invalidCredentials('Invalid email or password.');
     }
 
-    // Check account status
+    // 4. Check account status (blocked/suspended accounts must not authenticate)
     if (user.status === 'BLOCKED') {
       throw AppError.accountInactive(
         'Your account has been blocked. Please contact support.',
@@ -579,9 +926,9 @@ export class AuthService {
         'AUTH_ACCOUNT_SUSPENDED'
       );
     }
-    if (user.status === 'INACTIVE') {
+    if (user.status !== 'ACTIVE') {
       throw AppError.accountInactive(
-        'Your account is inactive. Please contact support.',
+        'Your account is inactive or not eligible to sign in. Please contact support.',
         'AUTH_ACCOUNT_INACTIVE'
       );
     }
@@ -594,7 +941,7 @@ export class AuthService {
       );
     }
 
-    // Verify password with Argon2id
+    // 5. Verify password with Argon2id
     const isMatch = await verifyPassword(password, user.passwordHash);
     if (!isMatch) {
       // Increment failed attempts
@@ -612,24 +959,30 @@ export class AuthService {
       throw AppError.invalidCredentials('Invalid email or password.');
     }
 
-    // Reset failed attempts and update last login
+    // 6. Reset failed attempts and update lastLoginAt on both user and security profile
+    const now = new Date();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: now },
+    });
+
     await prisma.securityProfile.upsert({
       where: { userId: user.id },
       update: {
         failedLoginAttempts: 0,
-        lastLoginAt: new Date(),
+        lastLoginAt: now,
         lastLoginIp: metadata.ipAddress,
         lockoutUntil: null,
       },
       create: {
         userId: user.id,
         failedLoginAttempts: 0,
-        lastLoginAt: new Date(),
+        lastLoginAt: now,
         lastLoginIp: metadata.ipAddress,
       },
     });
 
-    // Create session and issue tokens
+    // 7. Create session and issue tokens
     const tokens = await this.createSession(
       user.id,
       user.email,
@@ -640,15 +993,18 @@ export class AuthService {
 
     logger.info({ userId: user.id, email: user.email }, 'User logged in successfully');
 
+    // 8. Return safe user information (never passwordHash, secrets, or reset tokens)
     const userDisplayName =
       user.distributorProfile?.displayName ||
+      user.fullName ||
       `${user.distributorProfile?.firstName || ''} ${user.distributorProfile?.lastName || ''}`.trim() ||
       user.email;
-    const memberCode = user.distributorProfile?.distributorCode || 'KV-1001';
+    const memberCode = user.distributorProfile?.distributorCode || user.referralCode || 'KV-1001';
 
     return {
       user: {
         id: user.id,
+        userId: user.userId || user.id,
         email: user.email,
         role: user.roleName,
         status: user.status,
@@ -657,11 +1013,15 @@ export class AuthService {
         name: userDisplayName,
         fullName: userDisplayName,
         displayName: userDisplayName,
+        referralCode: user.referralCode || memberCode,
+        distributorCode: user.distributorProfile?.distributorCode || memberCode,
         memberId: memberCode,
         distributorId: memberCode,
+        sponsorId: user.sponsorId,
+        phone: user.phone,
+        lastLoginAt: now,
         ...(user.distributorProfile && {
           distributorProfileId: user.distributorProfile.id,
-          distributorCode: user.distributorProfile.distributorCode,
         }),
         ...(user.customer && {
           customerId: user.customer.id,

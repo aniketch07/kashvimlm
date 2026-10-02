@@ -1,5 +1,6 @@
 import { SponsorRepository, SponsorRecord } from '../repositories/sponsor.repository';
 import { AppError } from '../utils/appError';
+import { AuthService } from './auth.service';
 
 export interface SafeSponsorInfo {
   id: string;
@@ -40,6 +41,29 @@ export class SponsorService {
     try {
       sponsor = await SponsorRepository.findByIdentifier(identifier);
     } catch {
+      // Offline fallback
+    }
+
+    if (!sponsor) {
+      const inMemUser = AuthService.getInMemoryUser(identifier);
+      if (inMemUser) {
+        sponsor = {
+          id: inMemUser.distributorProfile?.id || inMemUser.id,
+          distributorId: inMemUser.distributorCode || inMemUser.referralCode || inMemUser.memberId,
+          distributorCode: inMemUser.distributorCode || inMemUser.referralCode || inMemUser.memberId,
+          firstName: inMemUser.firstName || inMemUser.distributorProfile?.firstName || 'Distributor',
+          lastName: inMemUser.lastName || inMemUser.distributorProfile?.lastName || 'Member',
+          displayName:
+            inMemUser.displayName ||
+            inMemUser.fullName ||
+            `${inMemUser.firstName || ''} ${inMemUser.lastName || ''}`.trim(),
+          status: inMemUser.status || inMemUser.distributorProfile?.status || 'ACTIVE',
+          mlmNodes: [{ id: `node-${inMemUser.id}`, children: [] }],
+        };
+      }
+    }
+
+    if (!sponsor) {
       // Offline / in-memory fallback for local mock testing
       const upper = identifier.toUpperCase();
       if (upper === 'KV-1001' || upper === '88767139') {

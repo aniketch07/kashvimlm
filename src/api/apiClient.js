@@ -1,14 +1,41 @@
 /**
  * KashviMLM Centralized API Client
- * Enterprise HTTP Client with Auth Interceptors, Error Normalization & 401 Handling
+ * Enterprise HTTP Client with Auth Interceptors, HttpOnly Cookie Refresh & Error Normalization
  */
 
-const API_BASE_URL = (import.meta.env?.VITE_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env?.VITE_API_URL || import.meta.env?.VITE_BACKEND_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api';
+  }
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 class ApiClient {
   constructor(baseUrl = API_BASE_URL) {
     this.baseUrl = baseUrl;
+    this.accessToken = null;
+    this.refreshPromise = null;
     this.onUnauthorizedCallbacks = new Set();
+  }
+
+  setToken(token) {
+    this.accessToken = token || null;
+    if (token) {
+      localStorage.setItem('kashvi_token', token);
+    } else {
+      localStorage.removeItem('kashvi_token');
+    }
+  }
+
+  clearToken() {
+    this.accessToken = null;
+    localStorage.removeItem('kashvi_token');
   }
 
   onUnauthorized(callback) {
@@ -17,14 +44,22 @@ class ApiClient {
   }
 
   getToken() {
+    if (this.accessToken) return this.accessToken;
     try {
       const explicitToken = localStorage.getItem('kashvi_token');
-      if (explicitToken) return explicitToken;
+      if (explicitToken) {
+        this.accessToken = explicitToken;
+        return explicitToken;
+      }
 
       const authStr = localStorage.getItem('kashvi_auth');
       if (authStr) {
         const parsed = JSON.parse(authStr);
-        return parsed.token || parsed.accessToken || (parsed.user && parsed.user.token) || null;
+        const t = parsed.token || parsed.accessToken || (parsed.user && parsed.user.token) || null;
+        if (t) {
+          this.accessToken = t;
+          return t;
+        }
       }
     } catch {
       // ignore
@@ -65,9 +100,55 @@ class ApiClient {
     try {
       const response = await fetch(url, config);
 
-      // Handle 401 Unauthorized (session expired or invalid)
+      // Handle 401 Unauthorized
       if (response.status === 401) {
-        this.handle401();
+        const isAuthRoute =
+          cleanEndpoint.includes('/auth/login') ||
+          cleanEndpoint.includes('/auth/register') ||
+          cleanEndpoint.includes('/auth/logout');
+        const isRefreshRoute = cleanEndpoint.includes('/auth/refresh') || options._isRefreshRequest;
+
+        // If this is an expired token on a normal protected route, attempt silent refresh via HttpOnly cookie
+        if (!isAuthRoute && !isRefreshRoute && !options._retry) {
+          if (!this.refreshPromise) {
+            this.refreshPromise = this.request('/auth/refresh', {
+              method: 'POST',
+              _isRefreshRequest: true,
+            })
+              .then((res) => {
+                const refreshedToken =
+                  res?.data?.accessToken ||
+                  res?.accessToken ||
+                  res?.tokens?.accessToken ||
+                  res?.data?.tokens?.accessToken;
+                if (refreshedToken) {
+                  this.setToken(refreshedToken);
+                  return refreshedToken;
+                }
+                return null;
+              })
+              .catch((refreshErr) => {
+                this.handle401();
+                throw refreshErr;
+              })
+              .finally(() => {
+                this.refreshPromise = null;
+              });
+          }
+
+          const refreshedToken = await this.refreshPromise;
+          if (refreshedToken) {
+            return this.request(endpoint, {
+              ...options,
+              _retry: true,
+            });
+          }
+        }
+
+        // If refresh failed or route was refresh/logout
+        if (isRefreshRoute || options._retry) {
+          this.handle401();
+        }
       }
 
       let data = null;
@@ -111,7 +192,7 @@ class ApiClient {
 
   handle401() {
     try {
-      localStorage.removeItem('kashvi_token');
+      this.clearToken();
       const authStr = localStorage.getItem('kashvi_auth');
       if (authStr) {
         const parsed = JSON.parse(authStr);

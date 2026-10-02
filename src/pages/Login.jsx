@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { Lock, Mail, Eye, EyeOff, ArrowRight, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, AlertCircle, Loader2, CheckCircle2, ShieldAlert } from 'lucide-react';
 import './Login.css';
 
 export function Login() {
@@ -10,60 +10,95 @@ export function Login() {
   const { login, isAuthenticated } = useAuth();
 
   const [formData, setFormData] = useState({
-    identifier: '',
+    email: '',
     password: '',
-    rememberMe: true,
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [generalError, setGeneralError] = useState(null);
+  const [isBlocked, setIsBlocked] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  // If already logged in, redirect to dashboard
-  React.useEffect(() => {
-    if (isAuthenticated) {
+  // If already authenticated and not transitioning from a successful login, redirect to dashboard
+  useEffect(() => {
+    if (isAuthenticated && !successMsg) {
       const from = location.state?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate, location]);
+  }, [isAuthenticated, successMsg, navigate, location]);
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: value,
     }));
-    if (error) setError(null);
+
+    // Clear field-level error as user types
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        [name]: null,
+      }));
+    }
+
+    if (generalError) {
+      setGeneralError(null);
+      setIsBlocked(false);
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const cleanEmail = formData.email.trim();
+
+    if (!cleanEmail) {
+      errors.email = 'Please enter your email address.';
+    } else if (!emailRegex.test(cleanEmail)) {
+      errors.email = 'Please enter a valid email address.';
+    }
+
+    if (!formData.password) {
+      errors.password = 'Please enter your password.';
+    }
+
+    return errors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+
+    // Prevent duplicate submissions
+    if (loading) return;
+
+    setGeneralError(null);
+    setIsBlocked(false);
     setSuccessMsg('');
 
-    const cleanId = formData.identifier.trim();
-    if (!cleanId) {
-      setError('Please enter your email or distributor username.');
-      return;
-    }
-    if (!formData.password) {
-      setError('Please enter your password.');
+    // Client-side validation
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setGeneralError('Please enter a valid email address and password.');
       return;
     }
 
+    setFieldErrors({});
     setLoading(true);
+
     try {
-      const isEmail = cleanId.includes('@');
+      const cleanEmail = formData.email.trim().toLowerCase();
       const credentials = {
-        email: isEmail ? cleanId : undefined,
-        username: !isEmail ? cleanId : undefined,
-        identifier: cleanId,
+        email: cleanEmail,
         password: formData.password,
       };
 
       await login(credentials);
-      setSuccessMsg('Authentication successful. Redirecting to your dashboard...');
+
+      setSuccessMsg('Login successful. Redirecting to your dashboard...');
 
       const from = location.state?.from?.pathname || '/dashboard';
       setTimeout(() => {
@@ -71,14 +106,24 @@ export function Login() {
       }, 500);
     } catch (err) {
       console.error('[Login] Error:', err);
-      if (err.status === 401) {
-        setError('Invalid credentials. Please verify your email/username and password.');
-      } else if (err.status === 403) {
-        setError(err.message || 'Your account is suspended or inactive. Please contact administration.');
-      } else if (err.isNetworkError) {
-        setError('Cannot reach server. Please ensure the backend is running.');
+
+      const status = err.status || err.response?.status;
+      const message = err.message || err.response?.data?.message || '';
+
+      if (status === 401) {
+        // Generic credentials error to prevent email/account enumeration
+        setGeneralError('Invalid email or password.');
+      } else if (status === 403) {
+        setIsBlocked(true);
+        setGeneralError(
+          message || 'Your account has been blocked or suspended. Please contact support.'
+        );
+      } else if (err.isNetworkError || status === 0 || /failed to fetch|network/i.test(message)) {
+        setGeneralError(
+          'Unable to connect to the server. Please check your internet connection or server status.'
+        );
       } else {
-        setError(err.message || 'Login failed. Please try again.');
+        setGeneralError(message || 'An error occurred during login. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -88,21 +133,37 @@ export function Login() {
   return (
     <div className="auth-page-container">
       <div className="auth-card">
+        {/* Header */}
         <div className="auth-header">
           <div className="auth-logo-badge">
             <span className="logo-initials">KV</span>
           </div>
-          <h1 className="auth-title">Distributor Portal</h1>
-          <p className="auth-subtitle">Sign in to access your MLM network and commissions</p>
+          <h1 className="auth-title">Welcome Back</h1>
+          <p className="auth-subtitle">Sign in to access your distributor dashboard and network</p>
         </div>
 
-        {error && (
+        {/* General Error Alert */}
+        {generalError && (
           <div className="auth-alert error-alert" role="alert">
-            <AlertCircle size={18} className="alert-icon" />
-            <span>{error}</span>
+            {isBlocked ? (
+              <ShieldAlert size={18} className="alert-icon" />
+            ) : (
+              <AlertCircle size={18} className="alert-icon" />
+            )}
+            <div style={{ flex: 1 }}>
+              <span>{generalError}</span>
+              {isBlocked && (
+                <div style={{ marginTop: '6px', fontSize: '12px' }}>
+                  <Link to="/contact" style={{ color: '#b91c1c', fontWeight: 600, textDecoration: 'underline' }}>
+                    Contact Support &rarr;
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
+        {/* Success Alert */}
         {successMsg && (
           <div className="auth-alert success-alert" role="status">
             <CheckCircle2 size={18} className="alert-icon" />
@@ -111,29 +172,35 @@ export function Login() {
         )}
 
         <form onSubmit={handleSubmit} className="auth-form" noValidate>
+          {/* Email */}
           <div className="form-group">
-            <label htmlFor="identifier">Email or Username</label>
-            <div className="input-wrapper">
+            <label htmlFor="email">Email</label>
+            <div className={`input-wrapper ${fieldErrors.email ? 'has-error' : ''}`}>
               <Mail size={18} className="input-icon" />
               <input
-                id="identifier"
-                name="identifier"
-                type="text"
-                autoComplete="username"
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
                 required
-                placeholder="distributor@example.com"
-                value={formData.identifier}
+                placeholder="name@example.com"
+                value={formData.email}
                 onChange={handleChange}
-                disabled={loading}
+                disabled={loading || Boolean(successMsg)}
+                style={fieldErrors.email ? { borderColor: '#ef4444' } : {}}
               />
             </div>
+            {fieldErrors.email && (
+              <span className="field-error-text">
+                {fieldErrors.email}
+              </span>
+            )}
           </div>
 
+          {/* Password */}
           <div className="form-group">
-            <div className="label-row">
-              <label htmlFor="password">Password</label>
-            </div>
-            <div className="input-wrapper">
+            <label htmlFor="password">Password</label>
+            <div className={`input-wrapper ${fieldErrors.password ? 'has-error' : ''}`}>
               <Lock size={18} className="input-icon" />
               <input
                 id="password"
@@ -144,7 +211,8 @@ export function Login() {
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
-                disabled={loading}
+                disabled={loading || Boolean(successMsg)}
+                style={fieldErrors.password ? { borderColor: '#ef4444' } : {}}
               />
               <button
                 type="button"
@@ -156,41 +224,39 @@ export function Login() {
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {fieldErrors.password && (
+              <span className="field-error-text">
+                {fieldErrors.password}
+              </span>
+            )}
           </div>
 
+          {/* Forgot Password? */}
           <div className="form-actions-row">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                name="rememberMe"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-                disabled={loading}
-              />
-              <span>Remember me</span>
-            </label>
+            <Link to="/forgot-password" className="forgot-password-link">
+              Forgot Password?
+            </Link>
           </div>
 
-          <button type="submit" className="submit-auth-btn" disabled={loading}>
+          {/* Login Button */}
+          <button type="submit" className="submit-auth-btn" disabled={loading || Boolean(successMsg)}>
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                <span>Signing in...</span>
+                <span>Logging in...</span>
               </>
             ) : (
-              <>
-                <span>Sign In to Dashboard</span>
-                <ArrowRight size={18} />
-              </>
+              <span>Login</span>
             )}
           </button>
         </form>
 
+        {/* Footer */}
         <div className="auth-footer">
           <p>
-            Don't have an active distributor account?{' '}
+            Don't have an account?{' '}
             <Link to="/register" className="auth-link">
-              Register now
+              Register
             </Link>
           </p>
         </div>

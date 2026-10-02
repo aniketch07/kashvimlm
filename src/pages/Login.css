@@ -157,8 +157,36 @@
 .form-actions-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   font-size: 13px;
+}
+
+.forgot-password-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.forgot-password-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.field-error-text {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.has-error input {
+  border-color: #ef4444 !important;
+}
+
+.has-error input:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
 }
 
 .checkbox-label {

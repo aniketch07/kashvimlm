@@ -1,6 +1,27 @@
 import { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../services/auth.service';
 import { sendSuccess } from '../utils/apiResponse';
+import { AppError } from '../utils/appError';
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+export const REFRESH_COOKIE_NAME = 'kashvi_refresh';
+
+export const getRefreshCookieOptions = () => ({
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: (isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
+  path: '/',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+});
+
+export const getClearCookieOptions = () => ({
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: (isProduction ? 'strict' : 'lax') as 'strict' | 'lax',
+  path: '/',
+  maxAge: 0,
+});
 
 export class AuthController {
   /**
@@ -16,10 +37,40 @@ export class AuthController {
 
       const result = await AuthService.register(req.body, metadata);
 
-      sendSuccess(res, {
-        statusCode: 201,
+      if (result.tokens?.refreshToken) {
+        res.cookie(REFRESH_COOKIE_NAME, result.tokens.refreshToken, getRefreshCookieOptions());
+        res.cookie('refreshToken', result.tokens.refreshToken, getRefreshCookieOptions());
+      }
+
+      const safeUser = {
+        userId: result.user.userId || result.user.id,
+        id: result.user.id,
+        fullName:
+          result.user.fullName ||
+          result.user.name ||
+          `${result.user.firstName || ''} ${result.user.lastName || ''}`.trim() ||
+          'Distributor',
+        email: result.user.email,
+        referralCode:
+          result.user.referralCode ||
+          result.user.distributorCode ||
+          result.user.memberId,
+        sponsorId: result.user.sponsorId,
+        sponsor: result.user.sponsor,
+      };
+
+      res.status(201).json({
+        success: true,
         message: 'Registration successful',
-        data: result,
+        user: safeUser,
+        tokens: result.tokens,
+        data: {
+          ...result,
+          user: {
+            ...result.user,
+            ...safeUser,
+          },
+        },
       });
     } catch (error) {
       next(error);
@@ -39,10 +90,49 @@ export class AuthController {
 
       const result = await AuthService.login(req.body, metadata);
 
-      sendSuccess(res, {
-        statusCode: 200,
+      if (result.tokens?.refreshToken) {
+        res.cookie(REFRESH_COOKIE_NAME, result.tokens.refreshToken, getRefreshCookieOptions());
+        res.cookie('refreshToken', result.tokens.refreshToken, getRefreshCookieOptions());
+      }
+
+      const safeUser = {
+        userId: result.user.userId || result.user.id,
+        id: result.user.id,
+        fullName:
+          result.user.fullName ||
+          result.user.name ||
+          result.user.displayName ||
+          `${result.user.firstName || ''} ${result.user.lastName || ''}`.trim() ||
+          'Distributor',
+        email: result.user.email,
+        role: result.user.role || (result.user as any).roleName,
+        status: result.user.status,
+        referralCode:
+          result.user.referralCode ||
+          result.user.distributorCode ||
+          result.user.memberId,
+        distributorCode:
+          result.user.distributorCode ||
+          result.user.referralCode ||
+          result.user.memberId,
+        sponsorId: result.user.sponsorId,
+        lastLoginAt: result.user.lastLoginAt,
+      };
+
+      res.status(200).json({
+        success: true,
         message: 'Login successful',
-        data: result,
+        user: safeUser,
+        tokens: result.tokens,
+        accessToken: result.accessToken || result.tokens?.accessToken,
+        refreshToken: result.tokens?.refreshToken,
+        data: {
+          ...result,
+          user: {
+            ...result.user,
+            ...safeUser,
+          },
+        },
       });
     } catch (error) {
       next(error);
@@ -60,8 +150,21 @@ export class AuthController {
         ipAddress: req.ip || (req.headers['x-forwarded-for'] as string),
       };
 
-      const { refreshToken } = req.body;
+      const refreshToken =
+        req.cookies?.[REFRESH_COOKIE_NAME] ||
+        req.cookies?.refreshToken ||
+        req.body?.refreshToken;
+
+      if (!refreshToken) {
+        throw AppError.unauthorized('Refresh token is missing or expired', 'AUTH_TOKEN_MISSING');
+      }
+
       const result = await AuthService.refreshToken(refreshToken, metadata);
+
+      if (result.tokens?.refreshToken) {
+        res.cookie(REFRESH_COOKIE_NAME, result.tokens.refreshToken, getRefreshCookieOptions());
+        res.cookie('refreshToken', result.tokens.refreshToken, getRefreshCookieOptions());
+      }
 
       sendSuccess(res, {
         statusCode: 200,
@@ -79,10 +182,17 @@ export class AuthController {
    */
   public static async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const refreshToken = req.body?.refreshToken;
+      const refreshToken =
+        req.cookies?.[REFRESH_COOKIE_NAME] ||
+        req.cookies?.refreshToken ||
+        req.body?.refreshToken;
       const userId = req.user?.id;
 
       await AuthService.logout(refreshToken, userId);
+
+      res.clearCookie(REFRESH_COOKIE_NAME, getClearCookieOptions());
+      res.clearCookie('refreshToken', getClearCookieOptions());
+      res.clearCookie('accessToken', { path: '/' });
 
       sendSuccess(res, {
         statusCode: 200,

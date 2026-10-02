@@ -35,24 +35,67 @@ export function AuthProvider({ children }) {
 
   const [loading, setLoading] = useState(true);
 
-  // Sync auth state from backend /auth/me on mount
+  // Sync auth state from backend /auth/me on mount or page refresh
   const refreshUser = useCallback(async () => {
-    const token = apiClient.getToken();
-    if (!token) {
-      setCurrentUser(null);
-      setIsAuthenticated(false);
-      setLoading(false);
-      return null;
-    }
+    let token = apiClient.getToken();
 
     try {
-      const res = await authApi.getMe();
+      // 1. If no token in local cache, attempt session restoration via secure HttpOnly cookie
+      if (!token) {
+        try {
+          const refreshRes = await authApi.refresh();
+          const refreshedToken =
+            refreshRes?.data?.accessToken ||
+            refreshRes?.accessToken ||
+            refreshRes?.tokens?.accessToken ||
+            refreshRes?.data?.tokens?.accessToken;
+          if (refreshedToken) {
+            token = refreshedToken;
+            apiClient.setToken(refreshedToken);
+          }
+        } catch {
+          // No active refresh session cookie or unauthorized
+        }
+      }
+
+      // 2. If still no token, user is unauthenticated
+      if (!token) {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        return null;
+      }
+
+      // 3. Fetch authenticated user profile
+      let res;
+      try {
+        res = await authApi.getMe();
+      } catch (meErr) {
+        // If access token expired, try refreshing once via HttpOnly cookie
+        if (meErr.status === 401) {
+          const refreshRes = await authApi.refresh();
+          const refreshedToken =
+            refreshRes?.data?.accessToken ||
+            refreshRes?.accessToken ||
+            refreshRes?.tokens?.accessToken ||
+            refreshRes?.data?.tokens?.accessToken;
+          if (refreshedToken) {
+            apiClient.setToken(refreshedToken);
+            res = await authApi.getMe();
+          } else {
+            throw meErr;
+          }
+        } else {
+          throw meErr;
+        }
+      }
+
       const user = res?.data?.user || res?.data || res?.user;
       if (res && res.success && user) {
         setCurrentUser(user);
         setIsAuthenticated(true);
 
-        // Update local cache
+        // Update safe local UI cache (never store passwords or refresh tokens in storage)
         const saved = localStorage.getItem('kashvi_auth');
         const parsed = saved ? JSON.parse(saved) : {};
         parsed.isLoggedIn = true;
@@ -64,18 +107,15 @@ export function AuthProvider({ children }) {
       }
     } catch (err) {
       console.warn('[AuthContext] Session verification failed:', err.message);
-      // If 401, clear state
-      if (err.status === 401) {
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-        localStorage.removeItem('kashvi_token');
-        const saved = localStorage.getItem('kashvi_auth');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          parsed.isLoggedIn = false;
-          parsed.token = null;
-          localStorage.setItem('kashvi_auth', JSON.stringify(parsed));
-        }
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      apiClient.clearToken();
+      const saved = localStorage.getItem('kashvi_auth');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        parsed.isLoggedIn = false;
+        parsed.token = null;
+        localStorage.setItem('kashvi_auth', JSON.stringify(parsed));
       }
       return null;
     } finally {
@@ -111,12 +151,17 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const res = await authApi.login(credentials);
-      if (res && res.success && res.data) {
-        const { user, accessToken, token } = res.data;
-        const validToken = accessToken || token;
+      const user = res?.user || res?.data?.user;
+      const validToken =
+        res?.tokens?.accessToken ||
+        res?.accessToken ||
+        res?.data?.tokens?.accessToken ||
+        res?.data?.accessToken ||
+        res?.data?.token;
 
+      if (res && res.success && user) {
         if (validToken) {
-          localStorage.setItem('kashvi_token', validToken);
+          apiClient.setToken(validToken);
         }
 
         const authPayload = {
@@ -143,11 +188,17 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const res = await authApi.register(registrationData);
-      if (res && res.success && res.data?.user && (res.data?.accessToken || res.data?.token)) {
-        const { user, accessToken, token } = res.data;
-        const validToken = accessToken || token;
+      const user = res?.user || res?.data?.user;
+      const validToken =
+        res?.tokens?.accessToken ||
+        res?.data?.tokens?.accessToken ||
+        res?.data?.accessToken ||
+        res?.data?.token;
 
-        localStorage.setItem('kashvi_token', validToken);
+      if (res && res.success && user) {
+        if (validToken) {
+          apiClient.setToken(validToken);
+        }
         const authPayload = {
           isLoggedIn: true,
           token: validToken,
@@ -168,15 +219,18 @@ export function AuthProvider({ children }) {
 
   // Logout action
   const logout = async () => {
+    setLoading(true);
     try {
       await authApi.logout();
     } catch {
       // ignore
     } finally {
+      apiClient.clearToken();
       localStorage.removeItem('kashvi_token');
       localStorage.removeItem('kashvi_auth');
       setCurrentUser(null);
       setIsAuthenticated(false);
+      setLoading(false);
       window.dispatchEvent(new Event('kashvi_auth_change'));
     }
   };

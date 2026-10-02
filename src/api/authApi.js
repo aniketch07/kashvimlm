@@ -4,12 +4,14 @@ export const authApi = {
   /**
    * Login with email or username + password (+ optional sponsorId)
    */
-  async login({ email, username, password, sponsorId }) {
+  async login({ email, username, identifier, password, sponsorId, rememberMe }) {
     const payload = {
       password,
       ...(email ? { email } : {}),
       ...(username ? { username } : {}),
+      ...(identifier ? { identifier } : {}),
       ...(sponsorId ? { sponsorId } : {}),
+      ...(rememberMe !== undefined ? { rememberMe } : {}),
     };
     return apiClient.post('/auth/login', payload);
   },
@@ -34,6 +36,13 @@ export const authApi = {
       localStorage.removeItem('kashvi_auth');
       window.dispatchEvent(new Event('kashvi_auth_change'));
     }
+  },
+
+  /**
+   * Refresh session and retrieve fresh access token via HttpOnly cookie
+   */
+  async refresh() {
+    return apiClient.post('/auth/refresh', {});
   },
 
   /**
