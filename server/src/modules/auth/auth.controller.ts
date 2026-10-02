@@ -55,7 +55,7 @@ export class AuthController {
    */
   static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { fullName, email, phone, username, password, confirmPassword, sponsorId } = req.body;
+      const { fullName, email, phone, username, password, confirmPassword, sponsorId, referralCode } = req.body;
       if (!email || !password) {
         res.status(400).json({
           success: false,
@@ -71,7 +71,7 @@ export class AuthController {
         username,
         password,
         confirmPassword,
-        sponsorId,
+        sponsorId: sponsorId || referralCode,
       });
 
       // Set HTTP-Only Secure Cookie for Refresh Token

@@ -153,6 +153,7 @@ export function Register() {
         password: formData.password,
         confirmPassword: formData.confirmPassword,
         referralCode: formData.referralCode.trim() || 'KV-1001',
+        sponsorId: formData.referralCode.trim() || 'KV-1001',
       };
 
       const res = await register(payload);
