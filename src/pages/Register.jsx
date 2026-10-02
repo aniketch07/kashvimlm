@@ -105,6 +105,14 @@ export function Register() {
       errors.password = 'Password is required.';
     } else if (formData.password.length < 8) {
       errors.password = 'Password must be at least 8 characters long.';
+    } else if (
+      !/[A-Z]/.test(formData.password) ||
+      !/[a-z]/.test(formData.password) ||
+      !/[0-9]/.test(formData.password) ||
+      !/[^A-Za-z0-9]/.test(formData.password)
+    ) {
+      errors.password =
+        'Password must include uppercase, lowercase, number, and special character (e.g. Password@123).';
     }
 
     // Confirm Password
@@ -194,6 +202,9 @@ export function Register() {
       } else if (code === 'AUTH_PASSWORD_MISMATCH' || /passwords do not match/i.test(message)) {
         setGeneralError('Passwords do not match. Please verify both password fields.');
         setFieldErrors((prev) => ({ ...prev, confirmPassword: 'Passwords do not match' }));
+      } else if (code === 'AUTH_WEAK_PASSWORD' || /password must contain/i.test(message)) {
+        setGeneralError(message || 'Password must include uppercase, lowercase, number, and special character.');
+        setFieldErrors((prev) => ({ ...prev, password: message || 'Weak password' }));
       } else if (err?.isNetworkError || /network|failed to fetch|cannot reach/i.test(message)) {
         setGeneralError(
           'Network error: Unable to reach the server. Please verify that your backend server is running and accessible.'
