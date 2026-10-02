@@ -60,4 +60,36 @@ router.post(
   CommissionLedgerController.postOrderCommissions
 );
 
+// ==========================================
+// COMMISSION REVERSAL SYSTEM (PROMPT 22)
+// ==========================================
+
+// POST /api/v1/commissions/ledger/reversal/order/:orderId - Reverse commissions for an order
+router.post(
+  '/reversal/order/:orderId',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  CommissionLedgerController.reverseOrderCommissions
+);
+
+// GET /api/v1/commissions/ledger/reversals/order/:orderId - List reversals for an order
+router.get(
+  '/reversals/order/:orderId',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  CommissionLedgerController.getOrderReversals
+);
+
+// GET /api/v1/commissions/ledger/reversals/pending-reconciliations - List pending admin reconciliations
+router.get(
+  '/reversals/pending-reconciliations',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  CommissionLedgerController.getPendingReconciliations
+);
+
+// POST /api/v1/commissions/ledger/reversals/:reversalId/resolve - Resolve administrative reconciliation
+router.post(
+  '/reversals/:reversalId/resolve',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  CommissionLedgerController.resolveReconciliation
+);
+
 export default router;

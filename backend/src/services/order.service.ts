@@ -8,6 +8,7 @@ import { CommissionService } from './commission.service';
 import { LevelCommissionService } from './levelCommission.service';
 import { LevelPromotionService } from './level';
 import { OrderCommissionLifecycleService } from './orderCommissionLifecycle.service';
+import { CommissionReversalService } from './commissionReversal.service';
 
 export class OrderService {
   /**
@@ -646,6 +647,16 @@ export class OrderService {
         logger.warn({ error: revErr.message, orderId: order.id }, 'Level commission reversal warning');
       }
 
+      // 2c. Authoritative Commission Reversal System (Prompt 22)
+      try {
+        await CommissionReversalService.reverseOrderCommissions(order.id, {
+          reason: `Order cancellation ${order.orderNumber}`,
+          tx,
+        });
+      } catch (revErr: any) {
+        logger.warn({ error: revErr.message, orderId: order.id }, 'Commission reversal system warning');
+      }
+
       // 3. Update Order status to CANCELLED
       return await tx.order.update({
         where: { id: order.id },
@@ -743,6 +754,60 @@ export class OrderService {
    */
   public static async processOrderCommission(orderId: string) {
     return OrderCommissionLifecycleService.processOrderCommission(orderId);
+  }
+
+  /**
+   * Processes a full or partial order refund and automatically triggers the Commission Reversal System (Prompt 22).
+   */
+  public static async refundOrder(
+    userId: string,
+    role: string,
+    orderIdOrNumber: string,
+    options?: {
+      refundAmount?: number;
+      refundedBV?: number;
+      refundId?: string;
+      reason?: string;
+    }
+  ) {
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+      throw AppError.forbidden('Only administrators can issue order refunds.', 'AUTH_FORBIDDEN');
+    }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        OR: [{ id: orderIdOrNumber }, { orderNumber: orderIdOrNumber }],
+        deletedAt: null,
+      },
+    });
+
+    if (!order) {
+      throw AppError.notFound('Order not found.', 'ORDER_NOT_FOUND');
+    }
+
+    const isPartial = Boolean(
+      options?.refundAmount && options.refundAmount < Number(order.totalAmount)
+    );
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: isPartial ? order.status : 'REFUNDED',
+      },
+    });
+
+    const reversalSummary = await CommissionReversalService.reverseOrderCommissions(order.id, {
+      refundId: options?.refundId,
+      refundAmount: options?.refundAmount,
+      refundedBV: options?.refundedBV,
+      isPartialRefund: isPartial,
+      reason: options?.reason || `Refund for order ${order.orderNumber}`,
+    });
+
+    return {
+      order: this.formatOrder(updated),
+      reversal: reversalSummary,
+    };
   }
 
   /**

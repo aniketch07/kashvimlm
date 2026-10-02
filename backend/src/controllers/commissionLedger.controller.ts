@@ -240,5 +240,86 @@ export class CommissionLedgerController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/commissions/ledger/reversal/order/:orderId
+   * Admin endpoint: Reverses commissions for an order (Prompt 22).
+   */
+  public static async reverseOrderCommissions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { orderId } = req.params;
+      const { CommissionReversalService } = await import('../services/commissionReversal.service');
+      const result = await CommissionReversalService.reverseOrderCommissions(orderId, req.body);
+      sendSuccess(res, {
+        data: result,
+        message: `Order commissions reversed successfully (${result.totalReversalsCreated} reversals created).`,
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/commissions/ledger/reversals/order/:orderId
+   * Retrieves all reversals recorded for an order.
+   */
+  public static async getOrderReversals(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { orderId } = req.params;
+      const { CommissionReversalService } = await import('../services/commissionReversal.service');
+      const reversals = await CommissionReversalService.getReversalsForOrder(orderId);
+      sendSuccess(res, {
+        data: reversals,
+        message: `Retrieved ${reversals.length} reversal(s) for order ${orderId}.`,
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/commissions/ledger/reversals/pending-reconciliations
+   * Admin endpoint: Lists all reversals requiring administrative reconciliation (shortfalls from withdrawn commissions).
+   */
+  public static async getPendingReconciliations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { CommissionReversalService } = await import('../services/commissionReversal.service');
+      const pending = await CommissionReversalService.getPendingReconciliations();
+      sendSuccess(res, {
+        data: pending,
+        message: `Retrieved ${pending.length} reversal(s) requiring administrative reconciliation.`,
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/commissions/ledger/reversals/:reversalId/resolve
+   * Admin endpoint: Resolves an administrative reconciliation deficit.
+   */
+  public static async resolveReconciliation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { reversalId } = req.params;
+      const { resolutionType, notes } = req.body;
+      const { CommissionReversalService } = await import('../services/commissionReversal.service');
+      const resolved = await CommissionReversalService.resolveAdministrativeReconciliation({
+        reversalId,
+        resolutionType,
+        notes,
+        adminUserId: req.user!.id,
+      });
+      sendSuccess(res, {
+        data: resolved,
+        message: 'Administrative reconciliation deficit resolved successfully.',
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 

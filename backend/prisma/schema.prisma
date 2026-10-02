@@ -418,6 +418,7 @@ model DistributorProfile {
   sourceLevelCommissions LevelCommission[]       @relation("SourceMemberLevelCommissions")
   commissionTransactionsEarned  CommissionTransaction[] @relation("RecipientCommissionTransactions")
   commissionTransactionsSourced CommissionTransaction[] @relation("SourceMemberCommissionTransactions")
+  commissionReversals           CommissionReversal[]    @relation("RecipientCommissionReversals")
 
   @@index([userId])
   @@index([distributorId])
@@ -826,6 +827,7 @@ model Order {
   commissions       Commission[]        @relation("OrderCommissions")
   levelCommissions  LevelCommission[]   @relation("OrderLevelCommissions")
   commissionTransactions CommissionTransaction[] @relation("OrderCommissionTransactions")
+  commissionReversals    CommissionReversal[]    @relation("OrderCommissionReversals")
 
   @@index([orderNumber])
   @@index([userId])
@@ -1773,6 +1775,7 @@ model CommissionTransaction {
   sourceMember          DistributorProfile          @relation("SourceMemberCommissionTransactions", fields: [sourceMemberId], references: [id], onDelete: Restrict)
   order                 Order                       @relation("OrderCommissionTransactions", fields: [orderId], references: [id], onDelete: Restrict)
   walletTransaction     WalletTransaction?          @relation("CommissionTransactionWalletTx", fields: [walletTransactionId], references: [id], onDelete: SetNull)
+  reversals             CommissionReversal[]        @relation("CommissionReversals")
 
   @@unique([orderId, recipientMemberId, commissionLevel])
   @@index([recipientMemberId, status])
@@ -1783,4 +1786,37 @@ model CommissionTransaction {
   @@index([createdAt])
   @@map("commission_transactions")
 }
+
+// 56. CommissionReversal (Prompt 22: Immutable Commission Reversals)
+model CommissionReversal {
+  id                    String                @id @default(uuid())
+  originalCommissionId  String
+  orderId               String
+  refundId              String?
+  recipientMemberId     String
+  commissionLevel       Int
+  reversedBV            Decimal               @default(0.00) @db.Decimal(12, 2)
+  originalAmount        Decimal               @db.Decimal(12, 2)
+  amount                Decimal               @db.Decimal(12, 2) // Compensatory reversal amount (e.g., -2400.00)
+  recoveryStatus        String                @default("COMPLETED") // COMPLETED, PENDING_ADMIN_RECONCILIATION, NEGATIVE_BALANCE_APPLIED, REVERSED_UNPAID
+  unrecoveredAmount     Decimal               @default(0.00) @db.Decimal(12, 2)
+  walletTransactionId   String?
+  idempotencyKey        String                @unique
+  reason                String
+  metadata              Json?
+  createdAt             DateTime              @default(now())
+
+  originalCommission    CommissionTransaction @relation("CommissionReversals", fields: [originalCommissionId], references: [id], onDelete: Restrict)
+  order                 Order                 @relation("OrderCommissionReversals", fields: [orderId], references: [id], onDelete: Restrict)
+  recipient             DistributorProfile    @relation("RecipientCommissionReversals", fields: [recipientMemberId], references: [id], onDelete: Restrict)
+
+  @@index([originalCommissionId])
+  @@index([orderId])
+  @@index([recipientMemberId])
+  @@index([refundId])
+  @@index([recoveryStatus])
+  @@index([createdAt])
+  @@map("commission_reversals")
+}
+
 
