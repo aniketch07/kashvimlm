@@ -132,17 +132,20 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(false);
     });
 
-    const handleStorageChange = () => {
+    // Only an explicit auth change (login/logout in another tab) should re-verify the
+    // session. Re-running refreshUser() on 'kashvi_unauthorized' created an infinite
+    // loop: /auth/me 401 -> apiClient silent refresh -> handle401 -> this event ->
+    // /auth/me -> ... which burned the API rate limit within minutes for anyone
+    // visiting the app while signed out.
+    const handleAuthChange = () => {
       refreshUser();
     };
 
-    window.addEventListener('kashvi_unauthorized', handleStorageChange);
-    window.addEventListener('kashvi_auth_change', handleStorageChange);
+    window.addEventListener('kashvi_auth_change', handleAuthChange);
 
     return () => {
       unsub401();
-      window.removeEventListener('kashvi_unauthorized', handleStorageChange);
-      window.removeEventListener('kashvi_auth_change', handleStorageChange);
+      window.removeEventListener('kashvi_auth_change', handleAuthChange);
     };
   }, [refreshUser]);
 

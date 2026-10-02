@@ -20,6 +20,7 @@ import MemberDetailsPanel from '../components/networkTree/MemberDetailsPanel';
 import { useAuth } from '../context/AuthContext.jsx';
 import { treeApi } from '../api/treeApi.js';
 import { api } from '../services/api.js';
+import { normalizeTree } from '../utils/treeNormalize.js';
 import '../components/networkTree/NetworkTree.css';
 
 /**
@@ -284,7 +285,7 @@ function NetworkTreePage({ embedded = false }) {
         }
 
         if (data) {
-          setTreeData(data);
+          setTreeData(normalizeTree(data));
         } else {
           setError('Unable to load network tree from database.');
         }
@@ -465,7 +466,7 @@ function NetworkTreePage({ embedded = false }) {
     setExpandingNodeIds((prev) => ({ ...prev, [nodeId]: true }));
     try {
       const res = await api.getMemberNetworkTree(nodeId, 2);
-      const fetchedRoot = res?.root || res;
+      const fetchedRoot = normalizeTree(res?.root || res);
       if (fetchedRoot) {
         const hasAnyChildren = Boolean(fetchedRoot.left || fetchedRoot.right);
         setTreeData((prev) =>

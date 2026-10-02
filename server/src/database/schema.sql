@@ -342,7 +342,11 @@ CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 -- -----------------------------------------------------------------------------
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    -- Deliberately NOT a foreign key to users. The immutable-log trigger below rejects
+    -- every UPDATE/DELETE, which made an ON DELETE SET NULL cascade abort the delete,
+    -- so no user with audit history could ever be removed. The trail records the actor
+    -- uuid as a historical fact and must not be rewritten by user lifecycle changes.
+    actor_id UUID,
     action VARCHAR(50) NOT NULL, -- 'LOGIN', 'LOGOUT', 'USER_CREATED', 'USER_UPDATED', 'PRODUCT_CREATED', 'PRODUCT_UPDATED', 'PRODUCT_DELETED', 'ORDER_CREATED', 'ORDER_CANCELLED', 'BV_CREDIT', 'BV_DEBIT', 'COMMISSION_CREATED', 'COMMISSION_REVERSED', 'WALLET_ADJUSTMENT', 'PAYOUT_APPROVED', 'PAYOUT_REJECTED', 'KYC_APPROVED', 'KYC_REJECTED', 'ADMIN_ACTION', 'SPONSOR_ASSIGNED', 'DISTRIBUTOR_CREATED', 'TREE_MEMBER_PLACED', 'TREE_MEMBER_MOVED', 'TREE_MEMBER_REMOVED', 'TREE_POSITION_CHANGED'
     entity_type VARCHAR(100) NOT NULL,
     entity_id VARCHAR(100),

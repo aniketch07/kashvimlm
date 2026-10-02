@@ -1,4 +1,5 @@
 import React from 'react';
+import { refId } from '../../utils/treeNormalize.js';
 import { Award, PlusCircle, ArrowUpRight, Info, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 
 /**
@@ -97,10 +98,11 @@ function TreeNode({
   const totalBV = leftBV + rightBV;
   const leftPct = totalBV > 0 ? Math.round((leftBV / totalBV) * 100) : 50;
 
-  const sponsor = node.sponsor ? node.sponsor.split(' ')[0] : 'KV-1001';
-  const placementParent = node.placementParent
-    ? node.placementParent.split(' ')[0]
-    : (isRoot ? 'ROOT' : (parentNode?.distributorId || 'KV-1001'));
+  // refId tolerates a string, an object ({memberId,name}) or undefined — the API has
+  // returned both shapes, and calling .split() on the object form crashed the view.
+  const sponsor = refId(node.sponsor) || 'KV-1001';
+  const placementParent =
+    refId(node.placementParent ?? node.parent) || (isRoot ? 'ROOT' : (parentNode?.distributorId || 'KV-1001'));
   const businessCenter = node.businessCenter || 'BC-001';
 
   // Prompt 14: Check if node has deeper children
@@ -165,7 +167,7 @@ function TreeNode({
 
           {/* Micro Metadata Lineage Tags */}
           <div className="node-micro-meta-row">
-            <span className="meta-tag-pill" title={`Sponsor: ${node.sponsor || 'KV-1001'}`}>
+            <span className="meta-tag-pill" title={`Sponsor: ${sponsor}`}>
               Sp: {sponsor}
             </span>
             <span className="meta-tag-pill" title={`Placement Parent: ${placementParent}`}>

@@ -221,8 +221,8 @@ function Join() {
       country: 'India',
       sponsorId: sponsorData.sponsor.distributorId,
       placementParentId: sponsorData.sponsor.distributorId,
-      placementPosition: selectedPosition,
-      enrollmentType: 'DISTRIBUTOR',
+      placementLeg: (selectedPosition || 'auto').toLowerCase(),
+      enrollType: 'distributor',
       starterKitId: formData.starterKitId,
       productPackage:
         formData.starterKitId === 'kit_pro'
@@ -242,36 +242,27 @@ function Join() {
       const res = await api.submitCompleteEnrollment(payload);
       if (res && res.success && res.data) {
         const d = res.data;
-        const newDistributorId =
-          d.distributor?.distributorId ||
-          d.distributor?.distributorCode ||
-          `KV-${Math.floor(1000 + Math.random() * 9000)}`;
+        // The enrollment service returns a flat record ({ memberId, name, ... }).
+        const newDistributorId = d.memberId || d.distributor?.distributorId;
 
         const result = {
           memberId: newDistributorId,
-          name: d.distributor?.displayName || formData.fullName,
-          email: d.user?.email || formData.email,
-          sponsorId: sponsorData.sponsor.distributorId,
-          sponsorName: sponsorData.sponsor.name,
-          placement: `${selectedPosition} Leg`,
-          assignedBV: kitBV,
+          name: d.name || d.distributor?.displayName || formData.fullName,
+          email: d.email || d.user?.email || formData.email,
+          sponsorId: d.sponsorId || sponsorData.sponsor.distributorId,
+          sponsorName: d.sponsorName || sponsorData.sponsor.name,
+          placement: d.placement || `${selectedPosition} Leg`,
+          assignedBV: d.assignedBV ?? kitBV,
           referralUrl: `${window.location.origin}/join?ref=${newDistributorId}`,
         };
 
         setEnrollmentSuccess(result);
       } else {
-        // Fallback for offline client demo
-        const demoId = `KV-${Math.floor(1000 + Math.random() * 9000)}`;
-        setEnrollmentSuccess({
-          memberId: demoId,
-          name: formData.fullName,
-          email: formData.email,
-          sponsorId: sponsorData.sponsor.distributorId,
-          sponsorName: sponsorData.sponsor.name,
-          placement: `${selectedPosition} Leg`,
-          assignedBV: kitBV,
-          referralUrl: `${window.location.origin}/join?ref=${demoId}`,
-        });
+        // Never fake a success here: a fabricated member ID looks like the
+        // referral worked while nothing was written to the database.
+        setSubmitError(
+          res?.message || 'Enrollment failed. The sponsor may be invalid or the server is unreachable.'
+        );
       }
     } catch (err) {
       setSubmitError(err.message || 'Failed to complete enrollment. Please try again.');

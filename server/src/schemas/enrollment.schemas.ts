@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 export const enrollSchema = z.object({
+  // Declared so Zod does not strip it: validateRequest replaces req.body with the
+  // parsed result, and EnrollmentController.enroll reads req.body.sponsorId.
+  sponsorId: z.string().min(1, 'Sponsor ID is required'),
+  placementParentId: z.string().optional(),
   enrollType: z.enum(['distributor', 'customer']).default('distributor'),
   fullName: z.string().min(2, 'Full name is required'),
   dob: z.string().optional(),

@@ -1,5 +1,6 @@
 import { query } from '../../config/db.js';
 import { config } from '../../config/env.js';
+import { CommissionService } from './commission.service.js';
 
 export class CommissionEngineService {
   static async calculateWeeklyCommission(memberId: string, cycleWeek = 38, cycleYear = 2026) {
@@ -126,8 +127,63 @@ export class CommissionEngineService {
     return res.rows;
   }
 
+  /**
+   * Runs the weekly cycle for every active distributor and PERSISTS each result.
+   *
+   * This previously computed a single hardcoded example (leftLeg 1250 / rightLeg 1890,
+   * fixed sponsor and leadership bonuses) and returned it without writing anything, so
+   * the admin "calculate commissions" button reported success while commission_ledger
+   * stayed empty. Payout maths now lives in CommissionService, which reads real leg
+   * volume from the BV ledger, applies carry-forward, TDS and admin fees, and posts
+   * atomically (ledger insert + wallet credit) with duplicate-cycle protection.
+   */
   static async runWeeklyCalculation(cycleWeek = 38, cycleYear = 2026): Promise<any[]> {
-    const calculation = await this.calculateWeeklyCommission('88767139', cycleWeek, cycleYear);
-    return [calculation];
+    const distRes = await query(
+      `SELECT member_id FROM distributors
+       WHERE UPPER(QUALIFICATION_STATUS) = 'ACTIVE'
+       ORDER BY member_id`
+    );
+
+    const results: any[] = [];
+
+    for (const row of distRes.rows) {
+      const memberId = row.member_id;
+      const cycleId = `CYCLE-${cycleYear}-W${cycleWeek}`;
+      try {
+        // Preview first: posting a member whose legs have not matched would write a
+        // zero-value ledger row, which only clutters the ledger.
+        const preview = await CommissionService.calculateCommission(memberId, { cycleId });
+        if (!preview.eligible) {
+          results.push({ memberId, status: 'SKIPPED', reason: preview.reasons.join(', ') });
+          continue;
+        }
+        if (preview.matchedVolume <= 0) {
+          results.push({
+            memberId,
+            status: 'SKIPPED',
+            reason: `No matched volume this cycle (left ${preview.leftVolume} BV, right ${preview.rightVolume} BV).`,
+          });
+          continue;
+        }
+
+        const posted = await CommissionService.postCommission(memberId, {
+          cycleId,
+          cycleWeek,
+          cycleYear,
+        });
+        results.push({
+          memberId,
+          status: 'POSTED',
+          netPayout: posted.netPayout,
+          walletBalance: posted.walletBalance,
+          ledgerId: posted.ledgerId,
+        });
+      } catch (err: any) {
+        // Duplicate cycles and race conditions land here.
+        results.push({ memberId, status: 'SKIPPED', reason: err.message });
+      }
+    }
+
+    return results;
   }
 }

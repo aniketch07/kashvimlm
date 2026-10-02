@@ -7,69 +7,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum Role {
-  DISTRIBUTOR
-  ADMIN
-  CUSTOMER
-}
-
-enum QualificationStatus {
-  ACTIVE
-  GRACE_PERIOD
-  INACTIVE
-}
-
-enum ProductStatus {
-  IN_STOCK
-  LOW_STOCK
-  OUT_OF_STOCK
-  PENDING_PRICING
-}
-
-enum PlacementLeg {
-  LEFT
-  RIGHT
-  AUTO
-}
-
-enum OrderStatus {
-  PROCESSING
-  SHIPPED
-  DELIVERED
-  CANCELLED
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-}
-
-enum TicketPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum TicketStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
-}
-
-enum NotificationType {
-  COMMISSION
-  ORDER
-  PAYMENT
-  PAYOUT
-  ENROLLMENT
-  TRAINING
-  SYSTEM
-  SUPPORT
-  NEWS
-}
+// NOTE: The enum types below are intentionally modelled as String.
+// src/database/schema.sql (the authoritative DDL applied by `npm run db:init`)
+// creates every one of these columns as VARCHAR, so Prisma enums — which map to
+// real Postgres enum types — made every write fail with
+// `type "public.Role" does not exist`. String keeps Prisma in sync with the DB.
+// Values use the SQL-native casing (e.g. 'Active', not 'ACTIVE'); raw SQL in
+// src/modules/** compares these columns case-sensitively.
 
 // 1. USERS (Authentication & Identity)
 model User {
@@ -78,7 +22,7 @@ model User {
   phone        String        @unique
   username     String        @unique
   passwordHash String        @map("password_hash")
-  role         Role          @default(DISTRIBUTOR)
+  role         String        @default("distributor")
   isActive     Boolean       @default(true) @map("is_active")
   lastLoginAt  DateTime?     @map("last_login_at")
   createdAt    DateTime      @default(now()) @map("created_at")
@@ -101,18 +45,16 @@ model Distributor {
   fullName            String              @map("full_name")
   sponsorId           String              @map("sponsor_id")
   parentId            String?             @map("parent_id")
-  placementLeg        PlacementLeg        @default(AUTO) @map("placement_leg")
+  placementLeg        String              @default("auto") @map("placement_leg")
   rank                String              @default("Business Center")
-  qualificationStatus QualificationStatus @default(ACTIVE) @map("qualification_status")
+  qualificationStatus String              @default("Active") @map("qualification_status")
   currentPsv          Decimal             @default(0.00) @map("current_psv") @db.Decimal(10, 2)
   lifetimeBv          Decimal             @default(0.00) @map("lifetime_bv") @db.Decimal(12, 2)
   teamSize            Int                 @default(0) @map("team_size")
-  dob                 DateTime?
-  gender              String?
   panNumber           String?             @map("pan_number")
   bankName            String?             @map("bank_name")
-  accountNumber       String?             @map("account_number")
-  ifscCode            String?             @map("ifsc_code")
+  accountNumber       String?             @map("bank_account_number")
+  ifscCode            String?             @map("bank_ifsc_code")
   address             String?
   city                String?
   state               String?
@@ -147,12 +89,12 @@ model Product {
   mrp              Decimal       @default(0.00) @db.Decimal(10, 2)
   volumeBv         Decimal       @default(0.00) @map("volume_bv") @db.Decimal(10, 2)
   stockQuantity    Int           @default(0) @map("stock_quantity")
-  status           ProductStatus @default(PENDING_PRICING)
+  status           String        @default("In Stock")
   imageUrl         String?       @map("image_url") @db.Text
   sizeSpec         String?       @map("size_spec")
   shortDesc        String?       @map("short_desc") @db.Text
   benefits         Json          @default("[]")
-  usage            String?       @db.Text
+  usage            String?       @map("usage_instructions") @db.Text
   isActive         Boolean       @default(true) @map("is_active")
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
@@ -173,8 +115,8 @@ model Order {
   totalMrp        Decimal       @map("total_mrp") @db.Decimal(12, 2)
   savingsAmount   Decimal       @default(0.00) @map("savings_amount") @db.Decimal(12, 2)
   paymentMethod   String        @default("Online Payment") @map("payment_method")
-  paymentStatus   PaymentStatus @default(PAID) @map("payment_status")
-  orderStatus     OrderStatus   @default(PROCESSING) @map("order_status")
+  paymentStatus   String        @default("Paid") @map("payment_status")
+  orderStatus     String        @default("Processing") @map("order_status")
   shippingAddress String        @map("shipping_address") @db.Text
   trackingNumber  String?       @map("tracking_number")
   deliveryEta     String        @default("2-4 Business Days via Bluedart Express") @map("delivery_eta")
@@ -212,7 +154,7 @@ model MlmTreeNode {
   parentDistributorId String?      @map("parent_distributor_id")
   leftChildId         String?      @map("left_child_id")
   rightChildId        String?      @map("right_child_id")
-  legPosition         PlacementLeg @default(AUTO) @map("leg_position")
+  legPosition         String?      @map("leg_position")
   depth               Int          @default(0)
   treePath            String?      @map("tree_path")
   createdAt           DateTime     @default(now()) @map("created_at")
@@ -231,7 +173,7 @@ model BvLedger {
   distributor    Distributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
   sourceOrderId  String?     @map("source_order_id")
   order          Order?      @relation(fields: [sourceOrderId], references: [id])
-  type           String      // 'Personal_Order' | 'Downline_Left' | 'Downline_Right' | 'Cycle_Match'
+  type           String      @map("transaction_type") // 'Personal_Order' | 'Downline_Left' | 'Downline_Right' | 'Cycle_Match'
   legAffected    String?     @map("leg_affected")
   amountBv       Decimal     @map("amount_bv") @db.Decimal(10, 2)
   leftLegTotal   Decimal     @default(0.00) @map("left_leg_total") @db.Decimal(12, 2)
@@ -258,7 +200,7 @@ model CommissionLedger {
   matchedVolume       Decimal     @map("matched_volume") @db.Decimal(12, 2)
   binaryMatchingBonus Decimal     @map("binary_matching_bonus") @db.Decimal(12, 2)
   directSponsorBonus  Decimal     @default(0.00) @map("direct_sponsor_bonus") @db.Decimal(12, 2)
-  leadershipBonus     Decimal     @default(0.00) @map("leadership_bonus") @db.Decimal(12, 2)
+  leadershipBonus     Decimal     @default(0.00) @map("leadership_rank_bonus") @db.Decimal(12, 2)
   grossCommission     Decimal     @map("gross_commission") @db.Decimal(12, 2)
   tdsDeduction        Decimal     @map("tds_deduction") @db.Decimal(10, 2) // 5% TDS
   adminCharge         Decimal     @map("admin_charge") @db.Decimal(10, 2)  // 5% Admin
@@ -290,7 +232,7 @@ model WalletTransaction {
   id            String   @id @default(uuid())
   walletId      String   @map("wallet_id")
   wallet        Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  type          String   // 'COMMISSION_CREDIT' | 'WITHDRAWAL_DEBIT' | 'ORDER_PAYMENT'
+  type          String   @map("transaction_type") // 'COMMISSION_CREDIT' | 'WITHDRAWAL_DEBIT' | 'ORDER_PAYMENT'
   amount        Decimal  @db.Decimal(12, 2)
   balanceBefore Decimal  @map("balance_before") @db.Decimal(12, 2)
   balanceAfter  Decimal  @map("balance_after") @db.Decimal(12, 2)
@@ -351,8 +293,8 @@ model SupportTicket {
   department    String
   subject       String
   description   String          @db.Text
-  status        TicketStatus    @default(OPEN)
-  priority      TicketPriority  @default(MEDIUM)
+  status        String          @default("Open")
+  priority      String          @default("Medium")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
@@ -388,7 +330,7 @@ model Notification {
   user          User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
   title         String
   message       String           @db.Text
-  type          NotificationType @default(SYSTEM)
+  type          String           @default("SYSTEM")
   isRead        Boolean          @default(false) @map("is_read")
   actionUrl     String?          @map("action_url")
   createdAt     DateTime         @default(now()) @map("created_at")
@@ -400,42 +342,12 @@ model Notification {
   @@map("notifications")
 }
 
-enum AuditAction {
-  LOGIN
-  LOGOUT
-  USER_CREATED
-  USER_UPDATED
-  PRODUCT_CREATED
-  PRODUCT_UPDATED
-  PRODUCT_DELETED
-  ORDER_CREATED
-  ORDER_CANCELLED
-  BV_CREDIT
-  BV_DEBIT
-  COMMISSION_CREATED
-  COMMISSION_REVERSED
-  WALLET_ADJUSTMENT
-  PAYOUT_APPROVED
-  PAYOUT_REJECTED
-  KYC_APPROVED
-  KYC_REJECTED
-  ADMIN_ACTION
-
-  // MLM Binary Tree Audit Events (Prompt 16)
-  SPONSOR_ASSIGNED
-  DISTRIBUTOR_CREATED
-  TREE_MEMBER_PLACED
-  TREE_MEMBER_MOVED
-  TREE_MEMBER_REMOVED
-  TREE_POSITION_CHANGED
-}
-
 // 13. AUDIT LOGS (Immutable Compliance Ledger)
 model AuditLog {
   id                 String      @id @default(uuid())
   actorId            String?     @map("actor_id")
   user               User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  action             AuditAction
+  action             String
   entityType         String      @map("entity_type")
   entityId           String?     @map("entity_id")
   memberId           String?     @map("member_id")

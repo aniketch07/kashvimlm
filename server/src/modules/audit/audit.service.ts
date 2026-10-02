@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { randomUUID } from 'crypto';
 import { query } from '../../config/db.js';
 import {
   AuditAction,
@@ -9,6 +10,14 @@ import {
 } from './audit.types.js';
 
 export class AuditService {
+  /** Returns the value when it is a v4-shaped uuid, otherwise null. */
+  private static asUuidOrNull(value?: string | null): string | null {
+    if (!value) return null;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+      ? value
+      : null;
+  }
+
   /**
    * Resilient in-memory audit store with immutable entries (Object.freeze)
    * Populated with compliant historical seed records across all tracked actions
@@ -356,7 +365,9 @@ export class AuditService {
       timestamp = params.timestamp || new Date().toISOString(),
     } = params;
 
-    const newId = `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    // audit_logs.id is a uuid column — a 'audit-<ts>' string fails the insert and was
+    // silently swallowed, which is why the audit trail was always empty.
+    const newId = randomUUID();
     const effectiveMemberId =
       memberId ||
       entityId ||
@@ -390,7 +401,9 @@ export class AuditService {
 
     const entry: AuditLogEntry = {
       id: newId,
-      actorId,
+      // actor_id is a uuid FK to users(id); placeholder ids like 'usr-admin-001'
+      // would abort the insert, so store NULL when the actor is not a real uuid.
+      actorId: AuditService.asUuidOrNull(actorId),
       action,
       entityType,
       entityId: entityId || effectiveMemberId,

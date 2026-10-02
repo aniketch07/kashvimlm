@@ -22,6 +22,7 @@ import TreeControls from '../components/networkTree/TreeControls';
 import MemberDetailsPanel from '../components/networkTree/MemberDetailsPanel';
 import TreeTestRunnerModal from '../components/networkTree/TreeTestRunnerModal';
 import { api } from '../services/api';
+import { normalizeTree } from '../utils/treeNormalize.js';
 import '../components/networkTree/NetworkTree.css';
 
 /**
@@ -247,7 +248,7 @@ export default function AdminNetworkTreePage() {
       }
       const data = res?.root || res?.data?.root || res?.data || res;
       if (data) {
-        setTreeData(data);
+        setTreeData(normalizeTree(data));
         // Automatically default focal inspector to root node if no member selected
         setSelectedMember((prev) => {
           if (!prev) return data;

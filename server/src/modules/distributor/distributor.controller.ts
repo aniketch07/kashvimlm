@@ -190,14 +190,16 @@ export class DistributorController {
   }
 
   static async getMeReferralLink(req: any, res: Response): Promise<void> {
-    const targetMemberId = req.user?.distributorId || req.user?.memberId || 'KV-1001';
+    // Referral links must carry the human-facing member id: EnrollmentService.verifySponsor
+    // resolves sponsors by member_id, so a distributor UUID would fail validation.
+    const targetMemberId = req.user?.memberId || req.user?.distributorId || 'KV-1001';
     const baseUrl = req.query.baseUrl || req.headers['x-base-url'];
     const data = await DistributorService.getReferralLink(targetMemberId, baseUrl);
     res.status(200).json({ success: true, data });
   }
 
   static async getReferralLink(req: any, res: Response): Promise<void> {
-    const targetMemberId = req.params.memberId || req.user?.distributorId || req.user?.memberId || 'KV-1001';
+    const targetMemberId = req.params.memberId || req.user?.memberId || req.user?.distributorId || 'KV-1001';
     const baseUrl = req.query.baseUrl || req.headers['x-base-url'];
     const data = await DistributorService.getReferralLink(targetMemberId, baseUrl);
     res.status(200).json({ success: true, data });

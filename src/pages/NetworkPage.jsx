@@ -21,6 +21,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import './NetworkPage.css';
+import { normalizeTree } from '../utils/treeNormalize.js';
 
 export function NetworkPage() {
   const { currentUser } = useAuth();
@@ -72,7 +73,7 @@ export function NetworkPage() {
         ]);
 
         if (treeRes.status === 'fulfilled' && treeRes.value?.data) {
-          setTreeData(treeRes.value.data);
+          setTreeData(normalizeTree(treeRes.value.data));
         } else if (treeRes.status === 'rejected') {
           throw treeRes.reason;
         }

@@ -145,7 +145,7 @@ export class BinaryTreeService {
                 p.full_name AS parent_name, p.member_id AS parent_member_id, p.id AS parent_db_id
          FROM distributors d
          LEFT JOIN mlm_tree t ON t.distributor_id = d.id
-         LEFT JOIN distributors sp ON sp.member_id = d.sponsor_id OR sp.id = d.sponsor_id
+         LEFT JOIN distributors sp ON sp.member_id = d.sponsor_id OR sp.id::text = d.sponsor_id
          LEFT JOIN distributors p ON p.id = t.parent_distributor_id OR p.member_id = d.parent_id
          WHERE UPPER(d.member_id) = UPPER($1) OR d.id::text = $1`,
         [lookupId]
@@ -243,7 +243,7 @@ export class BinaryTreeService {
                 p.full_name AS parent_name, p.member_id AS parent_member_id, p.id AS parent_db_id
          FROM distributors d
          LEFT JOIN mlm_tree t ON t.distributor_id = d.id
-         LEFT JOIN distributors sp ON sp.member_id = d.sponsor_id OR sp.id = d.sponsor_id
+         LEFT JOIN distributors sp ON sp.member_id = d.sponsor_id OR sp.id::text = d.sponsor_id
          LEFT JOIN distributors p ON p.id = t.parent_distributor_id OR p.member_id = d.parent_id`
       );
 

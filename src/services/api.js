@@ -197,7 +197,7 @@ export const api = {
   // 4. Downline Enrollment
   async enroll(enrollData) {
     try {
-      const res = await fetch(`${API_BASE_URL}/enrollment/enroll`, {
+      const res = await fetch(`${API_BASE_URL}/v1/enrollment/enroll`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(enrollData),
@@ -668,7 +668,7 @@ export const api = {
 
   async submitCompleteEnrollment(enrollData) {
     try {
-      const res = await fetch(`${API_BASE_URL}/enrollments/complete`, {
+      const res = await fetch(`${API_BASE_URL}/v1/enrollment/submit`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(enrollData),

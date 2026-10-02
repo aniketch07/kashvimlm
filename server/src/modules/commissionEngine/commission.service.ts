@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { query, withTransaction } from '../../config/db.js';
 import { SafeDecimal } from '../../utils/safeDecimal.js';
 import { BinaryTreeService } from '../mlmTree/binaryTree.service.js';
@@ -202,6 +203,8 @@ export class CommissionService {
     distributorId: string,
     options: {
       cycleId?: string;
+      cycleWeek?: number;
+      cycleYear?: number;
       periodType?: CommissionPeriodType;
       overrideLeftVolume?: number;
       overrideRightVolume?: number;
@@ -224,7 +227,9 @@ export class CommissionService {
       );
     }
 
-    const ledgerId = `comm-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    // commission_ledger.id is a uuid column; a 'comm-<ts>' string only survived because
+    // the insert rewrote it into a fake uuid. Generate a real one instead.
+    const ledgerId = randomUUID();
     const now = new Date().toISOString();
 
     const ledgerEntry: CommissionLedgerEntry = {
@@ -249,52 +254,49 @@ export class CommissionService {
     };
 
     // Execute within database transaction for ACID safety
+    const cycleWeek = options.cycleWeek ?? 38;
+    const cycleYear = options.cycleYear ?? 2026;
+
     await withTransaction(async (client) => {
       // 1. Check duplicate inside transaction
-      try {
-        const dupCheck = await client.query(
-          `SELECT id FROM commission_ledger
-           JOIN distributors d ON d.id = commission_ledger.distributor_id
-           WHERE UPPER(d.member_id) = $1 AND cycle_week = $2`,
-          [cleanId, 38]
+      const dupCheck = await client.query(
+        `SELECT cl.id FROM commission_ledger cl
+         JOIN distributors d ON d.id = cl.distributor_id
+         WHERE UPPER(d.member_id) = $1 AND cl.cycle_week = $2 AND cl.cycle_year = $3`,
+        [cleanId, cycleWeek, cycleYear]
+      );
+      if (dupCheck && dupCheck.rows.length > 0) {
+        throw new Error(
+          `Duplicate commission: cycle ${cycleWeek}/${cycleYear} already has a ledger entry for ${distributorId}.`
         );
-        if (dupCheck && dupCheck.rows.length > 0) {
-          // If duplicate in DB
-        }
-      } catch {
-        // Fallback
       }
 
       // 2. Insert into commission_ledger
-      try {
-        const distRes = await client.query('SELECT id FROM distributors WHERE UPPER(member_id) = $1', [cleanId]);
-        if (distRes && distRes.rows.length > 0) {
-          const distId = distRes.rows[0].id;
-          await client.query(
-            `INSERT INTO commission_ledger (
-              id, distributor_id, cycle_week, cycle_year, left_leg_volume, right_leg_volume,
-              matched_volume, binary_matching_bonus, gross_commission, tds_deduction,
-              admin_charge, net_payout, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Approved')`,
-            [
-              ledgerId.length === 36 ? ledgerId : 'd0000000-0000-0000-0000-' + ledgerId.slice(-12).padStart(12, '0'),
-              distId,
-              38,
-              2026,
-              ledgerEntry.leftVolume,
-              ledgerEntry.rightVolume,
-              ledgerEntry.matchedVolume,
-              ledgerEntry.grossCommission,
-              ledgerEntry.grossCommission,
-              ledgerEntry.tdsDeduction,
-              ledgerEntry.adminCharge,
-              ledgerEntry.netPayout,
-            ]
-          );
-        }
-      } catch {
-        // Fallback
+      const distRes = await client.query('SELECT id FROM distributors WHERE UPPER(member_id) = $1', [cleanId]);
+      if (!distRes || distRes.rows.length === 0) {
+        throw new Error(`Distributor ${distributorId} not found while posting commission.`);
       }
+      await client.query(
+        `INSERT INTO commission_ledger (
+          id, distributor_id, cycle_week, cycle_year, left_leg_volume, right_leg_volume,
+          matched_volume, binary_matching_bonus, gross_commission, tds_deduction,
+          admin_charge, net_payout, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'Calculated')`,
+        [
+          ledgerId,
+          distRes.rows[0].id,
+          cycleWeek,
+          cycleYear,
+          ledgerEntry.leftVolume,
+          ledgerEntry.rightVolume,
+          ledgerEntry.matchedVolume,
+          ledgerEntry.grossCommission,
+          ledgerEntry.grossCommission,
+          ledgerEntry.tdsDeduction,
+          ledgerEntry.adminCharge,
+          ledgerEntry.netPayout,
+        ]
+      );
 
       // 3. Atomically credit wallet
       await WalletService.creditWallet(

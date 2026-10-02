@@ -112,6 +112,30 @@ export class AuthService {
       },
     ];
 
+    // The seed list above carries placeholder ids ('demo-dist-id', '88767139').
+    // Those match no row in Postgres, so anything keyed off the token's member/
+    // distributor id (e.g. "my network tree") resolved to nothing and silently
+    // served a fallback fixture. Re-point the seeds at their real rows when the
+    // database is reachable.
+    try {
+      for (const u of seedList) {
+        const res = await query(
+          `SELECT d.id AS distributor_uuid, d.member_id
+           FROM distributors d
+           JOIN users usr ON usr.id = d.user_id
+           WHERE usr.email = $1`,
+          [u.email.toLowerCase()]
+        );
+        if (res.rows[0]) {
+          u.id = res.rows[0].distributor_uuid;
+          u.memberId = res.rows[0].member_id;
+          u.distributorId = res.rows[0].distributor_uuid;
+        }
+      }
+    } catch {
+      // Database offline: keep the placeholder seeds so the app still boots.
+    }
+
     for (const u of seedList) {
       this.inMemoryUsers.set(u.id, u);
       this.inMemoryUsers.set(u.email.toLowerCase(), u);
@@ -198,15 +222,15 @@ export class AuthService {
           phone: newUser.phone || '',
           username: cleanUsername,
           passwordHash,
-          role: 'DISTRIBUTOR',
+          role: 'distributor',
           distributor: {
             create: {
               memberId,
               fullName: newUser.name,
               sponsorId: sponsorCode,
-              placementLeg: 'AUTO',
+              placementLeg: 'auto',
               rank: 'Business Center',
-              qualificationStatus: 'ACTIVE',
+              qualificationStatus: 'Active',
             },
           },
         },
@@ -219,8 +243,14 @@ export class AuthService {
         newUser.memberId = user.distributor.memberId;
       }
       this.saveStoredUser(newUser);
-    } catch {
-      logger.warn('[AuthService] Saved user in resilient registry mode.');
+    } catch (dbErr) {
+      // The in-memory registry keeps the session usable, but a user that is not in
+      // Postgres can never sponsor anyone (EnrollmentService.verifySponsor reads the
+      // distributors table), so log the real cause instead of hiding it.
+      logger.warn(
+        { err: dbErr },
+        '[AuthService] Prisma user creation failed. User is only in the in-memory registry and will not persist to Postgres.'
+      );
     }
 
     const authUser: AuthenticatedUser = {
@@ -283,13 +313,20 @@ export class AuthService {
     // If not found in memory, try DB
     if (!user) {
       try {
-        const cleanUser = identifier.toLowerCase().replace('@', '');
+        // Strip only a LEADING '@' (usernames are stored as '@handle').
+        // Stripping every '@' mangles emails ('a@b.com' -> 'ab.com'), which made
+        // email login impossible for anyone not in the in-memory registry.
+        const raw = identifier.trim();
+        const lower = raw.toLowerCase();
+        const handle = lower.replace(/^@/, '');
         const dbUser = await prisma.user.findFirst({
           where: {
             OR: [
-              { email: { equals: cleanUser, mode: 'insensitive' } },
-              { username: { contains: cleanUser, mode: 'insensitive' } },
-              { distributor: { memberId: cleanUser } },
+              { email: { equals: lower, mode: 'insensitive' } },
+              { username: { equals: lower, mode: 'insensitive' } },
+              { username: { equals: handle, mode: 'insensitive' } },
+              { username: { equals: `@${handle}`, mode: 'insensitive' } },
+              { distributor: { is: { memberId: raw } } },
             ],
           },
           include: { distributor: true },
