@@ -57,3 +57,4 @@ export * from './commissionEligibility.types';
 export * from './levelCommission.types';
 export * from './commissionConfig.types';
 export * from './commissionLedger.types';
+export * from './commissionPosting.types';

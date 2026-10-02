@@ -17,6 +17,7 @@
     "test:commission-calc": "vitest run tests/commissionCalculation.test.ts",
     "test:commission-eligibility": "vitest run tests/commissionEligibility.test.ts",
     "test:commission-ledger": "vitest run tests/commissionLedger.test.ts",
+    "test:commission-posting": "vitest run tests/atomicCommissionPosting.test.ts",
     "test:watch": "vitest",
     "test:runner": "tsx tests/runner.ts"
   },

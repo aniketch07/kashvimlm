@@ -17,6 +17,7 @@
     "test:commission-calc": "npm run test:commission-calc --prefix backend",
     "test:commission-eligibility": "npm run test:commission-eligibility --prefix backend",
     "test:commission-ledger": "npm run test:commission-ledger --prefix backend",
+    "test:commission-posting": "npm run test:commission-posting --prefix backend",
     "test:tree": "npm run test:tree --prefix server",
     "test:api": "npm run test:api --prefix server",
     "db:init": "npm run db:init --prefix server"

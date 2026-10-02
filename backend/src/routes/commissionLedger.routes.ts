@@ -40,4 +40,11 @@ router.post(
   CommissionLedgerController.reverseCommission
 );
 
+// POST /api/v1/commissions/ledger/post-order/:orderId - Atomic commission posting (Prompt 19)
+router.post(
+  '/post-order/:orderId',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  CommissionLedgerController.postOrderCommissions
+);
+
 export default router;

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { CommissionLedgerService } from '../services/commissionLedger.service';
+import { AtomicCommissionPostingService } from '../services/atomicCommissionPosting.service';
 import { sendSuccess } from '../utils/apiResponse';
 import { AppError } from '../utils/appError';
 import { prisma } from '../config/database';
@@ -167,4 +168,28 @@ export class CommissionLedgerController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/commissions/ledger/post-order/:orderId
+   * Admin endpoint: Atomically posts commissions for an order (Prompt 19).
+   * Validates order, BV, uplines, rates, writes ledger and wallet transactions atomically.
+   */
+  public static async postOrderCommissions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { orderId } = req.params;
+      if (!orderId) {
+        throw AppError.badRequest('Order ID is required');
+      }
+
+      const result = await AtomicCommissionPostingService.postCommissionForOrder(orderId);
+      sendSuccess(res, {
+        data: result,
+        message: result.message || 'Commissions posted atomically',
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+
