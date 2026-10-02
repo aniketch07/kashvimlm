@@ -346,4 +346,127 @@ describe('AUTH MODULE AUTOMATED TESTS (Supertest + Vitest)', () => {
       expect(hash1).not.toBe(rawToken);
     });
   });
+
+  describe('7. End-to-End Registration & Future Login Flow (Email + Password Invariant)', () => {
+    const testEmail = `distributor.${Date.now()}@kashvimlm.test`;
+    const testPassword = 'MySecretPassword@2026';
+    let registeredReferralCode: string;
+    let registeredUserId: string;
+
+    it('should register a new distributor with Email + Password, generating User ID, Referral Code, and Sponsor Link', async () => {
+      const registerPayload = {
+        fullName: 'Aarav Sharma',
+        email: testEmail,
+        password: testPassword,
+        confirmPassword: testPassword,
+        phone: '+919876543210',
+        sponsorId: 'KV-1001',
+      };
+
+      const res = await request(app)
+        .post('/api/v1/auth/register')
+        .send(registerPayload)
+        .expect(201);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.user).toBeDefined();
+      expect(res.body.data.user.email).toBe(testEmail.toLowerCase());
+      expect(res.body.data.user.role).toBe('DISTRIBUTOR');
+      expect(res.body.data.user.status).toBe('ACTIVE');
+
+      // Verify unique User ID
+      expect(res.body.data.user.id).toBeDefined();
+      expect(typeof res.body.data.user.id).toBe('string');
+      registeredUserId = res.body.data.user.id;
+
+      // Verify generated Referral Code
+      const code = res.body.data.user.distributorCode || res.body.data.user.memberId;
+      expect(code).toBeDefined();
+      expect(code).toMatch(/^DST-\d+/);
+      registeredReferralCode = code;
+
+      // Verify tokens issued
+      expect(res.body.data.tokens?.accessToken || res.body.data.accessToken).toBeDefined();
+    });
+
+    it('should successfully log in with the registered Email and Password in future sessions', async () => {
+      const loginPayload = {
+        email: testEmail,
+        password: testPassword,
+      };
+
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send(loginPayload)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.user.id).toBe(registeredUserId);
+      expect(res.body.data.user.email).toBe(testEmail.toLowerCase());
+      expect(res.body.data.tokens?.accessToken || res.body.data.accessToken).toBeDefined();
+    });
+
+    it('should also successfully log in using the assigned Referral Code and Password', async () => {
+      const loginPayload = {
+        identifier: registeredReferralCode,
+        password: testPassword,
+      };
+
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send(loginPayload)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.user.id).toBe(registeredUserId);
+      expect(res.body.data.user.email).toBe(testEmail.toLowerCase());
+    });
+
+    it('should support case-insensitive email matching during future login', async () => {
+      const loginPayload = {
+        email: testEmail.toUpperCase(),
+        password: testPassword,
+      };
+
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send(loginPayload)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.user.id).toBe(registeredUserId);
+    });
+
+    it('should reject future login if an incorrect password is provided', async () => {
+      const loginPayload = {
+        email: testEmail,
+        password: 'WrongPassword@999',
+      };
+
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send(loginPayload)
+        .expect(401);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('Invalid email or password');
+    });
+
+    it('should prevent duplicate registration with the same email', async () => {
+      const duplicatePayload = {
+        fullName: 'Imposter User',
+        email: testEmail,
+        password: 'DifferentPassword123!',
+        confirmPassword: 'DifferentPassword123!',
+      };
+
+      const res = await request(app)
+        .post('/api/v1/auth/register')
+        .send(duplicatePayload)
+        .expect(409);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toContain('already exists');
+    });
+  });
 });

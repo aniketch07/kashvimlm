@@ -58,6 +58,7 @@ export function Login() {
       const credentials = {
         email: isEmail ? cleanId : undefined,
         username: !isEmail ? cleanId : undefined,
+        identifier: cleanId,
         password: formData.password,
       };
 

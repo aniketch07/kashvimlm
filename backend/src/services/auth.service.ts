@@ -123,6 +123,13 @@ export class AuthService {
       this.inMemoryUsers.set(user.distributorProfile.distributorCode.toUpperCase(), user);
       this.inMemoryUsers.set(user.distributorProfile.distributorCode.toLowerCase(), user);
     }
+    if (user.username) {
+      this.inMemoryUsers.set(user.username.toLowerCase(), user);
+      this.inMemoryUsers.set(user.username.toUpperCase(), user);
+    }
+    if (user.phone) {
+      this.inMemoryUsers.set(user.phone, user);
+    }
   }
 
   /**
@@ -173,6 +180,7 @@ export class AuthService {
       role,
       status: 'ACTIVE',
       phone,
+      username: input.username?.trim(),
       firstName,
       lastName,
       name: displayName,
@@ -316,6 +324,7 @@ export class AuthService {
           wallet: {
             create: {
               balance: 0,
+              availableBalance: 0,
               currency: 'USD',
             },
           },
@@ -470,7 +479,10 @@ export class AuthService {
       throw AppError.badRequest('Please enter your email or username.', 'AUTH_MISSING_IDENTIFIER');
     }
 
-    const user = this.inMemoryUsers.get(cleanId);
+    const user =
+      this.inMemoryUsers.get(cleanId) ||
+      this.inMemoryUsers.get(rawId) ||
+      this.inMemoryUsers.get(rawId.toUpperCase());
     if (!user) {
       throw AppError.invalidCredentials('Invalid email or password.');
     }
