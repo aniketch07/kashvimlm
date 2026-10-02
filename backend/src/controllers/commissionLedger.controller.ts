@@ -1,0 +1,170 @@
+import { Request, Response, NextFunction } from 'express';
+import { CommissionLedgerService } from '../services/commissionLedger.service';
+import { sendSuccess } from '../utils/apiResponse';
+import { AppError } from '../utils/appError';
+import { prisma } from '../config/database';
+
+export class CommissionLedgerController {
+  /**
+   * GET /api/v1/commissions/ledger/order/:orderId
+   * Retrieves all immutable commission transactions for a specific order.
+   */
+  public static async getByOrder(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { orderId } = req.params;
+      if (!orderId) {
+        throw AppError.badRequest('Order ID is required');
+      }
+
+      const transactions = await CommissionLedgerService.getTransactionsByOrder(orderId);
+      sendSuccess(res, {
+        data: transactions,
+        message: 'Commission ledger transactions retrieved successfully',
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/commissions/ledger/me
+   * Retrieves the authenticated distributor's paginated commission transactions.
+   */
+  public static async getMyLedger(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        throw AppError.unauthorized('Authentication required');
+      }
+
+      const profile = await prisma.distributorProfile.findFirst({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (!profile) {
+        throw AppError.notFound('Distributor profile not found');
+      }
+
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+      const status = req.query.status as any;
+      const commissionLevel = req.query.commissionLevel ? parseInt(req.query.commissionLevel as string, 10) : undefined;
+
+      const result = await CommissionLedgerService.getTransactionsByRecipient(profile.id, {
+        page,
+        limit,
+        status,
+        commissionLevel,
+      });
+
+      sendSuccess(res, {
+        data: result.transactions,
+        message: 'Personal commission ledger retrieved successfully',
+        statusCode: 200,
+        meta: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/commissions/ledger/:id/audit
+   * Retrieves complete 8-dimensional audit trail for a commission transaction.
+   */
+  public static async getAuditTrail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        throw AppError.badRequest('Transaction ID is required');
+      }
+
+      const audit = await CommissionLedgerService.getAuditTrail(id);
+      sendSuccess(res, {
+        data: audit,
+        message: 'Commission audit trail retrieved successfully',
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/commissions/ledger/approve-order/:orderId
+   * Admin endpoint: Batch approves all pending commission transactions for an order.
+   */
+  public static async approveOrderCommissions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { orderId } = req.params;
+      if (!orderId) {
+        throw AppError.badRequest('Order ID is required');
+      }
+
+      const result = await CommissionLedgerService.approveOrderCommissions(orderId);
+      sendSuccess(res, {
+        data: result,
+        message: `Successfully approved ${result.approvedCount} commission transactions for order ${orderId}`,
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/commissions/ledger/:id/credit-wallet
+   * Admin endpoint: Credits an available/approved commission transaction to recipient wallet.
+   * Strictly records WalletTransaction first.
+   */
+  public static async creditToWallet(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      if (!id) {
+        throw AppError.badRequest('Transaction ID is required');
+      }
+
+      const result = await CommissionLedgerService.creditCommissionToWallet(id);
+      sendSuccess(res, {
+        data: result,
+        message: `Commission successfully credited to wallet with transaction ${result.walletTransactionId}`,
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/commissions/ledger/:id/reverse
+   * Admin endpoint: Post-payout compensatory reversal.
+   */
+  public static async reverseCommission(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body || {};
+      if (!id) {
+        throw AppError.badRequest('Transaction ID is required');
+      }
+      if (!reason || !reason.trim()) {
+        throw AppError.badRequest('Reversal reason is required');
+      }
+
+      const result = await CommissionLedgerService.reversePaidCommission(id, reason);
+      sendSuccess(res, {
+        data: result,
+        message: 'Commission transaction successfully reversed',
+        statusCode: 200,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
