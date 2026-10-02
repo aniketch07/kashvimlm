@@ -59,3 +59,4 @@ export * from './commissionConfig.types';
 export * from './commissionLedger.types';
 export * from './commissionPosting.types';
 export * from './commissionWallet.types';
+export * from './orderCommissionLifecycle.types';

@@ -74,6 +74,12 @@ export const adminAdjustOrderBVSchema = z.object({
   reason: z.string().min(3, 'Adjustment reason is required').trim(),
 });
 
+export const updateOrderStatusSchema = z.object({
+  status: orderStatusEnum,
+});
+
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type OrderQueryInput = z.infer<typeof orderQuerySchema>;
 export type AdminAdjustOrderBVInput = z.infer<typeof adminAdjustOrderBVSchema>;
+export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+

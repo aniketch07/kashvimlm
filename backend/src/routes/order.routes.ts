@@ -8,6 +8,7 @@ import {
   orderIdParamSchema,
   orderQuerySchema,
   adminAdjustOrderBVSchema,
+  updateOrderStatusSchema,
 } from '../validators/order.validators';
 
 const router = Router();
@@ -49,6 +50,29 @@ router.put(
   authorizeRoles('ADMIN', 'SUPER_ADMIN'),
   validate({ params: orderIdParamSchema, body: adminAdjustOrderBVSchema }),
   OrderController.adminAdjustBV
+);
+
+// PUT /api/v1/orders/:id/status - Admin update order status (triggers lifecycle progression)
+router.put(
+  '/:id/status',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  validate({ params: orderIdParamSchema, body: updateOrderStatusSchema }),
+  OrderController.updateOrderStatus
+);
+
+// POST /api/v1/orders/:id/process-commission - Authoritative commission processing trigger (Prompt 21)
+router.post(
+  '/:id/process-commission',
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  validate({ params: orderIdParamSchema }),
+  OrderController.processCommission
+);
+
+// GET /api/v1/orders/:id/commission-lifecycle - Inspect commission lifecycle status
+router.get(
+  '/:id/commission-lifecycle',
+  validate({ params: orderIdParamSchema }),
+  OrderController.getCommissionLifecycleStatus
 );
 
 export const orderRouter = router;

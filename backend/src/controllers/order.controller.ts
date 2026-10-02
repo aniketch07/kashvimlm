@@ -92,4 +92,63 @@ export class OrderController {
       next(error);
     }
   }
+
+  /**
+   * Updates order status and automatically transitions lifecycle (Admin only).
+   * PUT /api/v1/orders/:id/status
+   */
+  public static async updateOrderStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const result = await OrderService.updateOrderStatus(req.user!.id, req.user!.role, id, status);
+      sendSuccess(res, {
+        message: `Order status updated to ${status}.`,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Authoritative commission execution for an order (Prompt 21).
+   * POST /api/v1/orders/:id/process-commission
+   */
+  public static async processCommission(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const result = await OrderService.processOrderCommission(id);
+      sendSuccess(res, {
+        statusCode: result.status === 'SUCCESS' ? 200 : 200,
+        message: result.status === 'ALREADY_PROCESSED'
+          ? 'Commissions already processed for this order (idempotent skip).'
+          : result.status === 'SUCCESS'
+          ? 'Commissions processed and distributed successfully.'
+          : result.reason || 'Commission lifecycle evaluated.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Retrieves commission lifecycle status for an order.
+   * GET /api/v1/orders/:id/commission-lifecycle
+   */
+  public static async getCommissionLifecycleStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { OrderCommissionLifecycleService } = await import('../services/orderCommissionLifecycle.service');
+      const status = await OrderCommissionLifecycleService.getOrderCommissionLifecycleStatus(id);
+      sendSuccess(res, {
+        message: 'Order commission lifecycle status retrieved.',
+        data: status,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
+

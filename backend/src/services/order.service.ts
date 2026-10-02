@@ -7,6 +7,7 @@ import { BVService } from './bv.service';
 import { CommissionService } from './commission.service';
 import { LevelCommissionService } from './levelCommission.service';
 import { LevelPromotionService } from './level';
+import { OrderCommissionLifecycleService } from './orderCommissionLifecycle.service';
 
 export class OrderService {
   /**
@@ -367,7 +368,14 @@ export class OrderService {
       if (orderStatus === 'PAID') {
         await CommissionService.processOrderCommissions(order.id, tx);
 
-        // 5-Level Unilevel Commission Engine (Prompt 12)
+        // 5-Level Unilevel Commission Lifecycle Engine (Prompt 21)
+        try {
+          await OrderCommissionLifecycleService.processOrderCommission(order.id, { tx });
+        } catch (commErr: any) {
+          logger.warn({ error: commErr.message, orderId: order.id }, 'Order unilevel commission lifecycle warning');
+        }
+
+        // 5-Level Legacy Unilevel Commission Engine (Prompt 12)
         try {
           await LevelCommissionService.calculateCommissionsForOrder(order.id, tx);
         } catch (levelCommErr: any) {
@@ -665,6 +673,76 @@ export class OrderService {
 
     logger.info({ orderId: cancelled.id, orderNumber: cancelled.orderNumber }, 'Order cancelled and restocked');
     return this.formatOrder(cancelled);
+  }
+
+  /**
+   * Updates an order's status and automatically triggers downstream lifecycle actions
+   * (e.g. commission processing on payment or delivery confirmation).
+   */
+  public static async updateOrderStatus(
+    userId: string,
+    role: string,
+    orderIdOrNumber: string,
+    newStatus: OrderStatus
+  ) {
+    if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
+      throw AppError.forbidden('Only administrators can update order status directly.', 'AUTH_FORBIDDEN');
+    }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        OR: [{ id: orderIdOrNumber }, { orderNumber: orderIdOrNumber }],
+        deletedAt: null,
+      },
+    });
+
+    if (!order) {
+      throw AppError.notFound('Order not found.', 'ORDER_NOT_FOUND');
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        status: newStatus,
+        paidAt: newStatus === 'PAID' && !order.paidAt ? new Date() : order.paidAt,
+      },
+      include: {
+        items: {
+          include: {
+            product: { select: { id: true, sku: true, name: true, slug: true } },
+          },
+        },
+        payments: true,
+      },
+    });
+
+    // If order transitioned to PAID, mark pending payments COMPLETED as well
+    if (newStatus === 'PAID') {
+      await prisma.payment.updateMany({
+        where: { orderId: order.id, status: 'PENDING' },
+        data: { status: 'COMPLETED', paidAt: new Date() },
+      });
+    }
+
+    // Trigger authoritative commission lifecycle processing
+    let commissionResult = null;
+    try {
+      commissionResult = await OrderCommissionLifecycleService.processOrderCommission(order.id);
+    } catch (commErr: any) {
+      logger.warn({ error: commErr.message, orderId: order.id }, 'Order commission processing notification');
+    }
+
+    return {
+      order: this.formatOrder(updated),
+      commission: commissionResult,
+    };
+  }
+
+  /**
+   * Single authoritative entrypoint matching Prompt 21: processOrderCommission(orderId)
+   */
+  public static async processOrderCommission(orderId: string) {
+    return OrderCommissionLifecycleService.processOrderCommission(orderId);
   }
 
   /**

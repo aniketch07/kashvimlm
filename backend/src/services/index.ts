@@ -35,5 +35,6 @@ export * from './commissionEligibility.service';
 export * from './commissionLedger.service';
 export * from './atomicCommissionPosting.service';
 export * from './commissionWallet.service';
+export * from './orderCommissionLifecycle.service';
 
 

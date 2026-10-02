@@ -19,6 +19,7 @@
     "test:commission-ledger": "vitest run tests/commissionLedger.test.ts",
     "test:commission-posting": "vitest run tests/atomicCommissionPosting.test.ts",
     "test:commission-wallet": "vitest run tests/commissionWallet.test.ts",
+    "test:order-commission-lifecycle": "vitest run tests/orderCommissionLifecycle.test.ts",
     "test:watch": "vitest",
     "test:runner": "tsx tests/runner.ts"
   },
