@@ -30,5 +30,6 @@ export * from './levelCommission.service';
 export * from './commissionConfig.service';
 export * from './authoritativeBV.service';
 export * from './sponsorUpline.service';
+export * from './commissionCalculation.service';
 
 

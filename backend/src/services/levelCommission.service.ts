@@ -6,6 +6,7 @@ import { SafeDecimal } from '../utils/safeDecimal';
 import { CommissionConfigService } from './commissionConfig.service';
 import { AuthoritativeBVService } from './authoritativeBV.service';
 import { SponsorUplineService } from './sponsorUpline.service';
+import { CommissionCalculationService } from './commissionCalculation.service';
 import {
   CANONICAL_LEVEL_RATES,
   TOTAL_THEORETICAL_DISTRIBUTION_PERCENT,
@@ -18,6 +19,42 @@ import {
 } from '../types/levelCommission.types';
 
 export class LevelCommissionService {
+  /**
+   * Commission Calculation Engine delegations (Prompt 16)
+   */
+  public static calculateCommissionAmount(
+    businessVolume: Prisma.Decimal.Value | number | string,
+    percentage: Prisma.Decimal.Value | number | string
+  ): number {
+    return CommissionCalculationService.calculateCommissionAmount(businessVolume, percentage);
+  }
+
+  public static async calculateUplineCommission(
+    memberId: string,
+    businessVolume: Prisma.Decimal.Value | number | string,
+    options?: any,
+    client?: Prisma.TransactionClient
+  ) {
+    return CommissionCalculationService.calculateUplineCommission(memberId, businessVolume, options, client);
+  }
+
+  public static async calculateCommissionForMemberPurchase(
+    memberId: string,
+    orderId: string,
+    options?: any,
+    client?: Prisma.TransactionClient
+  ) {
+    return CommissionCalculationService.calculateCommissionForMemberPurchase(memberId, orderId, options, client);
+  }
+
+  public static async calculateCommissionForOrder(
+    orderId: string,
+    options?: any,
+    client?: Prisma.TransactionClient
+  ) {
+    return CommissionCalculationService.calculateCommissionForOrder(orderId, options, client);
+  }
+
   /**
    * Traverses sponsor upline up to 5 generations for a given distributor.
    * Delegates to the authoritative SponsorUplineService.
