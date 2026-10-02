@@ -53,5 +53,6 @@ export interface PaginationParams {
 }
 
 export * from './commissionCalculation.types';
+export * from './commissionEligibility.types';
 export * from './levelCommission.types';
 export * from './commissionConfig.types';

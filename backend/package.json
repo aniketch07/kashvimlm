@@ -15,6 +15,7 @@
     "test:matching": "vitest run tests/matching.test.ts",
     "test:bb": "vitest run tests/bb.test.ts",
     "test:commission-calc": "vitest run tests/commissionCalculation.test.ts",
+    "test:commission-eligibility": "vitest run tests/commissionEligibility.test.ts",
     "test:watch": "vitest",
     "test:runner": "tsx tests/runner.ts"
   },

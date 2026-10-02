@@ -31,5 +31,6 @@ export * from './commissionConfig.service';
 export * from './authoritativeBV.service';
 export * from './sponsorUpline.service';
 export * from './commissionCalculation.service';
+export * from './commissionEligibility.service';
 
 

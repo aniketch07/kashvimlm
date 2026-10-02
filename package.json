@@ -15,6 +15,7 @@
     "test:binary": "npm run test:binary --prefix backend",
     "test:matching": "npm run test:matching --prefix backend",
     "test:commission-calc": "npm run test:commission-calc --prefix backend",
+    "test:commission-eligibility": "npm run test:commission-eligibility --prefix backend",
     "test:tree": "npm run test:tree --prefix server",
     "test:api": "npm run test:api --prefix server",
     "db:init": "npm run db:init --prefix server"

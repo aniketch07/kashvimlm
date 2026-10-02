@@ -6,6 +6,7 @@ import { SafeDecimal } from '../utils/safeDecimal';
 import { CommissionConfigService } from './commissionConfig.service';
 import { AuthoritativeBVService } from './authoritativeBV.service';
 import { SponsorUplineService, UplineNode } from './sponsorUpline.service';
+import { CommissionEligibilityService } from './commissionEligibility.service';
 import {
   CANONICAL_COMMISSION_TIERS,
   TOTAL_THEORETICAL_COMMISSION_PERCENTAGE,
@@ -88,19 +89,14 @@ export class CommissionCalculationService {
     upline: UplineNode,
     level: number,
     businessVolume: number,
-    options?: CommissionCalculationOptions
+    options?: CommissionCalculationOptions,
+    client?: Prisma.TransactionClient
   ): Promise<{ isEligible: boolean; reason?: string }> {
     if (!upline) {
       return { isEligible: false, reason: 'NO_UPLINE_EXISTS' };
     }
 
-    // 1. Account status verification
-    const requireActive = options?.requireActive !== false;
-    if (requireActive && (upline.status !== 'ACTIVE' || !upline.isActive)) {
-      return { isEligible: false, reason: 'UPLINE_INACTIVE' };
-    }
-
-    // 2. Custom rank / business rule eligibility confirmation
+    // 1. Custom rank / business rule eligibility confirmation callback (if provided)
     if (options?.confirmEligibility) {
       try {
         const confirmed = await options.confirmEligibility(upline, level, businessVolume);
@@ -114,6 +110,26 @@ export class CommissionCalculationService {
         );
         return { isEligible: false, reason: 'ELIGIBILITY_RULE_ERROR' };
       }
+    }
+
+    // 2. Delegate to dedicated CommissionEligibilityService (Prompt 17)
+    const check = await CommissionEligibilityService.isEligibleForLevel(
+      upline,
+      level,
+      {
+        businessVolume,
+        allowInactiveForTesting: options?.requireActive === false,
+      },
+      client
+    );
+
+    if (!check.isEligible) {
+      return {
+        isEligible: false,
+        reason: (check.reasons[0] && check.reasons[0].includes('not active')
+          ? 'UPLINE_INACTIVE'
+          : 'ELIGIBILITY_NOT_CONFIRMED'),
+      };
     }
 
     return { isEligible: true };
