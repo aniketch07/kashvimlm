@@ -192,6 +192,15 @@ enum LevelCommissionStatus {
   FORFEITED
 }
 
+enum CommissionTransactionStatus {
+  PENDING
+  APPROVED
+  AVAILABLE
+  PAID
+  REVERSED
+  CANCELLED
+}
+
 enum BonusType {
   FAST_START
   CAR_BONUS
@@ -407,6 +416,8 @@ model DistributorProfile {
   supportTickets        SupportTicket[]
   earnedLevelCommissions LevelCommission[]       @relation("UplineLevelCommissions")
   sourceLevelCommissions LevelCommission[]       @relation("SourceMemberLevelCommissions")
+  commissionTransactionsEarned  CommissionTransaction[] @relation("RecipientCommissionTransactions")
+  commissionTransactionsSourced CommissionTransaction[] @relation("SourceMemberCommissionTransactions")
 
   @@index([userId])
   @@index([distributorId])
@@ -814,6 +825,7 @@ model Order {
   bvLedgers         BVLedger[]
   commissions       Commission[]        @relation("OrderCommissions")
   levelCommissions  LevelCommission[]   @relation("OrderLevelCommissions")
+  commissionTransactions CommissionTransaction[] @relation("OrderCommissionTransactions")
 
   @@index([orderNumber])
   @@index([userId])
@@ -1070,6 +1082,7 @@ model WalletTransaction {
   wallet            Wallet                  @relation(fields: [walletId], references: [id], onDelete: Cascade)
   payoutRequest     PayoutRequest?
   levelCommission   LevelCommission?        @relation("LevelCommissionWalletTx")
+  commissionTransaction CommissionTransaction? @relation("CommissionTransactionWalletTx")
 
   @@index([transactionNumber])
   @@index([walletId])
@@ -1722,5 +1735,46 @@ model CommissionLevel {
   @@index([levelNumber])
   @@index([isActive])
   @@map("commission_levels")
+}
+
+// 47. CommissionTransaction (Immutable Commission Ledger)
+model CommissionTransaction {
+  id                    String                      @id @default(uuid())
+  recipientMemberId     String
+  sourceMemberId        String
+  orderId               String
+  commissionLevel       Int                         // 1, 2, 3, 4, 5
+  businessVolume        Decimal                     @db.Decimal(12, 2)
+  percentage            Decimal                     @db.Decimal(5, 2)
+  grossCommissionAmount Decimal                     @db.Decimal(12, 2)
+  status                CommissionTransactionStatus @default(PENDING)
+  source                String                      @default("ORDER_PURCHASE")
+  idempotencyKey        String                      @unique
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  // Auditing, traceability & financial posting linkage
+  walletTransactionId   String?                     @unique
+  calculationDetails    Json?
+  reversalReason        String?
+  approvedAt            DateTime?
+  availableAt           DateTime?
+  paidAt                DateTime?
+  reversedAt            DateTime?
+  cancelledAt           DateTime?
+
+  recipient             DistributorProfile          @relation("RecipientCommissionTransactions", fields: [recipientMemberId], references: [id], onDelete: Restrict)
+  sourceMember          DistributorProfile          @relation("SourceMemberCommissionTransactions", fields: [sourceMemberId], references: [id], onDelete: Restrict)
+  order                 Order                       @relation("OrderCommissionTransactions", fields: [orderId], references: [id], onDelete: Restrict)
+  walletTransaction     WalletTransaction?          @relation("CommissionTransactionWalletTx", fields: [walletTransactionId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, recipientMemberId, commissionLevel])
+  @@index([recipientMemberId, status])
+  @@index([sourceMemberId])
+  @@index([orderId])
+  @@index([commissionLevel])
+  @@index([status])
+  @@index([createdAt])
+  @@map("commission_transactions")
 }
 
