@@ -1779,6 +1779,8 @@ model CommissionTransaction {
 
   @@unique([orderId, recipientMemberId, commissionLevel])
   @@index([recipientMemberId, status])
+  @@index([recipientMemberId, commissionLevel])
+  @@index([recipientMemberId, createdAt])
   @@index([sourceMemberId])
   @@index([orderId])
   @@index([commissionLevel])
@@ -1813,6 +1815,7 @@ model CommissionReversal {
   @@index([originalCommissionId])
   @@index([orderId])
   @@index([recipientMemberId])
+  @@index([recipientMemberId, createdAt])
   @@index([refundId])
   @@index([recoveryStatus])
   @@index([createdAt])

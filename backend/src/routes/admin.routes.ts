@@ -34,8 +34,16 @@ router.get('/inventory', AdminController.getInventory);
 // 8. BV: GET /api/v1/admin/bv
 router.get('/bv', AdminController.getBV);
 
-// 9. Commissions: GET /api/v1/admin/commissions
-router.get('/commissions', AdminController.getCommissions);
+// 9. Commissions: GET /api/v1/admin/commissions (Prompt 23 & Prompt 27)
+import { AdminCommissionController } from '../controllers/adminCommission.controller';
+router.get('/commissions', AdminCommissionController.getCommissions);
+router.post('/orders/:orderId/process-commission', AdminCommissionController.processOrderCommission);
+router.post('/commissions/:commissionId/reverse', AdminCommissionController.reverseCommission);
+router.get('/commissions/reconcile/order/:orderId', AdminCommissionController.reconcileOrder);
+router.post('/commissions/reconcile/order/:orderId', AdminCommissionController.reconcileOrder);
+router.get('/commissions/reconcile/member/:memberId', AdminCommissionController.reconcileMember);
+router.post('/commissions/reconcile/member/:memberId', AdminCommissionController.reconcileMember);
+router.post('/commissions/reconcile/period', AdminCommissionController.reconcilePeriod);
 
 // 10. Commission Rules: GET /api/v1/admin/commission-rules
 router.get('/commission-rules', AdminController.getCommissionRules);

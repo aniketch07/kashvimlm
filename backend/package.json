@@ -21,6 +21,11 @@
     "test:commission-wallet": "vitest run tests/commissionWallet.test.ts",
     "test:order-commission-lifecycle": "vitest run tests/orderCommissionLifecycle.test.ts",
     "test:commission-reversal": "vitest run tests/commissionReversal.test.ts",
+    "test:commission-api": "vitest run tests/commissionApi.test.ts",
+    "test:commission-dashboard": "vitest run tests/commissionDashboard.test.ts",
+    "test:commission-security": "vitest run tests/commissionSecurity.test.ts",
+    "test:commission-suite": "vitest run tests/completeCommissionSuite.test.ts",
+    "test:commission-reconciliation": "vitest run tests/commissionReconciliation.test.ts",
     "test:watch": "vitest",
     "test:runner": "tsx tests/runner.ts"
   },

@@ -10,6 +10,7 @@ import {
   OrderCommissionReversalOptions,
   OrderCommissionReversalSummary,
   SingleCommissionReversalResult,
+  SingleCommissionReversalOptions,
   AdminReconciliationResolutionInput,
 } from '../types/commissionReversal.types';
 
@@ -594,5 +595,279 @@ export class CommissionReversalService {
     );
 
     return updated;
+  }
+
+  /**
+   * Reverses an individual commission transaction (Prompt 23).
+   * Validates idempotency, updates original status, credits/debits wallet if PAID,
+   * and creates an immutable CommissionReversal record.
+   */
+  public static async reverseSingleCommission(
+    commissionId: string,
+    options?: SingleCommissionReversalOptions
+  ): Promise<SingleCommissionReversalResult> {
+    if (!commissionId || typeof commissionId !== 'string' || !commissionId.trim()) {
+      throw AppError.badRequest('Valid commissionId is required for commission reversal');
+    }
+
+    const cleanId = commissionId.trim();
+    const effectivePolicy = options?.recoveryPolicyOverride || this.recoveryPolicy;
+    const now = new Date();
+    const reason = options?.reason || 'Administrative commission reversal';
+
+    const runner = async (db: Prisma.TransactionClient): Promise<SingleCommissionReversalResult> => {
+      const commTx = await db.commissionTransaction.findUnique({
+        where: { id: cleanId },
+        include: {
+          walletTransaction: true,
+          recipient: { select: { id: true, userId: true, distributorCode: true } },
+          order: { select: { id: true, orderNumber: true } },
+        },
+      });
+
+      if (!commTx) {
+        throw AppError.notFound(`Commission transaction '${cleanId}' not found`, 'TRANSACTION_NOT_FOUND');
+      }
+
+      const idempotencyKey = `REV:COMM:${commTx.id}`;
+
+      // Check if already reversed
+      const existingReversal = await db.commissionReversal.findUnique({
+        where: { idempotencyKey },
+      });
+
+      if (existingReversal || commTx.status === 'REVERSED') {
+        logger.info(
+          { commissionId: cleanId, reversalId: existingReversal?.id },
+          'reverseSingleCommission: Commission already reversed. Returning existing reversal idempotently.'
+        );
+
+        return {
+          reversalId: existingReversal?.id || `rev-existing-${cleanId}`,
+          originalCommissionId: commTx.id,
+          orderId: commTx.orderId,
+          refundId: existingReversal?.refundId || options?.refundId || null,
+          recipientMemberId: commTx.recipientMemberId,
+          commissionLevel: commTx.commissionLevel,
+          reversedBV: Number(commTx.businessVolume),
+          originalAmount: Number(commTx.grossCommissionAmount),
+          amount: Number(existingReversal?.amount ?? -Number(commTx.grossCommissionAmount)),
+          reversalAmount: Number(existingReversal?.amount ?? -Number(commTx.grossCommissionAmount)),
+          recoveryStatus: (existingReversal?.recoveryStatus as any) || 'COMPLETED',
+          unrecoveredAmount: Number(existingReversal?.unrecoveredAmount ?? 0),
+          walletTransactionId: existingReversal?.walletTransactionId || null,
+          walletBalanceBefore: 0,
+          walletBalanceAfter: 0,
+          reason: existingReversal?.reason || commTx.reversalReason || reason,
+          timestamp: existingReversal?.createdAt || now,
+          isIdempotentSkip: true,
+        };
+      }
+
+      const originalGross = Number(commTx.grossCommissionAmount);
+      const grossAmountDecimal = SafeDecimal.roundDecimal(commTx.grossCommissionAmount, 2);
+      const reversedBV = Number(commTx.businessVolume);
+
+      let walletTxId: string | null = null;
+      let balanceBefore = 0;
+      let balanceAfter = 0;
+      let recoveryStatus: CommissionReversalRecoveryStatus = 'COMPLETED';
+      let unrecoveredAmount = 0;
+
+      if (commTx.status !== 'PAID') {
+        recoveryStatus = 'REVERSED_UNPAID';
+        unrecoveredAmount = 0;
+      } else {
+        const recipientId = commTx.recipientMemberId;
+        const userId = commTx.recipient.userId;
+
+        const wallet = await db.wallet.findFirst({
+          where: { OR: [{ distributorId: recipientId }, { userId }] },
+        });
+
+        if (wallet) {
+          balanceBefore = Number(wallet.availableBalance);
+
+          if (balanceBefore >= originalGross) {
+            balanceAfter = SafeDecimal.round(balanceBefore - originalGross, 2);
+            recoveryStatus = 'COMPLETED';
+            unrecoveredAmount = 0;
+
+            const wtxNumber = CommissionLedgerService.generateWalletTransactionNumber();
+            const wtx = await db.walletTransaction.create({
+              data: {
+                walletId: wallet.id,
+                transactionNumber: wtxNumber,
+                type: 'REVERSAL',
+                status: 'COMPLETED',
+                amount: grossAmountDecimal.negated(),
+                netAmount: grossAmountDecimal.negated(),
+                feeAmount: new Prisma.Decimal(0),
+                balanceBefore: new Prisma.Decimal(balanceBefore),
+                balanceAfter: new Prisma.Decimal(balanceAfter),
+                referenceId: cleanId,
+                memberId: recipientId,
+                commissionTransactionId: cleanId,
+                orderId: commTx.orderId,
+                description: `Commission Reversal: Level ${commTx.commissionLevel} (${reason})`,
+                createdAt: now,
+              },
+            });
+            walletTxId = wtx.id;
+
+            await db.wallet.update({
+              where: { id: wallet.id },
+              data: {
+                availableBalance: new Prisma.Decimal(balanceAfter),
+                lifetimeEarned: { decrement: grossAmountDecimal },
+              },
+            });
+          } else {
+            if (effectivePolicy === 'ALLOW_NEGATIVE_BALANCE') {
+              balanceAfter = SafeDecimal.round(balanceBefore - originalGross, 2);
+              recoveryStatus = 'NEGATIVE_BALANCE_APPLIED';
+              unrecoveredAmount = 0;
+
+              const wtxNumber = CommissionLedgerService.generateWalletTransactionNumber();
+              const wtx = await db.walletTransaction.create({
+                data: {
+                  walletId: wallet.id,
+                  transactionNumber: wtxNumber,
+                  type: 'REVERSAL',
+                  status: 'COMPLETED',
+                  amount: grossAmountDecimal.negated(),
+                  netAmount: grossAmountDecimal.negated(),
+                  feeAmount: new Prisma.Decimal(0),
+                  balanceBefore: new Prisma.Decimal(balanceBefore),
+                  balanceAfter: new Prisma.Decimal(balanceAfter),
+                  referenceId: cleanId,
+                  memberId: recipientId,
+                  commissionTransactionId: cleanId,
+                  orderId: commTx.orderId,
+                  description: `Commission Reversal [Negative Balance]: Level ${commTx.commissionLevel} (${reason})`,
+                  createdAt: now,
+                },
+              });
+              walletTxId = wtx.id;
+
+              await db.wallet.update({
+                where: { id: wallet.id },
+                data: {
+                  availableBalance: new Prisma.Decimal(balanceAfter),
+                  lifetimeEarned: { decrement: grossAmountDecimal },
+                },
+              });
+            } else {
+              // Default: REQUIRE_ADMIN_RECONCILIATION
+              const recoverableAmount = Math.max(0, balanceBefore);
+              unrecoveredAmount = SafeDecimal.round(originalGross - recoverableAmount, 2);
+              balanceAfter = 0;
+              recoveryStatus = 'PENDING_ADMIN_RECONCILIATION';
+
+              if (recoverableAmount > 0) {
+                const partialRecDecimal = new Prisma.Decimal(recoverableAmount);
+                const wtxNumber = CommissionLedgerService.generateWalletTransactionNumber();
+                const wtx = await db.walletTransaction.create({
+                  data: {
+                    walletId: wallet.id,
+                    transactionNumber: wtxNumber,
+                    type: 'REVERSAL',
+                    status: 'COMPLETED',
+                    amount: partialRecDecimal.negated(),
+                    netAmount: partialRecDecimal.negated(),
+                    feeAmount: new Prisma.Decimal(0),
+                    balanceBefore: new Prisma.Decimal(balanceBefore),
+                    balanceAfter: new Prisma.Decimal(0),
+                    referenceId: cleanId,
+                    memberId: recipientId,
+                    commissionTransactionId: cleanId,
+                    orderId: commTx.orderId,
+                    description: `Partial Commission Recovery: Level ${commTx.commissionLevel} (Shortfall: ₹${unrecoveredAmount})`,
+                    createdAt: now,
+                  },
+                });
+                walletTxId = wtx.id;
+
+                await db.wallet.update({
+                  where: { id: wallet.id },
+                  data: {
+                    availableBalance: new Prisma.Decimal(0),
+                    lifetimeEarned: { decrement: partialRecDecimal },
+                  },
+                });
+              }
+            }
+          }
+        }
+      }
+
+      const compensatoryReversalAmount = -originalGross;
+
+      const reversalRecord = await db.commissionReversal.create({
+        data: {
+          originalCommissionId: cleanId,
+          orderId: commTx.orderId,
+          refundId: options?.refundId || null,
+          recipientMemberId: commTx.recipientMemberId,
+          commissionLevel: commTx.commissionLevel,
+          reversedBV: new Prisma.Decimal(reversedBV),
+          originalAmount: commTx.grossCommissionAmount,
+          amount: new Prisma.Decimal(compensatoryReversalAmount),
+          recoveryStatus,
+          unrecoveredAmount: new Prisma.Decimal(unrecoveredAmount),
+          walletTransactionId: walletTxId,
+          idempotencyKey,
+          reason,
+          metadata: {
+            originalStatus: commTx.status,
+            effectivePolicy,
+          },
+          createdAt: now,
+        },
+      });
+
+      await db.commissionTransaction.update({
+        where: { id: cleanId },
+        data: {
+          status: 'REVERSED',
+          reversedAt: now,
+          reversalReason: reason,
+          calculationDetails: {
+            ...(typeof commTx.calculationDetails === 'object' && commTx.calculationDetails !== null
+              ? (commTx.calculationDetails as Record<string, any>)
+              : {}),
+            lastReversalId: reversalRecord.id,
+            totalReversedAmount: originalGross,
+            isFullyReversed: true,
+          },
+        },
+      });
+
+      return {
+        reversalId: reversalRecord.id,
+        originalCommissionId: cleanId,
+        orderId: commTx.orderId,
+        refundId: options?.refundId || null,
+        recipientMemberId: commTx.recipientMemberId,
+        commissionLevel: commTx.commissionLevel,
+        reversedBV,
+        originalAmount: originalGross,
+        amount: compensatoryReversalAmount,
+        reversalAmount: compensatoryReversalAmount,
+        recoveryStatus,
+        unrecoveredAmount,
+        walletTransactionId: walletTxId,
+        walletBalanceBefore: balanceBefore,
+        walletBalanceAfter: balanceAfter,
+        reason,
+        timestamp: now,
+        isIdempotentSkip: false,
+      };
+    };
+
+    if (options?.tx) {
+      return runner(options.tx);
+    }
+    return prisma.$transaction(runner, { timeout: 20000 });
   }
 }

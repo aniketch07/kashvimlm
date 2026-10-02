@@ -47,4 +47,12 @@ router.get('/:memberId/bb', MemberLevelController.getMemberBB);
 router.get('/:memberId/matching/history', MemberLevelController.getMemberMatchingHistory);
 router.get('/:memberId/matching', MemberLevelController.getMemberMatching);
 
+// MEMBER 5-LEVEL COMMISSIONS (PROMPT 23 & 24)
+import { MemberCommissionController } from '../controllers/memberCommission.controller';
+import { CommissionDashboardController } from '../controllers/commissionDashboard.controller';
+router.get('/:memberId/commissions/dashboard', CommissionDashboardController.getMemberDashboard);
+router.get('/:memberId/commissions/summary', MemberCommissionController.getSummary);
+router.get('/:memberId/commissions/:commissionId', MemberCommissionController.getTransactionDetails);
+router.get('/:memberId/commissions', MemberCommissionController.getCommissions);
+
 export const memberRouter = router;

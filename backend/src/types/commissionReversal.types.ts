@@ -55,6 +55,13 @@ export interface OrderCommissionReversalOptions {
   tx?: Prisma.TransactionClient;
 }
 
+export interface SingleCommissionReversalOptions {
+  reason?: string;
+  refundId?: string;
+  recoveryPolicyOverride?: CommissionRecoveryPolicy;
+  tx?: Prisma.TransactionClient;
+}
+
 export interface SingleCommissionReversalResult {
   reversalId: string;
   originalCommissionId: string;

@@ -23,3 +23,5 @@ export * from './auth.validators';
 export * from './distributor.validators';
 export * from './mlmTree.validators';
 export * from './sponsor.validators';
+export * from './commissionApi.validators';
+

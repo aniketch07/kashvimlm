@@ -37,5 +37,10 @@ export * from './atomicCommissionPosting.service';
 export * from './commissionWallet.service';
 export * from './orderCommissionLifecycle.service';
 export * from './commissionReversal.service';
+export * from './commissionApi.service';
+export * from './commissionDashboard.service';
+export * from './commissionSecurity.service';
+export * from './commissionReconciliation.service';
+
 
 
